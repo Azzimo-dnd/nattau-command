@@ -10,7 +10,7 @@ const factions = [
   },
   {
     name: "Jin Yan Chao",
-    provinces: 1,
+    provinces: 2,
     status: "Imperial Presence",
     color: "text-amber-500",
   },
@@ -22,7 +22,7 @@ const factions = [
   },
   {
     name: "Cult of Lord Mazamundi",
-    provinces: 2,
+    provinces: 3,
     status: "Corrupted Territory",
     color: "text-red-500",
   },
