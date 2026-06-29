@@ -12,7 +12,7 @@ const factions = [
     name: "Jin Yan Chao",
     provinces: 2,
     status: "Imperial Presence",
-    color: "text-amber-500",
+    color: "text-red-500",
   },
   {
     name: "Wild Lizardfolk",
@@ -23,8 +23,8 @@ const factions = [
   {
     name: "Cult of Lord Mazamundi",
     provinces: 3,
-    status: "Corrupted Territory",
-    color: "text-red-500",
+    status: "Dangerouse Allies",
+    color: "text-amber-500",
   },
   {
     name: "Merrydock",
