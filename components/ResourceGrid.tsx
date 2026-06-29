@@ -1,5 +1,5 @@
 const resources = [
-  { name: "Resource Points", value: "8", status: "Available", icon: "⚜" },
+  { name: "Resource Points", value: "2", status: "Available", icon: "⚜" },
   { name: "Morale", value: "High", status: "Inspired", icon: "🔥" },
   { name: "Treasury", value: "3200", status: "Gold", icon: "💰" },
   { name: "Supplies", value: "Stable", status: "Secured", icon: "🌾" },
