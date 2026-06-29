@@ -1,10 +1,42 @@
+import { campaign } from "@/config/campaign";
+
 const resources = [
-  { name: "Resource Points", value: "2", status: "Available", icon: "⚜" },
-  { name: "Morale", value: "High", status: "Inspired", icon: "🔥" },
-  { name: "Treasury", value: "3200", status: "Gold", icon: "💰" },
-  { name: "Supplies", value: "Stable", status: "Secured", icon: "🌾" },
-  { name: "Threat Level", value: "High", status: "Enemy movement", icon: "⚔" },
-  { name: "Population", value: "200+", status: "Settlers", icon: "👥" },
+  {
+    name: "Resource Points",
+    value: campaign.resourcePoints.toString(),
+    status: "Available",
+    icon: "⚜",
+  },
+  {
+    name: "Morale",
+    value: campaign.morale,
+    status: "Inspired",
+    icon: "🔥",
+  },
+  {
+    name: "Treasury",
+    value: campaign.treasury.toString(),
+    status: "Gold",
+    icon: "💰",
+  },
+  {
+    name: "Supplies",
+    value: campaign.supplies,
+    status: "Secured",
+    icon: "🌾",
+  },
+  {
+    name: "Threat Level",
+    value: campaign.threatLevel,
+    status: "Enemy movement",
+    icon: "⚔",
+  },
+  {
+    name: "Population",
+    value: campaign.population,
+    status: "Settlers",
+    icon: "👥",
+  },
 ];
 
 export function ResourceGrid() {

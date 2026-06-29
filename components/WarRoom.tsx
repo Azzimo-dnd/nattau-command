@@ -40,8 +40,6 @@ const military = [
       "Lera Quickstep",
       "Gholz",
       "Elin Marr",
-      "Pippo",
-      "Noktar",
     ],
   },
   {
