@@ -5,6 +5,7 @@ export type Ability = {
 };
 
 export type CharacterSheet = {
+  portrait: string;
   id: string;
   name: string;
   title: string;
@@ -30,6 +31,7 @@ export type CharacterSheet = {
 
 export const councilMembers: CharacterSheet[] = [
   {
+    portrait: "/images/torsten.jpg",
     id: "torsten",
     name: "Torsten",
     title: "Master of Baldar's Inquisition",
@@ -64,6 +66,7 @@ export const councilMembers: CharacterSheet[] = [
     defenses: ["Frightened", "Magical Sleep"],
   },
   {
+    portrait: "/images/odetta.jpg",
     id: "odetta",
     name: "Sister Odetta",
     title: "N/A",
@@ -98,6 +101,7 @@ export const councilMembers: CharacterSheet[] = [
     defenses: ["Fire resistance"],
   },
   {
+    portrait: "/images/rabarbar.jpg",
     id: "rabarbar",
     name: "Ra-Bar-Bar",
     title: "N/A",
@@ -132,6 +136,7 @@ export const councilMembers: CharacterSheet[] = [
     defenses: [],
   },
   {
+    portrait: "/images/zibbeth.jpg",
     id: "zibbet",
     name: "Zibbet Stillwater",
     title: "N/A",

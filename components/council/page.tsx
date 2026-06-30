@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { councilMembers } from "@/components/council/councilData";
+import Image from "next/image";
 
 export default function CouncilPage() {
   return (
@@ -32,6 +33,14 @@ export default function CouncilPage() {
               href={`/council/${member.id}`}
               className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-yellow-600/40 hover:bg-yellow-500/5"
             >
+                <div className="relative h-40 overflow-hidden rounded-xl border border-yellow-600/30 bg-slate-950">
+                 <Image
+                    src={member.portrait}
+                    alt={member.name}
+                    fill
+                    className="object-cover"
+                />
+                </div>
               <p className="text-xs uppercase tracking-[0.3em] text-yellow-500">
                 Level {member.level}
               </p>
