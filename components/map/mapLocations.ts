@@ -17,7 +17,7 @@ export const mapLocations: MapLocation[] = [
     description:
         "Main headquarters of the Kainite Expedition and the center of their growing influence on Hinewai.",
     x: 43.6,
-    y: 40.8,
+    y: 38.8,
     },
   {
     id: "guardian",
@@ -27,7 +27,7 @@ export const mapLocations: MapLocation[] = [
     description:
       "An ancient fortress securing one of the key provinces controlled by the expedition.",
     x: 33.4,
-    y: 34.2,
+    y: 32.2,
   },
   {
     id: "merrydock",
@@ -37,7 +37,7 @@ export const mapLocations: MapLocation[] = [
     description:
       "A northern port settlement and trade partner known for its halflings and lucky cabbage.",
     x: 37.0,
-    y: 23.2,
+    y: 21.2,
   },
   {
     id: "whangaroa",
@@ -47,7 +47,7 @@ export const mapLocations: MapLocation[] = [
     description:
       "Imperial city of the Jin Yan Chao and a major political power on Hinewai.",
     x: 33.0,
-    y: 45.8,
+    y: 44.8,
   },
     {
     id: "pipdock",
@@ -56,7 +56,7 @@ export const mapLocations: MapLocation[] = [
     owner: "Kainites",
     description:
         "A new port founded by Pippo, intended to strengthen Kainite access to the sea.",
-    x: 51.2,
-    y: 48.4,
+    x: 53.2,
+    y: 47.4,
     },
 ];
