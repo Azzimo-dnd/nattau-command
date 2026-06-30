@@ -27,11 +27,11 @@ export default async function CouncilMemberPage({ params }: Props) {
           <div className="flex flex-col gap-6 md:flex-row md:items-center">
             <div className="relative mx-auto h-48 w-48 overflow-hidden rounded-2xl border-2 border-yellow-600/40 bg-slate-950 md:mx-0">
               <Image
-                src={member.portrait}
-                alt={member.name}
-                fill
-                priority
-                className="object-cover"
+                  src={member.portrait}
+                  alt={member.name}
+                  fill
+                  priority
+                  className={`object-cover ${member.portraitPosition}`}
               />
             </div>
 

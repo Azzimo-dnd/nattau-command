@@ -38,8 +38,8 @@ export default function CouncilPage() {
                     src={member.portrait}
                     alt={member.name}
                     fill
-                    className="object-cover"
-                />
+                    className={`object-cover ${member.portraitPosition}`}
+                  />
                 </div>
               <p className="text-xs uppercase tracking-[0.3em] text-yellow-500">
                 Level {member.level}
