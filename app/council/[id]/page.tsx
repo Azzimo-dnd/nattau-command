@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { councilMembers } from "@/components/council/councilData";
+import { councilMembers } from "@/app/council/councilData";
 
 type Props = {
   params: Promise<{

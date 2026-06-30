@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { councilMembers } from "@/components/council/councilData";
+import { councilMembers } from "@/app/council/councilData";
 import Image from "next/image";
 
 export default function CouncilPage() {
