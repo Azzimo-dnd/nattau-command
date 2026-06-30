@@ -31,7 +31,7 @@ export type CharacterSheet = {
 
 export const councilMembers: CharacterSheet[] = [
   {
-    portrait: "/portraits/torsten.jpg",
+    portrait: "/portraits/Torsten.jpg",
     id: "torsten",
     name: "Torsten",
     title: "Master of Baldar's Inquisition",
@@ -66,7 +66,7 @@ export const councilMembers: CharacterSheet[] = [
     defenses: ["Frightened", "Magical Sleep"],
   },
   {
-    portrait: "/portraits/odetta.jpg",
+    portrait: "/portraits/odetta.png",
     id: "odetta",
     name: "Sister Odetta",
     title: "N/A",
@@ -136,7 +136,7 @@ export const councilMembers: CharacterSheet[] = [
     defenses: [],
   },
   {
-    portrait: "/portraits/zibbeth.jpg",
+    portrait: "/portraits/zibbeth.png",
     id: "zibbet",
     name: "Zibbet Stillwater",
     title: "N/A",
