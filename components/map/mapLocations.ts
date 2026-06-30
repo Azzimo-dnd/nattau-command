@@ -10,14 +10,14 @@ export type MapLocation = {
 
 export const mapLocations: MapLocation[] = [
   {
-    id: "uc",
-    name: "UĆ",
-    type: "capital",
-    owner: "Kainites",
-    description:
+   id: "uc",
+   name: "UĆ",
+   type: "capital",
+   owner: "Kainites",
+   description:
       "Main headquarters of the Kainite Expedition and the center of their growing influence on Hinewai.",
-    x: 44.8,
-    y: 43.6,
+   x: 43.6,
+   y: 41.4,
   },
   {
     id: "guardian",
@@ -49,14 +49,14 @@ export const mapLocations: MapLocation[] = [
     x: 33.0,
     y: 45.8,
   },
-  {
+    {
     id: "pipdock",
     name: "Pipdock",
     type: "port",
     owner: "Kainites",
     description:
-      "A new port founded by Pippo, intended to strengthen Kainite access to the sea.",
-    x: 52.0,
-    y: 50.0,
-  },
+        "A new port founded by Pippo, intended to strengthen Kainite access to the sea.",
+    x: 49.3,
+    y: 48.4,
+    },
 ];
