@@ -17,7 +17,7 @@ export const mapLocations: MapLocation[] = [
     description:
       "Main headquarters of the Kainite Expedition and the center of their growing influence on Hinewai.",
     x: 44.8,
-    y: 42.6,
+    y: 43.6,
   },
   {
     id: "guardian",
@@ -56,7 +56,7 @@ export const mapLocations: MapLocation[] = [
     owner: "Kainites",
     description:
       "A new port founded by Pippo, intended to strengthen Kainite access to the sea.",
-    x: 51.0,
+    x: 52.0,
     y: 50.0,
   },
 ];
