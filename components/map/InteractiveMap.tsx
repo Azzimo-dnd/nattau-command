@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { mapLocations } from "./mapLocations";
+import { FactionInfluence } from "./FactionInfluence";
 
 function getLocationIcon(type: string) {
   switch (type) {
@@ -112,6 +113,8 @@ export function InteractiveMap() {
             {selectedLocation.description}
           </p>
         </div>
+        
+        <FactionInfluence />
       </aside>
 
       <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-3">
