@@ -137,48 +137,32 @@ export function InteractiveMap() {
                   left: `${location.x}%`,
                   top: `${location.y}%`,
                 }}
-                className="absolute -translate-x-1/2 -translate-y-full"
+                className="absolute -translate-x-1/2 -translate-y-1/2"
                 title={location.name}
               >
-                <div className="flex flex-col items-center">
-                  {isSelected && (
-                    <span className="absolute top-0 h-8 w-8 rounded-full bg-yellow-500/40 animate-ping" />
-                  )}
+                {isSelected && (
+                  <span className="absolute -inset-3 rounded-full bg-yellow-500/40 animate-ping" />
+                )}
 
-                  <span
-                    className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border shadow-lg transition-all ${
-                      isSelected
-                        ? "scale-110 border-yellow-300 bg-yellow-500 text-slate-950"
-                        : "border-slate-300 bg-slate-950/90 text-slate-100 hover:scale-105 hover:border-yellow-400"
-                    }`}
-                  >
-                    {getLocationIcon(location.type)}
-                  </span>
+                <span
+                  className={`relative flex h-8 w-8 items-center justify-center rounded-full border text-sm shadow-lg ${
+                    isSelected
+                      ? "border-yellow-300 bg-yellow-500 text-slate-950"
+                      : "border-slate-300 bg-slate-950/80 text-slate-100 hover:border-yellow-400"
+                  }`}
+                >
+                  {getLocationIcon(location.type)}
+                </span>
 
-                  <span
-                    className={`h-6 w-[2px] ${
-                      isSelected ? "bg-yellow-400" : "bg-slate-400"
-                    }`}
-                  />
-
-                  <span
-                    className={`-mt-[1px] h-0 w-0 border-l-[5px] border-r-[5px] border-t-[8px] border-l-transparent border-r-transparent ${
-                      isSelected
-                        ? "border-t-yellow-400"
-                        : "border-t-slate-400"
-                    }`}
-                  />
-
-                  <span
-                    className={`mt-2 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition-all ${
-                      isSelected
-                        ? "border-yellow-600/50 bg-slate-950 text-yellow-300"
-                        : "border-slate-700 bg-slate-950/90 text-slate-300"
-                    }`}
-                  >
-                    {location.name}
-                  </span>
-                </div>
+                <span
+                  className={`absolute left-1/2 top-9 hidden -translate-x-1/2 whitespace-nowrap rounded-full border px-2 py-1 text-xs md:block ${
+                    isSelected
+                      ? "border-yellow-600/40 bg-slate-950 text-yellow-300"
+                      : "border-slate-700 bg-slate-950/80 text-slate-300"
+                  }`}
+                >
+                  {location.name}
+                </span>
               </button>
             );
           })}
