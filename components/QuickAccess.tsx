@@ -23,6 +23,13 @@ const modules = [
     status: "Coming soon",
   },
   {
+  title: "High Command",
+  href: "/council",
+  icon: "⚜",
+  description: "Player characters and council member combat summaries.",
+  status: "Available",
+  },
+  {
     title: "Chronicle",
     href: "#chronicle",
     icon: "📜",
