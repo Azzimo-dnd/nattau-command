@@ -19,11 +19,12 @@ export const factions: Faction[] = [
     description:
       "The Kainite Expedition is a growing military-religious force centered around UĆ, Baldar's faith and the survival of the settlers.",
     controlledProvinces: 3,
-    controlledArmies: 7,
+    controlledArmies: 1,
     relations: [
       { type: "trade", faction: "Merrydock" },
       { type: "non-aggression", faction: "Cult of Lord Mazamundi" },
       { type: "enemy", faction: "Wild Lizardfolk" },
+      { type: "neutral", faction: "Jin Yan Chao" },
     ],
   },
   {
@@ -31,9 +32,10 @@ export const factions: Faction[] = [
     name: "Jin Yan Chao",
     description:
       "An imperial city-state force with strong military presence on Hinewai. Their long-term intentions toward the expedition remain uncertain.",
-    controlledProvinces: 1,
-    controlledArmies: 1,
+    controlledProvinces: 2,
+    controlledArmies: 6,
     relations: [
+      { type: "neutral", faction: "Kainites & Allies" },
       { type: "enemy", faction: "Wild Lizardfolk" },
       { type: "enemy", faction: "Cult of Lord Mazamundi" },
       { type: "neutral", faction: "Merrydock" },
@@ -45,7 +47,7 @@ export const factions: Faction[] = [
     description:
       "Hostile tribal forces scattered across the island. Aggressive toward nearly every other faction.",
     controlledProvinces: 1,
-    controlledArmies: 2,
+    controlledArmies: 3,
     relations: [
       { type: "enemy", faction: "Kainites & Allies" },
       { type: "enemy", faction: "Jin Yan Chao" },
@@ -58,8 +60,8 @@ export const factions: Faction[] = [
     name: "Cult of Lord Mazamundi",
     description:
       "A militant cult controlling corrupted territory. Currently bound to the Kainites by a non-aggression agreement and border passage rights.",
-    controlledProvinces: 2,
-    controlledArmies: 2,
+    controlledProvinces: 4,
+    controlledArmies: 3,
     relations: [
       { type: "non-aggression", faction: "Kainites & Allies" },
       { type: "enemy", faction: "Wild Lizardfolk" },
