@@ -14,7 +14,7 @@ export function Header() {
 
         <div className="mt-4 flex flex-wrap gap-2 text-sm">
           <span className="rounded-full border border-slate-700 bg-slate-950/60 px-3 py-1 text-slate-300">
-            Headquarters: ÓĆ
+            Headquarters: UĆ
           </span>
           <span className="rounded-full border border-slate-700 bg-slate-950/60 px-3 py-1 text-slate-300">
             Faction: Kainites
