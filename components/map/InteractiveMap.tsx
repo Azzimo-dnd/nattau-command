@@ -87,7 +87,7 @@ export function InteractiveMap() {
         <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-3">
           <div className="relative overflow-hidden rounded-xl">
             <Image
-              src="/images/hinewai-clear.jpg"
+              src="/images/Hinewai-clear.jpg"
               alt="Strategic map of Hinewai"
               width={1408}
               height={1024}
