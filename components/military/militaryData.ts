@@ -5,6 +5,7 @@ export type MilitaryStatus =
   | "Inactive"
   | "Garrisoned"
   | "Supporting"
+  | "On Mission"
   | "Wounded";
 
 export type Headquarters =
@@ -70,7 +71,7 @@ export const militaryUnits: MilitaryUnit[] = [
     commander: "Ared Helmsong",
     size: "12 hunters",
     cost: "2 RP",
-    status: "Expanded",
+    status: "On Mission",
     detail:
       "Scouts and trackers. The unit has doubled in size and established a new headquarters.",
     durability: 2,
