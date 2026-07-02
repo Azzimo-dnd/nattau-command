@@ -90,10 +90,9 @@ export const provinces: Province[] = [
   points:
     "34.6,38.5 35.6,38.8 36.3,39.6 36.9,39.9 37.4,40.7 37.9,42.1 37.7,43 37.5,43.8 36.9,44.8 36.1,45.9 35.3,46.5 34.8,46.5 33.9,46.2 33.1,45.4 32.4,44.9 31.3,43.7 30,43.3 29,43 28.1,42 28.8,41.3 29.7,41.7 30.4,41 31,40.4 31.5,39.4 32,38.7 33.1,38.5",
 },
-  {
-  id: "guardian-house",
+  {  id: "guardian-house",
   number: 3,
-  name: "Dom Strażnika",
+  name: "Guardian House",
   owner: "Kainites",
   status: "controlled",
   threatLevel: "medium",
@@ -105,7 +104,7 @@ export const provinces: Province[] = [
   {
   id: "northwestern-wilds",
   number: 4,
-  name: "Północno-Zachodnia Dzicz",
+  name: "Northwestern Wilds",
   owner: "Unknown",
   status: "neutral",
   threatLevel: "medium",
@@ -117,7 +116,7 @@ export const provinces: Province[] = [
   {
   id: "northern-road",
   number: 5,
-  name: "Północny Szlak",
+  name: "Northern Road",
   owner: "Merrydock",
   status: "neutral",
   threatLevel: "low",
@@ -153,7 +152,7 @@ export const provinces: Province[] = [
   {
   id: "western-jungle",
   number: 8,
-  name: "Zachodnia Dżungla",
+  name: "Western Jungle",
   owner: "Unknown",
   status: "contested",
   threatLevel: "medium",
@@ -165,7 +164,7 @@ export const provinces: Province[] = [
   {
     id: "central-hills",
     number: 9,
-    name: "Centralne Wzgórza",
+    name: "Central Hills",
     owner: "Wild Lizardfolk",
     status: "hostile",
     threatLevel: "high",
@@ -177,7 +176,7 @@ export const provinces: Province[] = [
   {
   id: "eastern-corridor",
   number: 10,
-  name: "Wschodni Korytarz",
+  name: "Eastern Corridor",
   owner: "Cult of Lord Mazamundi",
   status: "hostile",
   threatLevel: "high",
@@ -189,7 +188,7 @@ export const provinces: Province[] = [
   {
   id: "southern-ruins",
   number: 11,
-  name: "Południowe Ruiny",
+  name: "Southern Ruins",
   owner: "Wild Lizardfolk",
   status: "hostile",
   threatLevel: "high",
