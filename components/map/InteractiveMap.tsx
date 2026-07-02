@@ -4,6 +4,9 @@ import Image from "next/image";
 import { useState } from "react";
 import { FactionInfluence } from "./FactionInfluence";
 import { mapLocations } from "./mapLocations";
+import { ProvinceOverlay } from "./ProvinceOverlay";
+import type { FactionId } from "./provinceData";
+import { getProvinceControlLabel, provinces } from "./provinceData";
 
 function getLocationIcon(type: string) {
   switch (type) {
@@ -21,12 +24,51 @@ function getLocationIcon(type: string) {
 }
 
 function getOwnerClass(owner: string) {
+  if (owner.includes("Kainites") && owner.includes("Cult")) {
+    return "text-yellow-300";
+  }
+
   switch (owner) {
     case "Kainites":
       return "text-yellow-400";
     case "Merrydock":
       return "text-green-400";
     case "Jin Yan Chao":
+    case "Jin Yan Chao Empire":
+      return "text-orange-400";
+    case "Cult of Lord Mazamundi":
+      return "text-purple-400";
+    case "Wild Lizardfolk":
+      return "text-red-400";
+    case "Unknown":
+      return "text-slate-400";
+    default:
+      return "text-slate-400";
+  }
+}
+
+function getThreatClass(threatLevel: string) {
+  switch (threatLevel) {
+    case "low":
+      return "text-green-400";
+    case "medium":
+      return "text-yellow-400";
+    case "high":
+      return "text-red-400";
+    default:
+      return "text-slate-400";
+  }
+}
+
+function getStatusClass(status: string) {
+  switch (status) {
+    case "controlled":
+      return "text-green-400";
+    case "neutral":
+      return "text-slate-400";
+    case "hostile":
+      return "text-red-400";
+    case "contested":
       return "text-orange-400";
     default:
       return "text-slate-400";
@@ -35,10 +77,22 @@ function getOwnerClass(owner: string) {
 
 export function InteractiveMap() {
   const [selectedId, setSelectedId] = useState(mapLocations[0].id);
+  const [selectedProvinceId, setSelectedProvinceId] = useState(provinces[0].id);
+  const [selectedFactionId, setSelectedFactionId] = useState<FactionId | null>(
+    null
+  );
 
   const selectedLocation =
     mapLocations.find((location) => location.id === selectedId) ??
     mapLocations[0];
+
+  const selectedProvince =
+    provinces.find((province) => province.id === selectedProvinceId) ??
+    provinces[0];
+
+  const selectedProvinceControlLabel = getProvinceControlLabel(
+    selectedProvince.number
+  );
 
   return (
     <section className="grid gap-6 xl:grid-cols-[340px_1fr]">
@@ -72,7 +126,12 @@ export function InteractiveMap() {
                     <h3 className="font-bold text-slate-100">
                       {location.name}
                     </h3>
-                    <p className={`mt-1 text-sm ${getOwnerClass(location.owner)}`}>
+
+                    <p
+                      className={`mt-1 text-sm ${getOwnerClass(
+                        location.owner
+                      )}`}
+                    >
                       {location.owner}
                     </p>
                   </div>
@@ -95,6 +154,12 @@ export function InteractiveMap() {
               priority
             />
 
+            <ProvinceOverlay
+              selectedProvinceId={selectedProvinceId}
+              selectedFactionId={selectedFactionId}
+              onSelectProvince={setSelectedProvinceId}
+            />
+
             {mapLocations.map((location) => {
               const isSelected = selectedId === location.id;
 
@@ -107,7 +172,7 @@ export function InteractiveMap() {
                     left: `${location.x}%`,
                     top: `${location.y}%`,
                   }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
+                  className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
                   title={location.name}
                 >
                   {isSelected && (
@@ -140,35 +205,84 @@ export function InteractiveMap() {
         </div>
 
         <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
-              Selected Location
-            </p>
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+              <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
+                Selected Location
+              </p>
 
-            <h2 className="mt-3 text-3xl font-bold">
-              {selectedLocation.name}
-            </h2>
+              <h2 className="mt-3 text-3xl font-bold">
+                {selectedLocation.name}
+              </h2>
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide text-slate-400">
-                {selectedLocation.type}
-              </span>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide text-slate-400">
+                  {selectedLocation.type}
+                </span>
 
-              <span
-                className={`rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide ${getOwnerClass(
-                  selectedLocation.owner
-                )}`}
-              >
-                {selectedLocation.owner}
-              </span>
+                <span
+                  className={`rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide ${getOwnerClass(
+                    selectedLocation.owner
+                  )}`}
+                >
+                  {selectedLocation.owner}
+                </span>
+              </div>
+
+              <p className="mt-4 text-sm leading-6 text-slate-400">
+                {selectedLocation.description}
+              </p>
             </div>
 
-            <p className="mt-4 text-sm leading-6 text-slate-400">
-              {selectedLocation.description}
-            </p>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+              <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
+                Selected Province
+              </p>
+
+              <h2 className="mt-3 text-3xl font-bold">
+                {selectedProvince.name}
+              </h2>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="rounded-full border border-yellow-600/40 bg-yellow-500/10 px-3 py-1 text-xs uppercase tracking-wide text-yellow-300">
+                  Province {selectedProvince.number}
+                </span>
+
+                <span
+                  className={`rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide ${getOwnerClass(
+                    selectedProvinceControlLabel
+                  )}`}
+                >
+                  {selectedProvinceControlLabel}
+                </span>
+
+                <span
+                  className={`rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide ${getStatusClass(
+                    selectedProvince.status
+                  )}`}
+                >
+                  {selectedProvince.status}
+                </span>
+
+                <span
+                  className={`rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide ${getThreatClass(
+                    selectedProvince.threatLevel
+                  )}`}
+                >
+                  threat: {selectedProvince.threatLevel}
+                </span>
+              </div>
+
+              <p className="mt-4 text-sm leading-6 text-slate-400">
+                {selectedProvince.description}
+              </p>
+            </div>
           </div>
 
-          <FactionInfluence />
+          <FactionInfluence
+            selectedFactionId={selectedFactionId}
+            onSelectFaction={setSelectedFactionId}
+          />
         </section>
       </div>
     </section>
