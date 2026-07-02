@@ -1,5 +1,5 @@
 const entries = [
-  "Kainalia have begun in ÓĆ.",
+  "Kainalia have begun in UĆ.",
   "Scouts report increased Imperial movement near the House of the Guardian.",
   "Magical cabbage reserves have been sabotaged.",
 ];
