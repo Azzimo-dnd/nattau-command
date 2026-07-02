@@ -81,6 +81,7 @@ export function InteractiveMap() {
   const [selectedFactionId, setSelectedFactionId] = useState<FactionId | null>(
     null
   );
+  const [showLocations, setShowLocations] = useState(true);
 
   const selectedLocation =
     mapLocations.find((location) => location.id === selectedId) ??
@@ -110,7 +111,10 @@ export function InteractiveMap() {
               <button
                 key={location.id}
                 type="button"
-                onClick={() => setSelectedId(location.id)}
+                onClick={() => {
+                  setSelectedId(location.id);
+                  setShowLocations(true);
+                }}
                 className={`w-full rounded-xl border p-4 text-left transition ${
                   isSelected
                     ? "border-yellow-600/50 bg-yellow-500/10"
@@ -144,6 +148,29 @@ export function InteractiveMap() {
 
       <div className="space-y-6">
         <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
+                Strategic Map
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                Toggle location markers when the map becomes too crowded.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowLocations((current) => !current)}
+              className={`rounded-xl border px-4 py-2 text-sm transition ${
+                showLocations
+                  ? "border-yellow-500 bg-yellow-500/15 text-yellow-300"
+                  : "border-slate-700 bg-slate-950/70 text-slate-300 hover:border-yellow-600/40 hover:text-yellow-300"
+              }`}
+            >
+              {showLocations ? "Hide Locations" : "Show Locations"}
+            </button>
+          </div>
+
           <div className="relative overflow-hidden rounded-xl">
             <Image
               src="/images/hinewai-map.jpg"
@@ -160,47 +187,48 @@ export function InteractiveMap() {
               onSelectProvince={setSelectedProvinceId}
             />
 
-            {mapLocations.map((location) => {
-              const isSelected = selectedId === location.id;
+            {showLocations &&
+              mapLocations.map((location) => {
+                const isSelected = selectedId === location.id;
 
-              return (
-                <button
-                  key={location.id}
-                  type="button"
-                  onClick={() => setSelectedId(location.id)}
-                  style={{
-                    left: `${location.x}%`,
-                    top: `${location.y}%`,
-                  }}
-                  className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
-                  title={location.name}
-                >
-                  {isSelected && (
-                    <span className="absolute -inset-3 animate-ping rounded-full bg-yellow-500/40" />
-                  )}
-
-                  <span
-                    className={`relative flex h-8 w-8 items-center justify-center rounded-full border text-sm shadow-lg ${
-                      isSelected
-                        ? "border-yellow-300 bg-yellow-500 text-slate-950"
-                        : "border-slate-300 bg-slate-950/80 text-slate-100 hover:border-yellow-400"
-                    }`}
+                return (
+                  <button
+                    key={location.id}
+                    type="button"
+                    onClick={() => setSelectedId(location.id)}
+                    style={{
+                      left: `${location.x}%`,
+                      top: `${location.y}%`,
+                    }}
+                    className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
+                    title={location.name}
                   >
-                    {getLocationIcon(location.type)}
-                  </span>
+                    {isSelected && (
+                      <span className="absolute -inset-3 animate-ping rounded-full bg-yellow-500/40" />
+                    )}
 
-                  <span
-                    className={`absolute left-1/2 top-9 hidden -translate-x-1/2 whitespace-nowrap rounded-full border px-2 py-1 text-xs md:block ${
-                      isSelected
-                        ? "border-yellow-600/40 bg-slate-950 text-yellow-300"
-                        : "border-slate-700 bg-slate-950/80 text-slate-300"
-                    }`}
-                  >
-                    {location.name}
-                  </span>
-                </button>
-              );
-            })}
+                    <span
+                      className={`relative flex h-7 w-7 items-center justify-center rounded-full border text-xs shadow-lg md:h-8 md:w-8 md:text-sm ${
+                        isSelected
+                          ? "border-yellow-300 bg-yellow-500 text-slate-950"
+                          : "border-slate-300 bg-slate-950/80 text-slate-100 hover:border-yellow-400"
+                      }`}
+                    >
+                      {getLocationIcon(location.type)}
+                    </span>
+
+                    <span
+                      className={`absolute left-1/2 top-8 hidden -translate-x-1/2 whitespace-nowrap rounded-full border px-2 py-1 text-xs md:block ${
+                        isSelected
+                          ? "border-yellow-600/40 bg-slate-950 text-yellow-300"
+                          : "border-slate-700 bg-slate-950/80 text-slate-300"
+                      }`}
+                    >
+                      {location.name}
+                    </span>
+                  </button>
+                );
+              })}
           </div>
         </div>
 
