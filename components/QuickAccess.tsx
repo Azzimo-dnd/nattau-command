@@ -9,6 +9,13 @@ const modules = [
     status: "Available",
   },
   {
+    title: "Dice Roller",
+    href: "/dice",
+    icon: "🎲",
+    description: "Roll D&D dice and review the current session log.",
+    status: "Available",
+  },
+  {
     title: "War Room",
     href: "#war-room",
     icon: "⚔",
@@ -19,15 +26,15 @@ const modules = [
     title: "Settlement",
     href: "#",
     icon: "🏘",
-    description: "Buildings, population and development of ÓĆ.",
+    description: "Buildings, population and development of UĆ.",
     status: "Coming soon",
   },
   {
-  title: "High Command",
-  href: "/council",
-  icon: "⚜",
-  description: "Player characters and council member combat summaries.",
-  status: "Available",
+    title: "High Command",
+    href: "/council",
+    icon: "⚜",
+    description: "Player characters and council member combat summaries.",
+    status: "Available",
   },
   {
     title: "Chronicle",
@@ -57,9 +64,11 @@ export function QuickAccess() {
 
               <div>
                 <h3 className="font-bold text-slate-100">{module.title}</h3>
+
                 <p className="mt-1 text-sm text-slate-400">
                   {module.description}
                 </p>
+
                 <p className="mt-3 text-xs uppercase tracking-wide text-yellow-500">
                   {module.status}
                 </p>
