@@ -1,5 +1,5 @@
 export const campaign = {
-  resourcePoints: 2,
+  resourcePoints: 0,
   morale: "High",
   treasury: 3200,
   supplies: "Stable",

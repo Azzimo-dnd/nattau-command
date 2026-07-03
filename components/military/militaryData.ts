@@ -59,7 +59,7 @@ export const militaryUnits: MilitaryUnit[] = [
     commander: "Master Tink Reval",
     size: "4 specialists",
     cost: "1 RP",
-    status: "Operational",
+    status: "Ready",
     detail: "Artificers, heavy weapons, traps and prototypes.",
     durability: 1,
     maxDurability: 1,

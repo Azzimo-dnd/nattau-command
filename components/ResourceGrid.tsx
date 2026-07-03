@@ -1,61 +1,72 @@
+import Link from "next/link";
 import { campaign } from "@/config/campaign";
 
 const resources = [
   {
-    name: "Resource Points",
+    title: "Resource Points",
     value: campaign.resourcePoints.toString(),
-    status: "Available",
+    label: "AVAILABLE",
     icon: "⚜",
+    href: "/resources",
   },
   {
-    name: "Morale",
-    value: campaign.morale,
-    status: "Inspired",
-    icon: "🔥",
+    title: "Monthly Income",
+    value: "+3 RP",
+    label: "ORE + COAL",
+    icon: "⛏",
+    href: "/resources",
   },
   {
-    name: "Treasury",
-    value: campaign.treasury.toString(),
-    status: "Gold",
-    icon: "💰",
+    title: "Potential Income",
+    value: "+2 PRP",
+    label: "SWAMP HERBS",
+    icon: "🌿",
+    href: "/resources",
   },
   {
-    name: "Supplies",
-    value: campaign.supplies,
-    status: "Secured",
+    title: "Food Supply",
+    value: "Surplus",
+    label: "CABBAGE + GRAIN",
     icon: "🌾",
+    href: "/resources",
   },
   {
-    name: "Threat Level",
-    value: campaign.threatLevel,
-    status: "Enemy movement",
+    title: "Threat Level",
+    value: "High",
+    label: "ENEMY MOVEMENT",
     icon: "⚔",
+    href: "/map",
   },
   {
-    name: "Population",
-    value: campaign.population,
-    status: "Settlers",
+    title: "Population",
+    value: "200+",
+    label: "SETTLERS",
     icon: "👥",
+    href: "#",
   },
 ];
 
 export function ResourceGrid() {
   return (
-    <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+    <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {resources.map((resource) => (
-        <div
-          key={resource.name}
-          className="rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg"
+        <Link
+          key={resource.title}
+          href={resource.href}
+          className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-yellow-600/40 hover:bg-yellow-500/5"
         >
-          <div className="text-3xl">{resource.icon}</div>
-          <p className="mt-3 text-sm text-slate-400">{resource.name}</p>
-          <p className="mt-1 text-2xl font-bold text-yellow-500">
+          <div className="text-2xl">{resource.icon}</div>
+
+          <p className="mt-5 text-sm text-slate-400">{resource.title}</p>
+
+          <p className="mt-2 text-3xl font-black text-yellow-400">
             {resource.value}
           </p>
-          <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
-            {resource.status}
+
+          <p className="mt-2 text-xs uppercase tracking-wide text-slate-500">
+            {resource.label}
           </p>
-        </div>
+        </Link>
       ))}
     </section>
   );

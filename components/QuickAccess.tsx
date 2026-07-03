@@ -23,11 +23,11 @@ const modules = [
     status: "On this page",
   },
   {
-    title: "Settlement",
-    href: "#",
-    icon: "🏘",
-    description: "Buildings, population and development of UĆ.",
-    status: "Coming soon",
+  title: "Resources",
+  href: "/resources",
+  icon: "⛏",
+  description: "Monthly income, mines, crops and food production.",
+  status: "Available",
   },
   {
     title: "High Command",
