@@ -43,6 +43,13 @@ const modules = [
     description: "Recent important events known to the expedition.",
     status: "Preview",
   },
+  {
+  title: "Settlement",
+  href: "/settlement",
+  icon: "🏘",
+  description: "Village map, population, morale, food and key locations.",
+  status: "Available",
+}
 ];
 
 export function QuickAccess() {
