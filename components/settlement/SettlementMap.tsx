@@ -240,7 +240,7 @@ export function SettlementMap() {
 
                     {showLabels && (
                       <span
-                        className={`absolute left-1/2 top-9 hidden -translate-x-1/2 whitespace-nowrap rounded-full border px-2 py-1 text-xs md:block ${
+                        className={`absolute left-1/2 top-9 block -translate-x-1/2 whitespace-nowrap rounded-full border px-2 py-1 text-[10px] md:text-xs ${
                           isSelected
                             ? "border-yellow-600/40 bg-slate-950 text-yellow-300"
                             : "border-slate-700 bg-slate-950/80 text-slate-300"
