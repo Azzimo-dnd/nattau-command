@@ -5,5 +5,5 @@ export const campaign = {
   supplies: "Stable",
   threatLevel: "High",
   population: "200+",
-   nextSession: new Date("2026-07-01T19:00:00"),
+   nextSession: new Date("2026-07-22T20:00:00"),
 };
