@@ -1,5 +1,5 @@
 import { Header } from "@/components/Header";
-import { SessionCountdown } from "@/components/SessionCountdown";
+import { HomeWelcome } from "@/components/auth/HomeWelcome";
 import { ResourceGrid } from "@/components/ResourceGrid";
 import { SituationPanel } from "@/components/SituationPanel";
 import { QuickAccess } from "@/components/QuickAccess";
@@ -13,7 +13,7 @@ export default function Home() {
       <section className="mx-auto max-w-7xl space-y-8">
         <Header />
 
-        <SessionCountdown />
+        <HomeWelcome />
 
         <ResourceGrid />
 
