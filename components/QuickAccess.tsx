@@ -49,7 +49,14 @@ const modules = [
   icon: "🏘",
   description: "Village map, population, morale, food and key locations.",
   status: "Available",
-}
+},
+{
+  title: "GM Messages",
+  href: "/gm-chat",
+  icon: "💬",
+  description: "Private conversation between a player and the Game Master.",
+  status: "Available",
+},
 ];
 
 export function QuickAccess() {
