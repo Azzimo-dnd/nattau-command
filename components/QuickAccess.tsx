@@ -57,6 +57,13 @@ const modules = [
   description: "Private conversation between a player and the Game Master.",
   status: "Available",
 },
+{
+  title: "Council Proposals",
+  href: "/council/proposals",
+  icon: "⚖️",
+  description: "Submit motions and vote on expedition decisions.",
+  status: "Available",
+},
 ];
 
 export function QuickAccess() {
