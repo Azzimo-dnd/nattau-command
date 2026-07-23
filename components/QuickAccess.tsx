@@ -64,6 +64,13 @@ const modules = [
   description: "Submit motions and vote on expedition decisions.",
   status: "Available",
 },
+{
+  title: "Threads of Fate",
+  href: "/fate",
+  icon: "✦",
+  description: "Draw one Major Arcana blessing before the next session.",
+  status: "Available",
+},
 ];
 
 export function QuickAccess() {

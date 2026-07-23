@@ -1,0 +1,503 @@
+.ritualSurface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(234, 179, 8, 0.11), transparent 28%),
+    radial-gradient(circle at 18% 82%, rgba(14, 116, 144, 0.15), transparent 34%),
+    linear-gradient(145deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.97));
+}
+
+.ritualSurface::before,
+.ritualSurface::after {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  z-index: -2;
+  pointer-events: none;
+}
+
+.ritualSurface::before {
+  opacity: 0.42;
+  background-image:
+    radial-gradient(circle, rgba(250, 204, 21, 0.8) 0 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(125, 211, 252, 0.55) 0 1px, transparent 1.5px);
+  background-position: 0 0, 37px 53px;
+  background-size: 83px 83px, 127px 127px;
+  animation: driftStars 34s linear infinite;
+}
+
+.ritualSurface::after {
+  z-index: -1;
+  background: conic-gradient(
+    from 20deg,
+    transparent,
+    rgba(234, 179, 8, 0.04),
+    transparent 26%,
+    rgba(56, 189, 248, 0.035),
+    transparent 62%
+  );
+  animation: rotateAura 28s linear infinite;
+}
+
+.deckStage {
+  position: relative;
+  min-height: 430px;
+  perspective: 1500px;
+}
+
+.deckStack {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190px;
+  aspect-ratio: 5 / 8;
+  transform: translate(-50%, -50%);
+  transform-style: preserve-3d;
+}
+
+.deckLayer {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(250, 204, 21, 0.32);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at center, rgba(250, 204, 21, 0.18), transparent 24%),
+    repeating-radial-gradient(circle at center, rgba(250, 204, 21, 0.08) 0 1px, transparent 1px 9px),
+    linear-gradient(145deg, #07111f, #111827 58%, #020617);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.52);
+}
+
+.deckLayer:nth-child(1) { transform: translate(-8px, 7px) rotate(-3deg); }
+.deckLayer:nth-child(2) { transform: translate(7px, 5px) rotate(2deg); }
+.deckLayer:nth-child(3) { transform: translate(-3px, 2px) rotate(-1deg); }
+.deckLayer:nth-child(4) { transform: translate(3px, -1px) rotate(1deg); }
+.deckLayer:nth-child(5) { transform: translate(0, -4px); }
+
+.deckIdle {
+  animation: breatheDeck 3.4s ease-in-out infinite;
+}
+
+.deckShuffling .deckLayer:nth-child(1) { animation: shuffleLeft 0.56s ease-in-out 0s 3; }
+.deckShuffling .deckLayer:nth-child(2) { animation: shuffleRight 0.56s ease-in-out 0.08s 3; }
+.deckShuffling .deckLayer:nth-child(3) { animation: shuffleLeft 0.56s ease-in-out 0.16s 3; }
+.deckShuffling .deckLayer:nth-child(4) { animation: shuffleRight 0.56s ease-in-out 0.24s 3; }
+.deckShuffling .deckLayer:nth-child(5) { animation: shuffleTop 0.56s ease-in-out 0.32s 3; }
+
+.choiceCard {
+  --slot-x: -50%;
+  --slot-rotate: 0deg;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 210px;
+  aspect-ratio: 5 / 8;
+  border: 0;
+  padding: 0;
+  border-radius: 1rem;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.72) rotate(0deg);
+  transition:
+    transform 750ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 500ms ease,
+    filter 500ms ease;
+  transform-style: preserve-3d;
+}
+
+.choiceCard:nth-of-type(1) {
+  --slot-x: -168%;
+  --slot-rotate: -7deg;
+}
+
+.choiceCard:nth-of-type(2) {
+  --slot-x: -50%;
+  --slot-rotate: 0deg;
+}
+
+.choiceCard:nth-of-type(3) {
+  --slot-x: 68%;
+  --slot-rotate: 7deg;
+}
+
+.choiceDealt {
+  opacity: 1;
+  transform: translate(var(--slot-x), -50%) rotate(var(--slot-rotate));
+}
+
+.choiceDealt:nth-of-type(1) { transition-delay: 80ms; }
+.choiceDealt:nth-of-type(2) { transition-delay: 220ms; }
+.choiceDealt:nth-of-type(3) { transition-delay: 360ms; }
+
+.choiceDealt:hover,
+.choiceDealt:focus-visible {
+  z-index: 5;
+  outline: none;
+  filter: brightness(1.12);
+  transform: translate(var(--slot-x), calc(-50% - 18px)) rotate(var(--slot-rotate)) scale(1.055);
+}
+
+.choiceSelected {
+  z-index: 10;
+  opacity: 1;
+  cursor: default;
+  filter: none;
+  transform: translate(-50%, -50%) rotate(0deg) scale(1.08) !important;
+  transition-delay: 0ms !important;
+}
+
+.choiceDismissed {
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(8px);
+  transform: translate(var(--slot-x), -42%) scale(0.78) !important;
+  transition-delay: 0ms !important;
+}
+
+.cardShell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  perspective: 1400px;
+}
+
+.cardInner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 1050ms cubic-bezier(0.2, 0.72, 0.2, 1);
+}
+
+.cardFlipped {
+  transform: rotateY(180deg);
+}
+
+.cardFace {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 1rem;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.52),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.055);
+}
+
+.cardBack {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(250, 204, 21, 0.42);
+  background:
+    linear-gradient(45deg, transparent 47%, rgba(250, 204, 21, 0.08) 48% 52%, transparent 53%),
+    linear-gradient(-45deg, transparent 47%, rgba(56, 189, 248, 0.055) 48% 52%, transparent 53%),
+    radial-gradient(circle at center, rgba(250, 204, 21, 0.16), transparent 25%),
+    linear-gradient(145deg, #0f172a, #030712 64%, #111827);
+  background-size: 34px 34px, 34px 34px, auto, auto;
+}
+
+.cardBack::before,
+.cardBack::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.28);
+}
+
+.cardBack::before { inset: 12%; }
+.cardBack::after { inset: 25%; border-style: dashed; }
+
+.backSigil {
+  position: relative;
+  display: grid;
+  height: 76px;
+  width: 76px;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  background: rgba(2, 6, 23, 0.72);
+  color: rgb(250 204 21);
+  font-size: 2rem;
+  box-shadow: 0 0 34px rgba(234, 179, 8, 0.18);
+}
+
+.cardFront {
+  transform: rotateY(180deg);
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  background: linear-gradient(145deg, #172033, #050914 62%, #111827);
+}
+
+.frontContent {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.85rem;
+  transition: transform 750ms ease;
+}
+
+.frontContentReversed {
+  transform: rotate(180deg);
+}
+
+.cardOrnament {
+  position: absolute;
+  inset: 0.55rem;
+  pointer-events: none;
+  border: 1px solid rgba(250, 204, 21, 0.24);
+  border-radius: 0.72rem;
+}
+
+.cardOrnament::before,
+.cardOrnament::after {
+  content: "✦";
+  position: absolute;
+  color: rgba(250, 204, 21, 0.62);
+  font-size: 0.72rem;
+}
+
+.cardOrnament::before { left: 0.4rem; top: 0.25rem; }
+.cardOrnament::after { bottom: 0.25rem; right: 0.4rem; }
+
+.themeTide {
+  background:
+    radial-gradient(circle at 50% 37%, rgba(125, 211, 252, 0.34), transparent 30%),
+    linear-gradient(155deg, #082f49, #0f172a 60%, #020617);
+}
+.themeArcane {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(192, 132, 252, 0.38), transparent 29%),
+    linear-gradient(155deg, #3b0764, #111827 60%, #020617);
+}
+.themeMoon {
+  background:
+    radial-gradient(circle at 50% 32%, rgba(224, 231, 255, 0.34), transparent 23%),
+    linear-gradient(155deg, #172554, #0f172a 61%, #020617);
+}
+.themeRose {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(251, 113, 133, 0.35), transparent 28%),
+    linear-gradient(155deg, #4c0519, #111827 60%, #020617);
+}
+.themeStorm {
+  background:
+    radial-gradient(circle at 50% 32%, rgba(103, 232, 249, 0.31), transparent 26%),
+    linear-gradient(155deg, #164e63, #111827 58%, #020617);
+}
+.themeEmber {
+  background:
+    radial-gradient(circle at 50% 40%, rgba(251, 146, 60, 0.36), transparent 28%),
+    linear-gradient(155deg, #7c2d12, #111827 62%, #020617);
+}
+.themeLantern {
+  background:
+    radial-gradient(circle at 50% 36%, rgba(253, 224, 71, 0.4), transparent 24%),
+    linear-gradient(155deg, #422006, #111827 63%, #020617);
+}
+.themeGold {
+  background:
+    radial-gradient(circle at 50% 37%, rgba(250, 204, 21, 0.38), transparent 29%),
+    linear-gradient(155deg, #713f12, #111827 63%, #020617);
+}
+.themeJungle {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(74, 222, 128, 0.31), transparent 28%),
+    linear-gradient(155deg, #14532d, #111827 63%, #020617);
+}
+.themeAsh {
+  background:
+    radial-gradient(circle at 50% 37%, rgba(203, 213, 225, 0.2), transparent 27%),
+    linear-gradient(155deg, #27272a, #09090b 64%, #020617);
+}
+.themeLightning {
+  background:
+    radial-gradient(circle at 50% 35%, rgba(196, 181, 253, 0.4), transparent 25%),
+    linear-gradient(155deg, #312e81, #111827 62%, #020617);
+}
+.themeLagoon {
+  background:
+    radial-gradient(circle at 50% 36%, rgba(45, 212, 191, 0.36), transparent 28%),
+    linear-gradient(155deg, #134e4a, #111827 62%, #020617);
+}
+.themeNeutral {
+  background:
+    radial-gradient(circle at 50% 36%, rgba(148, 163, 184, 0.25), transparent 28%),
+    linear-gradient(155deg, #334155, #111827 62%, #020617);
+}
+
+.cardNumber {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.28em;
+  color: rgba(254, 240, 138, 0.92);
+}
+
+.cardArt {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  flex: 1;
+  place-items: center;
+}
+
+.cardSymbol {
+  display: grid;
+  height: 104px;
+  width: 104px;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(254, 240, 138, 0.34);
+  background: rgba(2, 6, 23, 0.42);
+  font-size: 3rem;
+  box-shadow:
+    0 0 45px rgba(250, 204, 21, 0.13),
+    inset 0 0 30px rgba(255, 255, 255, 0.04);
+}
+
+.cardTitle {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgb(254 240 138);
+}
+
+.cardMeaning {
+  position: relative;
+  z-index: 2;
+  margin-top: 0.35rem;
+  min-height: 2.1rem;
+  text-align: center;
+  font-size: 0.62rem;
+  line-height: 1.25rem;
+  color: rgb(203 213 225);
+}
+
+.compactCard {
+  width: 120px;
+  height: auto;
+  aspect-ratio: 5 / 8;
+}
+
+.compactCard .cardSymbol {
+  height: 54px;
+  width: 54px;
+  font-size: 1.55rem;
+}
+
+.compactCard .cardTitle {
+  font-size: 0.67rem;
+}
+
+.compactCard .cardMeaning {
+  display: none;
+}
+
+.compactCard .frontContent {
+  padding: 0.6rem;
+}
+
+.compactCard .cardNumber {
+  font-size: 0.55rem;
+}
+
+.revealGlow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 340px;
+  width: 340px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(250, 204, 21, 0.24), transparent 68%);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.65);
+  pointer-events: none;
+}
+
+.revealGlowActive {
+  animation: revealBurst 1.35s ease-out forwards;
+}
+
+.rewardReveal {
+  animation: rewardRise 720ms ease-out both;
+}
+
+@keyframes breatheDeck {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0) rotateZ(-0.5deg); }
+  50% { transform: translate(-50%, -50%) translateY(-10px) rotateZ(0.5deg); }
+}
+
+@keyframes shuffleLeft {
+  0%, 100% { transform: translate(-4px, 3px) rotate(-1deg); }
+  45% { transform: translate(-105px, -12px) rotate(-13deg); }
+  70% { transform: translate(40px, 8px) rotate(5deg); }
+}
+
+@keyframes shuffleRight {
+  0%, 100% { transform: translate(4px, 2px) rotate(1deg); }
+  45% { transform: translate(105px, -10px) rotate(13deg); }
+  70% { transform: translate(-38px, 7px) rotate(-5deg); }
+}
+
+@keyframes shuffleTop {
+  0%, 100% { transform: translate(0, -4px) rotate(0deg); }
+  50% { transform: translate(0, -38px) rotate(4deg); }
+}
+
+@keyframes rotateAura {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes driftStars {
+  to { transform: translate3d(9%, 7%, 0); }
+}
+
+@keyframes revealBurst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.55); }
+  35% { opacity: 1; }
+  100% { opacity: 0.18; transform: translate(-50%, -50%) scale(1.35); }
+}
+
+@keyframes rewardRise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 720px) {
+  .deckStage { min-height: 350px; }
+  .deckStack { width: 145px; }
+  .choiceCard { width: 152px; }
+  .choiceCard:nth-of-type(1) { --slot-x: -132%; --slot-rotate: -6deg; }
+  .choiceCard:nth-of-type(2) { --slot-x: -50%; }
+  .choiceCard:nth-of-type(3) { --slot-x: 32%; --slot-rotate: 6deg; }
+  .cardSymbol { height: 78px; width: 78px; font-size: 2.25rem; }
+  .cardTitle { font-size: 0.8rem; }
+  .cardMeaning { font-size: 0.55rem; line-height: 1rem; }
+  .revealGlow { height: 250px; width: 250px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ritualSurface::before,
+  .ritualSurface::after,
+  .deckIdle,
+  .deckShuffling .deckLayer,
+  .revealGlowActive,
+  .rewardReveal {
+    animation: none !important;
+  }
+
+  .choiceCard,
+  .cardInner,
+  .frontContent {
+    transition-duration: 1ms !important;
+  }
+}
