@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { NextSessionCountdown } from "@/components/home/NextSessionCountdown";
+import { loadCampaignSessionSettings } from "@/lib/campaign/sessionSettings";
 import { createClient } from "@/lib/supabase/server";
-import { SessionCountdown } from "@/components/SessionCountdown";
 
 export async function HomeWelcome() {
   const supabase = await createClient();
@@ -14,11 +15,15 @@ export async function HomeWelcome() {
     redirect("/login");
   }
 
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("display_name, role")
-    .eq("id", user.id)
-    .single();
+  const [{ data: profile, error }, sessionSettings] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("display_name, role")
+      .eq("id", user.id)
+      .single(),
+
+    loadCampaignSessionSettings(),
+  ]);
 
   const displayName =
     profile?.display_name ??
@@ -44,7 +49,7 @@ export async function HomeWelcome() {
             </h1>
 
             <p className="mt-2 text-sm text-slate-400">
-              Time until the next session:
+              Next session:
             </p>
           </div>
 
@@ -64,7 +69,11 @@ export async function HomeWelcome() {
       </div>
 
       <div className="p-5">
-        <SessionCountdown />
+        <NextSessionCountdown
+          status={sessionSettings.status}
+          target={sessionSettings.nextSessionAt}
+          message={sessionSettings.message}
+        />
       </div>
     </section>
   );
