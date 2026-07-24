@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ChangeEvent } from "react";
-import { formatLongDate } from "./plannerDateUtils";
+import { formatLongDate, isPastDate } from "./plannerDateUtils";
 import type {
   AvailabilityEntry,
   PlannerMember,
@@ -76,6 +76,8 @@ export function DayInspector({
     (member) => !modeByUser.has(member.id)
   );
 
+  const pastDate = isPastDate(dateKey);
+
   const openOnline = proposals.some(
     (proposal) =>
       proposal.proposed_date === dateKey &&
@@ -136,7 +138,14 @@ export function DayInspector({
         />
       </div>
 
-      {currentUser.role === "dm" && (
+      {pastDate && (
+        <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-950/45 px-4 py-3 text-sm text-slate-500">
+          This date is in the past. Availability and session proposals can no
+          longer be changed.
+        </div>
+      )}
+
+      {currentUser.role === "dm" && !pastDate && (
         <div className="mt-6 border-t border-slate-800 pt-5">
           <p className="text-xs uppercase tracking-[0.28em] text-purple-400">
             GM action

@@ -6,7 +6,7 @@ import type {
 
 export const mobilePrimaryItems: NavigationItem[] = [
   { label: "Home", href: "/", icon: "home", exact: true },
-  { label: "Map", href: "/map", icon: "map" },
+  { label: "Planner", href: "/session-planner", icon: "session" },
   { label: "Council", href: "/council", icon: "council" },
   { label: "Fate", href: "/fate", icon: "fate" },
 ];

@@ -151,27 +151,34 @@ export function PlannerCalendar({
           );
           const isSelected = selectedDate === dateKey;
           const isRangeStart = rangeStart === dateKey;
+          const isPast = isPastDate(dateKey);
 
           return (
             <div
               key={dateKey}
               role="button"
-              tabIndex={0}
+              tabIndex={isPast ? -1 : 0}
+              aria-disabled={isPast}
+              title={isPast ? "Past dates cannot be edited." : undefined}
               onPointerDown={(event: ReactPointerEvent<HTMLDivElement>) =>
-                selectionMode === "paint"
+                !isPast && selectionMode === "paint"
                   ? onPaintPointerDown(dateKey, event)
                   : undefined
               }
               onPointerEnter={(event: ReactPointerEvent<HTMLDivElement>) =>
-                selectionMode === "paint"
+                !isPast && selectionMode === "paint"
                   ? onPaintPointerEnter(dateKey, event)
                   : undefined
               }
               onClick={() =>
-                selectionMode === "range" ? onRangeClick(dateKey) : undefined
+                !isPast && selectionMode === "range"
+                  ? onRangeClick(dateKey)
+                  : undefined
               }
               onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
+                if (isPast || (event.key !== "Enter" && event.key !== " ")) {
+                  return;
+                }
                 event.preventDefault();
                 if (selectionMode === "range") {
                   onRangeClick(dateKey);
@@ -182,7 +189,9 @@ export function PlannerCalendar({
               )} ${heatClasses(heatValue, memberCount)} ${
                 isSelected ? "z-10 outline outline-2 outline-purple-400/70" : ""
               } ${isRangeStart ? "outline outline-2 outline-yellow-300" : ""} ${
-                isPastDate(dateKey) ? "opacity-65" : ""
+                isPast
+                  ? "cursor-not-allowed opacity-45 grayscale-[0.35]"
+                  : "cursor-pointer"
               }`}
             >
               <div className="flex items-start justify-between gap-1">
@@ -219,6 +228,12 @@ export function PlannerCalendar({
               {ownMode && (
                 <span className="absolute bottom-1.5 left-1.5 max-w-[calc(100%-3rem)] truncate rounded-full border border-slate-700 bg-slate-950/80 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-300 sm:bottom-2 sm:left-2 sm:text-[9px]">
                   You: {ownMode.replace("_", " ")}
+                </span>
+              )}
+
+              {isPast && !ownMode && (
+                <span className="absolute bottom-1.5 left-1.5 rounded-full border border-slate-700 bg-slate-950/80 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-500 sm:bottom-2 sm:left-2 sm:text-[9px]">
+                  Past
                 </span>
               )}
 

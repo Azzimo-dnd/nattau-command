@@ -19,6 +19,7 @@ import {
   enumerateDateRange,
   formatMonthTitle,
   getMonthDateKeys,
+  isPastDate,
   isWeekend,
   monthStart,
 } from "./plannerDateUtils";
@@ -109,10 +110,17 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
 
   const applyLocalAvailability = useCallback(
     (dateKeys: string[], mode: AvailabilityBrush) => {
+      const editableDates =
+        mode === "erase"
+          ? dateKeys
+          : dateKeys.filter((dateKey) => !isPastDate(dateKey));
+
+      if (editableDates.length === 0) return;
+
       setData((current) => {
         if (!current) return current;
 
-        const selected = new Set(dateKeys);
+        const selected = new Set(editableDates);
         const remaining = current.availability.filter(
           (entry) =>
             entry.user_id !== currentUser.id ||
@@ -124,7 +132,7 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
         }
 
         const now = new Date().toISOString();
-        const additions: AvailabilityEntry[] = dateKeys.map((dateKey) => ({
+        const additions: AvailabilityEntry[] = editableDates.map((dateKey) => ({
           user_id: currentUser.id,
           availability_date: dateKey,
           availability_mode: mode,
@@ -142,8 +150,15 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
 
   const persistAvailability = useCallback(
     async (dateKeys: string[], mode: AvailabilityBrush) => {
-      const uniqueDates = [...new Set(dateKeys)];
-      if (uniqueDates.length === 0) return;
+      const uniqueDates = [...new Set(dateKeys)].filter(
+        (dateKey) => mode === "erase" || !isPastDate(dateKey)
+      );
+
+      if (uniqueDates.length === 0) {
+        setErrorMessage("Past dates cannot be changed.");
+        setSuccessMessage(null);
+        return;
+      }
 
       setBusy(true);
       setErrorMessage(null);
@@ -191,7 +206,7 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
   }, [persistAvailability]);
 
   function addPaintDate(dateKey: string) {
-    if (dragDatesRef.current.has(dateKey)) return;
+    if (isPastDate(dateKey) || dragDatesRef.current.has(dateKey)) return;
 
     dragDatesRef.current.add(dateKey);
     applyLocalAvailability([dateKey], dragBrushRef.current);
@@ -202,7 +217,7 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
     dateKey: string,
     event: ReactPointerEvent<HTMLDivElement>
   ) {
-    if (busy) return;
+    if (busy || isPastDate(dateKey)) return;
 
     event.preventDefault();
     dragBrushRef.current = brush;
@@ -228,6 +243,12 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
   }
 
   function handleRangeClick(dateKey: string) {
+    if (isPastDate(dateKey)) {
+      setErrorMessage("Past dates cannot be selected.");
+      setSuccessMessage(null);
+      return;
+    }
+
     setSelectedDate(dateKey);
 
     if (!rangeStart) {
@@ -247,7 +268,9 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
   }
 
   function applyToWeekends() {
-    const dates = getMonthDateKeys(visibleMonth).filter(isWeekend);
+    const dates = getMonthDateKeys(visibleMonth).filter(
+      (dateKey) => isWeekend(dateKey) && !isPastDate(dateKey)
+    );
     applyLocalAvailability(dates, brush);
     void persistAvailability(dates, brush);
   }
@@ -275,6 +298,12 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
     mode: ProposalMode,
     message: string
   ) {
+    if (isPastDate(dateKey)) {
+      setErrorMessage("Past dates cannot be proposed for a session.");
+      setSuccessMessage(null);
+      return;
+    }
+
     setBusy(true);
     setErrorMessage(null);
     setSuccessMessage(null);

@@ -34,6 +34,15 @@ export function BeforeSession({
 }: BeforeSessionProps) {
   const playerItems: PreparationItem[] = [
     {
+      title: "Session Planner",
+      description:
+        "Mark the days when you can play and review the group availability calendar.",
+      href: "/session-planner",
+      icon: "session",
+      badge: "Update",
+      needsAttention: true,
+    },
+    {
       title: "Threads of Fate",
       description:
         fateState === "available"
@@ -77,6 +86,15 @@ export function BeforeSession({
 
   const gmWaiting = Math.max(0, playerCount - fateDrawCount);
   const gmItems: PreparationItem[] = [
+    {
+      title: "Session Planner",
+      description:
+        "Review group availability and open the most convenient dates for voting.",
+      href: "/session-planner",
+      icon: "session",
+      badge: "Review",
+      needsAttention: false,
+    },
     {
       title: "Fate Management",
       description:

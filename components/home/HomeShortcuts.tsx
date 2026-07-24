@@ -37,7 +37,7 @@ function getToneClasses(tone: ShortcutTone) {
 export function HomeShortcuts({
   fateStatus = "Open",
   councilStatus = "Open",
-  chatStatus = "Open channel",
+  chatStatus: _chatStatus = "Open channel",
 }: HomeShortcutsProps) {
   const shortcuts: Shortcut[] = [
     {
@@ -65,12 +65,12 @@ export function HomeShortcuts({
       tone: fateStatus.toLowerCase().includes("available") ? "gold" : "green",
     },
     {
-      title: "GM Messages",
-      href: "/gm-chat",
-      icon: "chat",
-      subtitle: "Private campaign channel",
-      status: chatStatus,
-      tone: "green",
+      title: "Session Planner",
+      href: "/session-planner",
+      icon: "session",
+      subtitle: "Mark availability and vote on dates",
+      status: "Update dates",
+      tone: "gold",
     },
   ];
 
