@@ -14,6 +14,12 @@ export const mobilePrimaryItems: NavigationItem[] = [
 export function getNavigationSections(role: AppRole): NavigationSection[] {
   const betweenSessions: NavigationItem[] = [
     {
+      label: "Session Planner",
+      href: "/session-planner",
+      icon: "session",
+      description: "Share availability and vote on possible session dates.",
+    },
+    {
       label: "Council Proposals",
       href: "/council/proposals",
       icon: "proposal",
