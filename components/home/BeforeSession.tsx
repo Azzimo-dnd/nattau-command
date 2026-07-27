@@ -13,6 +13,15 @@ type BeforeSessionProps = {
   proposalsAwaitingVote: number;
   fateDrawCount: number;
   playerCount: number;
+  plannerSummaryLoaded: boolean;
+  plannerAvailabilityDays: number;
+  plannerHasAvailability: boolean;
+  plannerPlayersResponded: number;
+  plannerMissingPlayerNames: string[];
+  plannerOpenProposalCount: number;
+  plannerVotesAwaiting: number;
+  plannerPromisingDateCount: number;
+  plannerResponseWindowDays: number;
 };
 
 type PreparationItem = {
@@ -24,6 +33,16 @@ type PreparationItem = {
   needsAttention: boolean;
 };
 
+function plural(value: number, singular: string, pluralForm = `${singular}s`) {
+  return value === 1 ? singular : pluralForm;
+}
+
+function compactNames(names: string[]) {
+  if (names.length === 0) return "";
+  if (names.length <= 2) return names.join(", ");
+  return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+}
+
 export function BeforeSession({
   role,
   fateState,
@@ -31,16 +50,50 @@ export function BeforeSession({
   proposalsAwaitingVote,
   fateDrawCount,
   playerCount,
+  plannerSummaryLoaded,
+  plannerAvailabilityDays,
+  plannerHasAvailability,
+  plannerPlayersResponded,
+  plannerMissingPlayerNames,
+  plannerOpenProposalCount,
+  plannerVotesAwaiting,
+  plannerPromisingDateCount,
+  plannerResponseWindowDays,
 }: BeforeSessionProps) {
+  const playerPlannerNeedsAttention =
+    plannerSummaryLoaded &&
+    (!plannerHasAvailability || plannerVotesAwaiting > 0);
+
+  const playerPlannerDescription = !plannerSummaryLoaded
+    ? "Open the shared calendar to mark availability and review proposed dates."
+    : plannerVotesAwaiting > 0
+      ? `${plannerVotesAwaiting} proposed session ${plural(
+          plannerVotesAwaiting,
+          "date"
+        )} ${plural(plannerVotesAwaiting, "needs", "need")} your vote.`
+      : !plannerHasAvailability
+        ? `You have not marked any availability for the next ${plannerResponseWindowDays} days.`
+        : `Availability submitted for ${plannerAvailabilityDays} future ${plural(
+            plannerAvailabilityDays,
+            "day"
+          )}. All current session-date votes are complete.`;
+
+  const playerPlannerBadge = !plannerSummaryLoaded
+    ? "Open"
+    : plannerVotesAwaiting > 0
+      ? `${plannerVotesAwaiting} to vote`
+      : !plannerHasAvailability
+        ? "Mark dates"
+        : "Completed";
+
   const playerItems: PreparationItem[] = [
     {
       title: "Session Planner",
-      description:
-        "Mark the days when you can play and review the group availability calendar.",
+      description: playerPlannerDescription,
       href: "/session-planner",
       icon: "session",
-      badge: "Update",
-      needsAttention: true,
+      badge: playerPlannerBadge,
+      needsAttention: playerPlannerNeedsAttention,
     },
     {
       title: "Threads of Fate",
@@ -64,8 +117,11 @@ export function BeforeSession({
       title: "Council Proposals",
       description:
         proposalsAwaitingVote > 0
-          ? `${proposalsAwaitingVote} proposal${proposalsAwaitingVote === 1 ? "" : "s"} may need your vote.`
-          : "No active proposal requires your vote.",
+          ? `${proposalsAwaitingVote} council ${plural(
+              proposalsAwaitingVote,
+              "proposal"
+            )} may need your vote.`
+          : "No active council proposal requires your vote.",
       href: "/council/proposals",
       icon: "proposal",
       badge:
@@ -84,16 +140,45 @@ export function BeforeSession({
     },
   ];
 
-  const gmWaiting = Math.max(0, playerCount - fateDrawCount);
+  const gmWaitingForFate = Math.max(0, playerCount - fateDrawCount);
+  const gmWaitingForAvailability = Math.max(
+    0,
+    playerCount - plannerPlayersResponded
+  );
+  const missingNames = compactNames(plannerMissingPlayerNames);
+  const gmPlannerNeedsAttention =
+    plannerSummaryLoaded &&
+    (gmWaitingForAvailability > 0 ||
+      (plannerPromisingDateCount > 0 && plannerOpenProposalCount === 0));
+
+  const gmPlannerDescription = !plannerSummaryLoaded
+    ? "Review group availability and open the most convenient dates for voting."
+    : `${plannerPlayersResponded} of ${playerCount} players responded. ${plannerPromisingDateCount} promising ${plural(
+        plannerPromisingDateCount,
+        "date"
+      )}. ${plannerOpenProposalCount} open ${plural(
+        plannerOpenProposalCount,
+        "vote"
+      )}.${missingNames ? ` Waiting: ${missingNames}.` : ""}`;
+
+  const gmPlannerBadge = !plannerSummaryLoaded
+    ? "Review"
+    : gmWaitingForAvailability > 0
+      ? `${gmWaitingForAvailability} waiting`
+      : plannerPromisingDateCount > 0 && plannerOpenProposalCount === 0
+        ? `${plannerPromisingDateCount} strong`
+        : plannerOpenProposalCount > 0
+          ? `${plannerOpenProposalCount} open`
+          : "Clear";
+
   const gmItems: PreparationItem[] = [
     {
       title: "Session Planner",
-      description:
-        "Review group availability and open the most convenient dates for voting.",
+      description: gmPlannerDescription,
       href: "/session-planner",
       icon: "session",
-      badge: "Review",
-      needsAttention: false,
+      badge: gmPlannerBadge,
+      needsAttention: gmPlannerNeedsAttention,
     },
     {
       title: "Fate Management",
@@ -103,15 +188,18 @@ export function BeforeSession({
           : "No player profiles are currently available.",
       href: "/fate",
       icon: "fate",
-      badge: playerCount > 0 ? `${gmWaiting} waiting` : "No players",
-      needsAttention: gmWaiting > 0,
+      badge: playerCount > 0 ? `${gmWaitingForFate} waiting` : "No players",
+      needsAttention: gmWaitingForFate > 0,
     },
     {
       title: "Council Proposals",
       description:
         activeProposalCount > 0
-          ? `${activeProposalCount} active proposal${activeProposalCount === 1 ? "" : "s"} await a decision.`
-          : "There are no active proposals.",
+          ? `${activeProposalCount} active council ${plural(
+              activeProposalCount,
+              "proposal"
+            )} await a decision.`
+          : "There are no active council proposals.",
       href: "/council/proposals",
       icon: "proposal",
       badge: activeProposalCount > 0 ? `${activeProposalCount} active` : "Clear",
@@ -165,7 +253,7 @@ export function BeforeSession({
               <span className="block truncate text-sm font-semibold text-slate-100">
                 {item.title}
               </span>
-              <span className="mt-1 block text-xs leading-5 text-slate-500 sm:truncate">
+              <span className="mt-1 block text-xs leading-5 text-slate-500">
                 {item.description}
               </span>
             </span>

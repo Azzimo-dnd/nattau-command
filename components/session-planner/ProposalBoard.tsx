@@ -10,6 +10,8 @@ import type {
 type ProposalBoardProps = {
   proposals: SessionProposal[];
   currentUser: SessionPlannerUser;
+  eligibleVoterIds: string[];
+  currentUserCountsTowardPlanning: boolean;
   busyProposalId: string | null;
   onVote: (proposalId: string, vote: ProposalVoteValue) => Promise<void>;
   onRemoveVote: (proposalId: string) => Promise<void>;
@@ -47,6 +49,8 @@ function getVoteClasses(vote: ProposalVoteValue, selected: boolean) {
 export function ProposalBoard({
   proposals,
   currentUser,
+  eligibleVoterIds,
+  currentUserCountsTowardPlanning,
   busyProposalId,
   onVote,
   onRemoveVote,
@@ -56,6 +60,7 @@ export function ProposalBoard({
   const activeProposals = proposals.filter(
     (proposal) => proposal.status === "voting" || proposal.status === "confirmed"
   );
+  const eligibleVoterIdSet = new Set(eligibleVoterIds);
 
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl shadow-slate-950/20 sm:p-6">
@@ -89,13 +94,16 @@ export function ProposalBoard({
             const ownVote = proposal.votes.find(
               (vote) => vote.voter_id === currentUser.id
             )?.vote;
-            const yesVotes = proposal.votes.filter(
+            const countedVotes = proposal.votes.filter((vote) =>
+              eligibleVoterIdSet.has(vote.voter_id)
+            );
+            const yesVotes = countedVotes.filter(
               (vote) => vote.vote === "yes"
             );
-            const maybeVotes = proposal.votes.filter(
+            const maybeVotes = countedVotes.filter(
               (vote) => vote.vote === "maybe"
             );
-            const noVotes = proposal.votes.filter(
+            const noVotes = countedVotes.filter(
               (vote) => vote.vote === "no"
             );
             const isBusy = busyProposalId === proposal.id;
@@ -183,6 +191,15 @@ export function ProposalBoard({
                     )}
                   </div>
                 )}
+
+                {!isConfirmed &&
+                  currentUser.role === "player" &&
+                  !currentUserCountsTowardPlanning && (
+                    <p className="mt-3 text-xs leading-5 text-cyan-300">
+                      Your test vote is saved for UI testing but is not included
+                      in the totals shown above.
+                    </p>
+                  )}
 
                 {!isConfirmed && currentUser.role === "dm" && (
                   <div className="mt-4 flex flex-wrap gap-2">

@@ -9,6 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { BestDates } from "./BestDates";
 import { DayInspector } from "./DayInspector";
 import { PlannerCalendar } from "./PlannerCalendar";
 import { PlannerToolbar } from "./PlannerToolbar";
@@ -57,6 +58,27 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
   const dragBrushRef = useRef<AvailabilityBrush>(brush);
 
   const monthKey = dateToKey(visibleMonth);
+
+  const playerMembers = useMemo(
+    () =>
+      (data?.members ?? []).filter(
+        (member) =>
+          member.role === "player" && member.planning_enabled !== false
+      ),
+    [data?.members]
+  );
+
+  const currentUserCountsTowardPlanning = useMemo(() => {
+    if (currentUser.role === "dm") {
+      return true;
+    }
+
+    const currentMember = (data?.members ?? []).find(
+      (member) => member.id === currentUser.id
+    );
+
+    return currentMember?.planning_enabled !== false;
+  }, [currentUser.id, currentUser.role, data?.members]);
 
   useEffect(() => {
     if (window.matchMedia("(pointer: fine)").matches) {
@@ -394,6 +416,16 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
     setBusyProposalId(null);
   }
 
+  function inspectBestDate(dateKey: string) {
+    setSelectedDate(dateKey);
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("planner-calendar")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   const currentMonthDistance = useMemo(() => {
     const today = monthStart(new Date());
     return (
@@ -405,14 +437,36 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
 
   return (
     <div className="space-y-6">
+      {currentUser.role === "player" &&
+        !currentUserCountsTowardPlanning && (
+          <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm leading-6 text-cyan-100">
+            This is a test profile. You can still use the planner, but your
+            availability and votes are excluded from group totals, Best Dates
+            and player counts.
+          </div>
+        )}
+
       <ProposalBoard
         proposals={data?.proposals ?? []}
         currentUser={currentUser}
+        eligibleVoterIds={playerMembers.map((member) => member.id)}
+        currentUserCountsTowardPlanning={currentUserCountsTowardPlanning}
         busyProposalId={busyProposalId}
         onVote={vote}
         onRemoveVote={removeVote}
         onConfirm={confirmProposal}
         onCancel={cancelProposal}
+      />
+
+      <BestDates
+        month={visibleMonth}
+        members={playerMembers}
+        availability={data?.availability ?? []}
+        proposals={data?.proposals ?? []}
+        currentUser={currentUser}
+        busy={busy}
+        onInspect={inspectBestDate}
+        onCreateProposal={createProposal}
       />
 
       <PlannerToolbar
@@ -440,7 +494,7 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
         </div>
       )}
 
-      <section className="rounded-3xl border border-slate-800 bg-slate-900/45 p-4 sm:p-5">
+      <section id="planner-calendar" className="scroll-mt-6 rounded-3xl border border-slate-800 bg-slate-900/45 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.32em] text-yellow-500">
@@ -493,7 +547,7 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
             <PlannerCalendar
               month={visibleMonth}
               currentUserId={currentUser.id}
-              memberCount={data?.members.length ?? 0}
+              members={playerMembers}
               availability={data?.availability ?? []}
               proposals={data?.proposals ?? []}
               selectedDate={selectedDate}
@@ -509,7 +563,7 @@ export function SessionPlanner({ currentUser }: SessionPlannerProps) {
 
           <DayInspector
             dateKey={selectedDate}
-            members={data?.members ?? []}
+            members={playerMembers}
             availability={data?.availability ?? []}
             proposals={data?.proposals ?? []}
             currentUser={currentUser}

@@ -15,13 +15,14 @@ import type {
   AvailabilityEntry,
   AvailabilityMode,
   HeatMode,
+  PlannerMember,
   SessionProposal,
 } from "./plannerTypes";
 
 type PlannerCalendarProps = {
   month: Date;
   currentUserId: string;
-  memberCount: number;
+  members: PlannerMember[];
   availability: AvailabilityEntry[];
   proposals: SessionProposal[];
   selectedDate: string | null;
@@ -76,7 +77,7 @@ function heatClasses(value: number, total: number) {
 export function PlannerCalendar({
   month,
   currentUserId,
-  memberCount,
+  members,
   availability,
   proposals,
   selectedDate,
@@ -90,6 +91,7 @@ export function PlannerCalendar({
 }: PlannerCalendarProps) {
   const dateKeys = getMonthDateKeys(month);
   const leadingBlanks = getLeadingBlankCount(month);
+  const memberIds = new Set(members.map((member) => member.id));
   const ownByDate = new Map(
     availability
       .filter((entry) => entry.user_id === currentUserId)
@@ -119,7 +121,8 @@ export function PlannerCalendar({
 
         {dateKeys.map((dateKey) => {
           const dayEntries = availability.filter(
-            (entry) => entry.availability_date === dateKey
+            (entry) =>
+              entry.availability_date === dateKey && memberIds.has(entry.user_id)
           );
           const onlineCount = dayEntries.filter(
             (entry) =>
@@ -143,6 +146,10 @@ export function PlannerCalendar({
             (proposal) =>
               proposal.proposed_date === dateKey &&
               (proposal.status === "voting" || proposal.status === "confirmed")
+          );
+          const hasVotingProposal = proposals.some(
+            (proposal) =>
+              proposal.proposed_date === dateKey && proposal.status === "voting"
           );
           const isConfirmed = proposals.some(
             (proposal) =>
@@ -186,7 +193,7 @@ export function PlannerCalendar({
               }}
               className={`group relative min-h-24 select-none border-b border-r p-2 text-left transition sm:min-h-32 sm:p-3 ${ownModeClasses(
                 ownMode
-              )} ${heatClasses(heatValue, memberCount)} ${
+              )} ${heatClasses(heatValue, members.length)} ${
                 isSelected ? "z-10 outline outline-2 outline-purple-400/70" : ""
               } ${isRangeStart ? "outline outline-2 outline-yellow-300" : ""} ${
                 isPast
@@ -239,13 +246,15 @@ export function PlannerCalendar({
 
               {hasProposal && (
                 <span
-                  className={`absolute bottom-2 right-2 h-2.5 w-2.5 rounded-full ${
+                  className={`absolute bottom-1.5 right-1.5 rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide sm:bottom-2 sm:right-2 sm:px-2 sm:text-[9px] ${
                     isConfirmed
-                      ? "bg-yellow-300 shadow shadow-yellow-500"
-                      : "bg-purple-400 shadow shadow-purple-500"
+                      ? "border-yellow-400/50 bg-yellow-500/15 text-yellow-200"
+                      : "border-purple-400/50 bg-purple-500/15 text-purple-200"
                   }`}
                   title={isConfirmed ? "Confirmed session" : "Open proposal"}
-                />
+                >
+                  {isConfirmed ? "Session" : hasVotingProposal ? "Vote" : ""}
+                </span>
               )}
             </div>
           );

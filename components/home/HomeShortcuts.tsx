@@ -16,6 +16,7 @@ type Shortcut = {
 type HomeShortcutsProps = {
   fateStatus?: string;
   councilStatus?: string;
+  plannerStatus?: string;
   chatStatus?: string;
 };
 
@@ -34,9 +35,29 @@ function getToneClasses(tone: ShortcutTone) {
   }
 }
 
+function getPlannerTone(status: string): ShortcutTone {
+  const normalized = status.toLowerCase();
+
+  if (
+    normalized.includes("mark") ||
+    normalized.includes("vote") ||
+    normalized.includes("waiting") ||
+    normalized.includes("strong")
+  ) {
+    return "gold";
+  }
+
+  if (normalized.includes("day") || normalized.includes("clear")) {
+    return "green";
+  }
+
+  return "blue";
+}
+
 export function HomeShortcuts({
   fateStatus = "Open",
   councilStatus = "Open",
+  plannerStatus = "Open planner",
   chatStatus: _chatStatus = "Open channel",
 }: HomeShortcutsProps) {
   const shortcuts: Shortcut[] = [
@@ -69,8 +90,8 @@ export function HomeShortcuts({
       href: "/session-planner",
       icon: "session",
       subtitle: "Mark availability and vote on dates",
-      status: "Update dates",
-      tone: "gold",
+      status: plannerStatus,
+      tone: getPlannerTone(plannerStatus),
     },
   ];
 

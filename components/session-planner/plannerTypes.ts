@@ -17,6 +17,7 @@ export type PlannerMember = {
   id: string;
   display_name: string;
   role: AppRole;
+  planning_enabled?: boolean;
 };
 
 export type AvailabilityEntry = {
