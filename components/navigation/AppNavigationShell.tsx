@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import type { CampaignMembership } from "@/lib/campaigns/campaignTypes";
 import { useEffect, useMemo, useState } from "react";
 import { NavIcon } from "./NavIcon";
 import { NavigationSignOut } from "./NavigationSignOut";
+import { BaroviaNavigationShell } from "./BaroviaNavigationShell";
 import {
   getNavigationSections,
   isRouteActive,
@@ -29,6 +31,7 @@ type AppNavigationShellProps = {
   role: AppRole;
   displayName?: string | null;
   enableSignOut?: boolean;
+  campaigns?: CampaignMembership[];
 };
 
 function DesktopNavigationItem({
@@ -185,7 +188,7 @@ function DesktopSidebar({
 function MobileTopBar({ role }: { role: AppRole }) {
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center border-b border-slate-800/90 bg-slate-950/90 px-4 backdrop-blur-xl lg:hidden">
-      <Link href="/" className="flex items-center gap-3">
+      <Link href="/campaigns/nattau" className="flex items-center gap-3">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-yellow-500/30 bg-yellow-500/10 font-serif text-sm font-black text-yellow-300">
           NC
         </span>
@@ -369,16 +372,20 @@ function MobileMoreSheet({
   );
 }
 
-export function AppNavigationShell({
+function NattauNavigationShell({
   children,
   role,
   displayName,
   enableSignOut = true,
+  campaigns = [],
 }: AppNavigationShellProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsedState] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const sections = useMemo(() => getNavigationSections(role), [role]);
+  const sections = useMemo(
+    () => getNavigationSections(role, campaigns.length > 1),
+    [role, campaigns.length]
+  );
 
   useEffect(() => {
     setCollapsedState(localStorage.getItem(STORAGE_KEY) === "true");
@@ -444,5 +451,51 @@ export function AppNavigationShell({
         enableSignOut={enableSignOut}
       />
     </div>
+  );
+}
+
+export function AppNavigationShell({
+  children,
+  role,
+  displayName,
+  enableSignOut = true,
+  campaigns = [],
+}: AppNavigationShellProps) {
+  const pathname = usePathname();
+
+  if (pathname === "/campaigns" || pathname === "/no-campaign-access") {
+    return <>{children}</>;
+  }
+
+  const activeSlug = pathname.startsWith("/campaigns/barovia")
+    ? "barovia"
+    : "nattau";
+  const activeMembership = campaigns.find(
+    (campaign) => campaign.slug === activeSlug
+  );
+  const activeRole = activeMembership?.role ?? role;
+
+  if (activeSlug === "barovia") {
+    return (
+      <BaroviaNavigationShell
+        role={activeRole}
+        displayName={displayName}
+        canSwitchCampaign={campaigns.length > 1}
+        enableSignOut={enableSignOut}
+      >
+        {children}
+      </BaroviaNavigationShell>
+    );
+  }
+
+  return (
+    <NattauNavigationShell
+      role={activeRole}
+      displayName={displayName}
+      enableSignOut={enableSignOut}
+      campaigns={campaigns}
+    >
+      {children}
+    </NattauNavigationShell>
   );
 }

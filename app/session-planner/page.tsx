@@ -1,20 +1,15 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { SessionPlanner } from "@/components/session-planner/SessionPlanner";
-import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
+import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 
-export default async function SessionPlannerPage() {
-  const currentUser = await getCurrentAppUser();
-
-  if (!currentUser) {
-    redirect("/login");
-  }
+export default async function NattauSessionPlannerPage() {
+  const access = await requireCampaignMembership("nattau");
 
   return (
     <main className="mx-auto min-h-screen max-w-[1600px] px-3 py-6 text-slate-100 sm:px-6 sm:py-8 xl:px-8">
       <Link
-        href="/"
-        className="inline-flex rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-300 transition hover:border-yellow-600/40 hover:text-yellow-300"
+        href="/campaigns/nattau"
+        className="inline-flex min-h-11 items-center rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-300 transition hover:border-yellow-600/40 hover:text-yellow-300"
       >
         ← Back to Command Center
       </Link>
@@ -28,27 +23,26 @@ export default async function SessionPlannerPage() {
             Session Planner
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-            Paint your availability directly onto the shared calendar. Mark a
-            single day, drag across several days on desktop or use Range mode
-            on any device. Online and in-person availability remain separate.
+            Mark the days when you can play. Desktop users may paint with the
+            mouse; phones use stable multi-select without drag gestures.
           </p>
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-400">
           Signed in as
-          <strong className="ml-1 text-slate-100">
-            {currentUser.displayName}
-          </strong>
-          {currentUser.role === "dm" ? " · Game Master" : ""}
+          <strong className="ml-1 text-slate-100">{access.displayName}</strong>
+          {access.membership.role === "dm" ? " · Game Master" : ""}
         </div>
       </div>
 
       <div className="mt-8">
         <SessionPlanner
+          campaignSlug="nattau"
+          variant="nattau"
           currentUser={{
-            id: currentUser.id,
-            displayName: currentUser.displayName,
-            role: currentUser.role,
+            id: access.userId,
+            displayName: access.displayName,
+            role: access.membership.role,
           }}
         />
       </div>

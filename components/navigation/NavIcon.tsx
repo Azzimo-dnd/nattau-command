@@ -54,6 +54,8 @@ export function NavIcon({ name, ...props }: NavIconProps) {
       return <svg {...commonProps}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v6h6M12 7v5l3 2" /></svg>;
     case "spark":
       return <svg {...commonProps}><path d="m12 3 1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6Z" /></svg>;
+    case "campaigns":
+      return <svg {...commonProps}><rect x="3" y="5" width="13" height="14" rx="2" /><path d="M8 5V3h13v14h-5" /><path d="M7 9h5M7 13h5" /></svg>;
     default:
       return null;
   }

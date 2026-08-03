@@ -1,5 +1,7 @@
 import type { AppRole } from "@/components/navigation/navigationTypes";
 
+export type PlannerVariant = "nattau" | "barovia";
+
 export type AvailabilityMode =
   | "online"
   | "in_person"
@@ -49,10 +51,13 @@ export type SessionProposal = {
 };
 
 export type SessionPlannerData = {
+  campaign_id: string;
+  campaign_slug: string;
   month_start: string;
   month_end: string;
   current_user_id: string;
   current_user_role: AppRole;
+  current_user_planning_enabled: boolean;
   members: PlannerMember[];
   availability: AvailabilityEntry[];
   proposals: SessionProposal[];

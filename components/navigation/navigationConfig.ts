@@ -5,13 +5,16 @@ import type {
 } from "./navigationTypes";
 
 export const mobilePrimaryItems: NavigationItem[] = [
-  { label: "Home", href: "/", icon: "home", exact: true },
+  { label: "Home", href: "/campaigns/nattau", icon: "home", exact: true },
   { label: "Planner", href: "/session-planner", icon: "session" },
   { label: "Council", href: "/council", icon: "council" },
   { label: "Fate", href: "/fate", icon: "fate" },
 ];
 
-export function getNavigationSections(role: AppRole): NavigationSection[] {
+export function getNavigationSections(
+  role: AppRole,
+  canSwitchCampaign = false
+): NavigationSection[] {
   const betweenSessions: NavigationItem[] = [
     {
       label: "Session Planner",
@@ -50,7 +53,7 @@ export function getNavigationSections(role: AppRole): NavigationSection[] {
       items: [
         {
           label: "Command Center",
-          href: "/",
+          href: "/campaigns/nattau",
           icon: "home",
           exact: true,
         },
@@ -115,9 +118,22 @@ export function getNavigationSections(role: AppRole): NavigationSection[] {
     });
   }
 
+  const accountItems: NavigationItem[] = [];
+
+  if (canSwitchCampaign) {
+    accountItems.push({
+      label: "Campaign Companion",
+      href: "/campaigns",
+      icon: "campaigns",
+      description: "Switch between campaigns assigned to your account.",
+    });
+  }
+
+  accountItems.push({ label: "Account", href: "/account", icon: "account" });
+
   sections.push({
     label: "Account",
-    items: [{ label: "Account", href: "/account", icon: "account" }],
+    items: accountItems,
   });
 
   return sections;

@@ -1,17 +1,22 @@
 "use client";
 
+import { getPlannerTheme } from "./plannerTheme";
 import type {
   AvailabilityBrush,
   HeatMode,
+  PlannerVariant,
   SelectionMode,
 } from "./plannerTypes";
 
 type PlannerToolbarProps = {
+  variant: PlannerVariant;
   brush: AvailabilityBrush;
   selectionMode: SelectionMode;
   heatMode: HeatMode;
   rangeStart: string | null;
   busy: boolean;
+  touchMode: boolean;
+  selectedTouchCount: number;
   onBrushChange: (brush: AvailabilityBrush) => void;
   onSelectionModeChange: (mode: SelectionMode) => void;
   onHeatModeChange: (mode: HeatMode) => void;
@@ -48,82 +53,103 @@ const brushes: Array<{
   {
     value: "erase",
     label: "Erase",
-    className: "border-slate-600 bg-slate-950/60 text-slate-300",
+    className: "border-slate-600 bg-black/25 text-slate-300",
   },
 ];
 
 export function PlannerToolbar({
+  variant,
   brush,
   selectionMode,
   heatMode,
   rangeStart,
   busy,
+  touchMode,
+  selectedTouchCount,
   onBrushChange,
   onSelectionModeChange,
   onHeatModeChange,
   onApplyWeekends,
   onClearMonth,
 }: PlannerToolbarProps) {
+  const theme = getPlannerTheme(variant);
+
   return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+    <section className={`rounded-3xl border p-5 ${theme.panel}`}>
       <div className="grid gap-5 xl:grid-cols-[1fr_auto]">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-yellow-500">
-            Availability brush
+          <p className={`text-xs uppercase tracking-[0.3em] ${theme.accentText}`}>
+            {touchMode ? "Mobile selection" : "Availability brush"}
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {brushes.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                disabled={busy}
-                onClick={() => onBrushChange(item.value)}
-                className={`rounded-xl border px-3 py-2 text-sm font-bold transition disabled:opacity-50 ${item.className} ${
-                  brush === item.value
-                    ? "ring-2 ring-yellow-300/70 ring-offset-2 ring-offset-slate-950"
-                    : "opacity-75 hover:opacity-100"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+
+          {touchMode ? (
+            <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm leading-6 ${theme.panelMuted} ${theme.body}`}>
+              Tap any future dates to select them. Then use the fixed action bar
+              above the mobile navigation to apply a status to every selected
+              date at once. Dragging is disabled, so the page can scroll normally.
+              {selectedTouchCount > 0 && (
+                <strong className={`ml-1 ${theme.heading}`}>
+                  {selectedTouchCount} selected.
+                </strong>
+              )}
+            </div>
+          ) : (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {brushes.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onBrushChange(item.value)}
+                  className={`rounded-xl border px-3 py-2 text-sm font-bold transition disabled:opacity-50 ${item.className} ${
+                    brush === item.value
+                      ? `ring-2 ${theme.accentRing} ring-offset-2 ring-offset-slate-950`
+                      : "opacity-75 hover:opacity-100"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
-            Selection
-          </p>
-          <div className="mt-3 flex rounded-xl border border-slate-700 bg-slate-950/60 p-1">
-            {(["paint", "range"] as SelectionMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => onSelectionModeChange(mode)}
-                className={`rounded-lg px-4 py-2 text-sm font-bold capitalize transition ${
-                  selectionMode === mode
-                    ? "bg-yellow-500/15 text-yellow-200"
-                    : "text-slate-500 hover:text-slate-300"
-                }`}
-              >
-                {mode}
-              </button>
-            ))}
+        {!touchMode && (
+          <div>
+            <p className={`text-xs uppercase tracking-[0.3em] ${theme.subtle}`}>
+              Selection
+            </p>
+            <div className={`mt-3 flex rounded-xl border p-1 ${theme.panelMuted}`}>
+              {(["paint", "range"] as SelectionMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onSelectionModeChange(mode)}
+                  className={`rounded-lg px-4 py-2 text-sm font-bold capitalize transition ${
+                    selectionMode === mode
+                      ? `${theme.accentSoft} ${theme.accentText}`
+                      : `${theme.subtle} hover:opacity-100`
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {selectionMode === "range" && (
-        <div className="mt-4 rounded-xl border border-purple-500/20 bg-purple-500/5 px-4 py-3 text-sm text-purple-200">
+      {!touchMode && selectionMode === "range" && (
+        <div className={`mt-4 rounded-xl border px-4 py-3 text-sm ${theme.voteAccent}`}>
           {rangeStart
             ? "Now choose the final day. Every date between them will receive the selected brush."
             : "Choose the first day of the range, then choose the final day."}
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4">
+      <div className={`mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4 ${theme.border}`}>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs uppercase tracking-wider text-slate-500">
+          <span className={`text-xs uppercase tracking-wider ${theme.subtle}`}>
             Group heat
           </span>
           {(["best", "online", "in_person"] as HeatMode[]).map((mode) => (
@@ -133,8 +159,8 @@ export function PlannerToolbar({
               onClick={() => onHeatModeChange(mode)}
               className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
                 heatMode === mode
-                  ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-200"
-                  : "border-slate-700 bg-slate-950/50 text-slate-500 hover:text-slate-300"
+                  ? `${theme.accentBorder} ${theme.accentSoft} ${theme.accentText}`
+                  : `${theme.panelMuted} ${theme.subtle}`
               }`}
             >
               {mode === "in_person" ? "In person" : mode}
@@ -147,15 +173,15 @@ export function PlannerToolbar({
             type="button"
             disabled={busy}
             onClick={onApplyWeekends}
-            className="rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs font-bold text-slate-300 transition hover:border-yellow-500/30 hover:text-yellow-200 disabled:opacity-50"
+            className={`rounded-xl border px-3 py-2 text-xs font-bold transition disabled:opacity-50 ${theme.panelMuted} ${theme.body}`}
           >
-            Apply to all weekends
+            Apply to future weekends
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={onClearMonth}
-            className="rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs font-bold text-slate-400 transition hover:border-red-500/30 hover:text-red-300 disabled:opacity-50"
+            className={`rounded-xl border px-3 py-2 text-xs font-bold text-red-300 transition disabled:opacity-50 ${theme.panelMuted}`}
           >
             Clear my month
           </button>

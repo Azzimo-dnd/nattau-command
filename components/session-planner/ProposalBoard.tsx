@@ -1,13 +1,16 @@
 "use client";
 
 import { formatShortDate } from "./plannerDateUtils";
+import { getPlannerTheme } from "./plannerTheme";
 import type {
+  PlannerVariant,
   ProposalVoteValue,
   SessionPlannerUser,
   SessionProposal,
 } from "./plannerTypes";
 
 type ProposalBoardProps = {
+  variant: PlannerVariant;
   proposals: SessionProposal[];
   currentUser: SessionPlannerUser;
   eligibleVoterIds: string[];
@@ -31,22 +34,20 @@ function getModeClasses(mode: SessionProposal["session_mode"]) {
 
 function getVoteClasses(vote: ProposalVoteValue, selected: boolean) {
   const selectedClasses = {
-    yes: "border-green-400 bg-green-500/20 text-green-200",
-    maybe: "border-yellow-400 bg-yellow-500/20 text-yellow-200",
-    no: "border-red-400 bg-red-500/20 text-red-200",
+    yes: "border-green-400 bg-green-500/20 text-green-100",
+    maybe: "border-yellow-400 bg-yellow-500/20 text-yellow-100",
+    no: "border-red-400 bg-red-500/20 text-red-100",
   };
-
   const idleClasses = {
-    yes: "border-green-500/20 bg-green-500/5 text-green-300 hover:border-green-400/60",
-    maybe:
-      "border-yellow-500/20 bg-yellow-500/5 text-yellow-300 hover:border-yellow-400/60",
-    no: "border-red-500/20 bg-red-500/5 text-red-300 hover:border-red-400/60",
+    yes: "border-green-500/25 bg-green-500/5 text-green-300",
+    maybe: "border-yellow-500/25 bg-yellow-500/5 text-yellow-300",
+    no: "border-red-500/25 bg-red-500/5 text-red-300",
   };
-
   return selected ? selectedClasses[vote] : idleClasses[vote];
 }
 
 export function ProposalBoard({
+  variant,
   proposals,
   currentUser,
   eligibleVoterIds,
@@ -57,36 +58,35 @@ export function ProposalBoard({
   onConfirm,
   onCancel,
 }: ProposalBoardProps) {
+  const theme = getPlannerTheme(variant);
   const activeProposals = proposals.filter(
     (proposal) => proposal.status === "voting" || proposal.status === "confirmed"
   );
   const eligibleVoterIdSet = new Set(eligibleVoterIds);
 
   return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl shadow-slate-950/20 sm:p-6">
+    <section className={`rounded-3xl border p-5 shadow-2xl shadow-black/20 sm:p-6 ${theme.panel}`}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.32em] text-purple-400">
-            Group decision
+          <p className={`text-xs uppercase tracking-[0.32em] ${theme.accentText}`}>
+            {theme.proposalEyebrow}
           </p>
-          <h2 className="mt-2 text-2xl font-black text-slate-100">
-            Session Proposals
+          <h2 className={`mt-2 text-2xl font-black ${theme.heading}`}>
+            {theme.proposalTitle}
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            The Game Master may nominate the most promising dates. Players can
-            answer Yes, Maybe or No until one date is confirmed.
+          <p className={`mt-2 max-w-2xl text-sm leading-6 ${theme.subtle}`}>
+            {theme.proposalDescription}
           </p>
         </div>
-
-        <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1.5 text-xs text-slate-400">
+        <span className={`rounded-full border px-3 py-1.5 text-xs ${theme.panelMuted} ${theme.body}`}>
           {activeProposals.length} visible
         </span>
       </div>
 
       {activeProposals.length === 0 ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-slate-700 bg-slate-950/35 p-5 text-sm text-slate-500">
-          No date is currently under consideration. Mark availability in the
-          calendar so the best options become easy to spot.
+        <div className={`mt-5 rounded-2xl border border-dashed p-5 text-sm ${theme.panelMuted} ${theme.subtle}`}>
+          No date is currently under consideration. Mark availability so the
+          strongest options become easy to see.
         </div>
       ) : (
         <div className="mt-5 grid gap-4 xl:grid-cols-2">
@@ -97,15 +97,11 @@ export function ProposalBoard({
             const countedVotes = proposal.votes.filter((vote) =>
               eligibleVoterIdSet.has(vote.voter_id)
             );
-            const yesVotes = countedVotes.filter(
-              (vote) => vote.vote === "yes"
-            );
+            const yesVotes = countedVotes.filter((vote) => vote.vote === "yes");
             const maybeVotes = countedVotes.filter(
               (vote) => vote.vote === "maybe"
             );
-            const noVotes = countedVotes.filter(
-              (vote) => vote.vote === "no"
-            );
+            const noVotes = countedVotes.filter((vote) => vote.vote === "no");
             const isBusy = busyProposalId === proposal.id;
             const isConfirmed = proposal.status === "confirmed";
 
@@ -113,55 +109,37 @@ export function ProposalBoard({
               <article
                 key={proposal.id}
                 className={`rounded-2xl border p-5 transition ${
-                  isConfirmed
-                    ? "border-yellow-500/40 bg-yellow-500/10"
-                    : "border-slate-800 bg-slate-950/55"
+                  isConfirmed ? theme.confirmAccent : theme.panelMuted
                 }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
-                      {isConfirmed ? "Confirmed session" : "Open vote"}
+                    <p className={`text-xs uppercase tracking-[0.28em] ${theme.subtle}`}>
+                      {isConfirmed
+                        ? variant === "barovia"
+                          ? "Chosen by the Mists"
+                          : "Confirmed session"
+                        : "Open vote"}
                     </p>
-                    <h3 className="mt-2 text-xl font-black text-slate-100">
+                    <h3 className={`mt-2 text-xl font-black ${theme.heading}`}>
                       {formatShortDate(proposal.proposed_date)}
                     </h3>
                   </div>
-
-                  <span
-                    className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide ${getModeClasses(
-                      proposal.session_mode
-                    )}`}
-                  >
+                  <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide ${getModeClasses(proposal.session_mode)}`}>
                     {getModeLabel(proposal.session_mode)}
                   </span>
                 </div>
 
                 {proposal.message && (
-                  <p className="mt-4 text-sm leading-6 text-slate-400">
+                  <p className={`mt-4 text-sm leading-6 ${theme.body}`}>
                     {proposal.message}
                   </p>
                 )}
 
                 <div className="mt-4 grid grid-cols-3 gap-2">
-                  <VoteSummary
-                    label="Yes"
-                    value={yesVotes.length}
-                    names={yesVotes.map((vote) => vote.voter_name)}
-                    className="text-green-300"
-                  />
-                  <VoteSummary
-                    label="Maybe"
-                    value={maybeVotes.length}
-                    names={maybeVotes.map((vote) => vote.voter_name)}
-                    className="text-yellow-300"
-                  />
-                  <VoteSummary
-                    label="No"
-                    value={noVotes.length}
-                    names={noVotes.map((vote) => vote.voter_name)}
-                    className="text-red-300"
-                  />
+                  <VoteSummary label="Yes" value={yesVotes.length} names={yesVotes.map((vote) => vote.voter_name)} className="text-green-300" variant={variant} />
+                  <VoteSummary label="Maybe" value={maybeVotes.length} names={maybeVotes.map((vote) => vote.voter_name)} className="text-yellow-300" variant={variant} />
+                  <VoteSummary label="No" value={noVotes.length} names={noVotes.map((vote) => vote.voter_name)} className="text-red-300" variant={variant} />
                 </div>
 
                 {!isConfirmed && currentUser.role === "player" && (
@@ -176,13 +154,10 @@ export function ProposalBoard({
                             disabled={isBusy}
                             onClick={() =>
                               selected
-                                ? onRemoveVote(proposal.id)
-                                : onVote(proposal.id, vote)
+                                ? void onRemoveVote(proposal.id)
+                                : void onVote(proposal.id, vote)
                             }
-                            className={`rounded-xl border px-3 py-2 text-sm font-bold capitalize transition disabled:cursor-wait disabled:opacity-60 ${getVoteClasses(
-                              vote,
-                              selected
-                            )}`}
+                            className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-bold capitalize transition disabled:opacity-60 ${getVoteClasses(vote, selected)}`}
                           >
                             {vote}
                           </button>
@@ -196,8 +171,8 @@ export function ProposalBoard({
                   currentUser.role === "player" &&
                   !currentUserCountsTowardPlanning && (
                     <p className="mt-3 text-xs leading-5 text-cyan-300">
-                      Your test vote is saved for UI testing but is not included
-                      in the totals shown above.
+                      Your test vote is saved for interface testing but is not
+                      included in the totals above.
                     </p>
                   )}
 
@@ -206,27 +181,20 @@ export function ProposalBoard({
                     <button
                       type="button"
                       disabled={isBusy}
-                      onClick={() => onConfirm(proposal.id)}
-                      className="rounded-xl border border-yellow-400/50 bg-yellow-500/15 px-4 py-2 text-sm font-bold text-yellow-200 transition hover:border-yellow-300 hover:bg-yellow-500/25 disabled:cursor-wait disabled:opacity-60"
+                      onClick={() => void onConfirm(proposal.id)}
+                      className={`min-h-11 rounded-xl border px-4 py-2 text-sm font-bold disabled:opacity-60 ${theme.confirmAccent}`}
                     >
-                      Confirm as next session
+                      Confirm this date
                     </button>
                     <button
                       type="button"
                       disabled={isBusy}
-                      onClick={() => onCancel(proposal.id)}
-                      className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-bold text-slate-400 transition hover:border-red-500/40 hover:text-red-300 disabled:cursor-wait disabled:opacity-60"
+                      onClick={() => void onCancel(proposal.id)}
+                      className="min-h-11 rounded-xl border border-red-500/25 bg-red-500/5 px-4 py-2 text-sm font-bold text-red-300 disabled:opacity-60"
                     >
                       Cancel proposal
                     </button>
                   </div>
-                )}
-
-                {isConfirmed && (
-                  <p className="mt-4 rounded-xl border border-yellow-500/20 bg-slate-950/50 px-3 py-2 text-xs leading-5 text-yellow-200">
-                    Published to the main session countdown. The default time is
-                    19:00 Europe/Warsaw and may be adjusted in Session Controls.
-                  </p>
                 )}
               </article>
             );
@@ -237,23 +205,29 @@ export function ProposalBoard({
   );
 }
 
-type VoteSummaryProps = {
+function VoteSummary({
+  label,
+  value,
+  names,
+  className,
+  variant,
+}: {
   label: string;
   value: number;
   names: string[];
   className: string;
-};
-
-function VoteSummary({ label, value, names, className }: VoteSummaryProps) {
+  variant: PlannerVariant;
+}) {
+  const theme = getPlannerTheme(variant);
   return (
     <div
-      className="rounded-xl border border-slate-800 bg-slate-900/65 p-3 text-center"
-      title={names.length > 0 ? names.join(", ") : `No ${label.toLowerCase()} votes`}
+      className={`rounded-xl border p-3 text-center ${theme.panelMuted}`}
+      title={names.length > 0 ? names.join(", ") : "Nobody"}
     >
-      <p className={`text-2xl font-black ${className}`}>{value}</p>
-      <p className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">
+      <p className={`text-[10px] uppercase tracking-wider ${theme.subtle}`}>
         {label}
       </p>
+      <p className={`mt-1 text-xl font-black ${className}`}>{value}</p>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { getCurrentAppUser } from "@/lib/auth/getCurrentAppUser";
+import { loadUserCampaignAccess } from "@/lib/campaigns/loadUserCampaigns";
 import { AppNavigationShell } from "./AppNavigationShell";
 
 type AuthenticatedNavigationProps = {
@@ -16,10 +17,13 @@ export async function AuthenticatedNavigation({
     return <>{children}</>;
   }
 
+  const campaignAccess = await loadUserCampaignAccess();
+
   return (
     <AppNavigationShell
       role={currentUser.role}
       displayName={currentUser.displayName}
+      campaigns={campaignAccess?.campaigns ?? []}
     >
       {children}
     </AppNavigationShell>

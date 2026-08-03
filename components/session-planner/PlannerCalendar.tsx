@@ -11,24 +11,30 @@ import {
   getMonthDateKeys,
   isPastDate,
 } from "./plannerDateUtils";
+import { getPlannerTheme } from "./plannerTheme";
 import type {
   AvailabilityEntry,
   AvailabilityMode,
   HeatMode,
   PlannerMember,
+  PlannerVariant,
+  SelectionMode,
   SessionProposal,
 } from "./plannerTypes";
 
 type PlannerCalendarProps = {
+  variant: PlannerVariant;
   month: Date;
   currentUserId: string;
   members: PlannerMember[];
   availability: AvailabilityEntry[];
   proposals: SessionProposal[];
   selectedDate: string | null;
+  selectedTouchDates: Set<string>;
   rangeStart: string | null;
   heatMode: HeatMode;
-  selectionMode: "paint" | "range";
+  selectionMode: SelectionMode;
+  touchMode: boolean;
   onPaintPointerDown: (
     dateKey: string,
     event: ReactPointerEvent<HTMLDivElement>
@@ -38,6 +44,7 @@ type PlannerCalendarProps = {
     event: ReactPointerEvent<HTMLDivElement>
   ) => void;
   onRangeClick: (dateKey: string) => void;
+  onToggleTouchDate: (dateKey: string) => void;
   onInspect: (dateKey: string) => void;
 };
 
@@ -52,43 +59,47 @@ function ownModeClasses(mode: AvailabilityMode | undefined) {
     case "unavailable":
       return "border-red-500/40 bg-red-500/10";
     default:
-      return "border-slate-800 bg-slate-950/35";
+      return "";
   }
 }
 
-function heatClasses(value: number, total: number) {
-  if (total <= 0 || value <= 0) {
+function heatClasses(value: number, total: number, variant: PlannerVariant) {
+  if (total <= 0 || value <= 0) return "";
+
+  const ratio = value / total;
+  if (variant === "barovia") {
+    if (ratio >= 1) return "ring-2 ring-[#d2a5b2]/70 shadow-lg shadow-black/30";
+    if (ratio >= 0.75) return "ring-1 ring-[#93465c]/70";
+    if (ratio >= 0.5) return "ring-1 ring-[#6f5962]/50";
     return "";
   }
 
-  const ratio = value / total;
-  if (ratio >= 1) {
-    return "ring-2 ring-yellow-300/70 shadow-lg shadow-yellow-950/25";
-  }
-  if (ratio >= 0.75) {
-    return "ring-1 ring-yellow-500/50";
-  }
-  if (ratio >= 0.5) {
-    return "ring-1 ring-slate-500/50";
-  }
+  if (ratio >= 1) return "ring-2 ring-yellow-300/70 shadow-lg shadow-yellow-950/25";
+  if (ratio >= 0.75) return "ring-1 ring-yellow-500/50";
+  if (ratio >= 0.5) return "ring-1 ring-slate-500/50";
   return "";
 }
 
 export function PlannerCalendar({
+  variant,
   month,
   currentUserId,
   members,
   availability,
   proposals,
   selectedDate,
+  selectedTouchDates,
   rangeStart,
   heatMode,
   selectionMode,
+  touchMode,
   onPaintPointerDown,
   onPaintPointerEnter,
   onRangeClick,
+  onToggleTouchDate,
   onInspect,
 }: PlannerCalendarProps) {
+  const theme = getPlannerTheme(variant);
   const dateKeys = getMonthDateKeys(month);
   const leadingBlanks = getLeadingBlankCount(month);
   const memberIds = new Set(members.map((member) => member.id));
@@ -99,12 +110,12 @@ export function PlannerCalendar({
   );
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/70">
-      <div className="grid grid-cols-7 border-b border-slate-800 bg-slate-950/45">
+    <div className={`touch-pan-y overflow-hidden rounded-3xl border ${theme.panel}`}>
+      <div className={`grid grid-cols-7 border-b bg-black/20 ${theme.border}`}>
         {WEEKDAY_LABELS.map((label) => (
           <div
             key={label}
-            className="px-1 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:px-3 sm:py-3 sm:text-xs"
+            className={`px-0.5 py-2 text-center text-[9px] font-bold uppercase tracking-wide sm:px-3 sm:py-3 sm:text-xs ${theme.subtle}`}
           >
             {label}
           </div>
@@ -115,7 +126,7 @@ export function PlannerCalendar({
         {Array.from({ length: leadingBlanks }, (_, index) => (
           <div
             key={`blank-${index}`}
-            className="min-h-24 border-b border-r border-slate-800/70 bg-slate-950/20 sm:min-h-32"
+            className={`min-h-[5.4rem] border-b border-r bg-black/10 sm:min-h-32 ${theme.border}`}
           />
         ))}
 
@@ -142,23 +153,29 @@ export function PlannerCalendar({
                 : Math.max(onlineCount, inPersonCount);
           const ownMode = ownByDate.get(dateKey);
           const dayNumber = Number(dateKey.slice(-2));
-          const hasProposal = proposals.some(
-            (proposal) =>
-              proposal.proposed_date === dateKey &&
-              (proposal.status === "voting" || proposal.status === "confirmed")
-          );
           const hasVotingProposal = proposals.some(
             (proposal) =>
               proposal.proposed_date === dateKey && proposal.status === "voting"
           );
           const isConfirmed = proposals.some(
             (proposal) =>
-              proposal.proposed_date === dateKey &&
-              proposal.status === "confirmed"
+              proposal.proposed_date === dateKey && proposal.status === "confirmed"
           );
-          const isSelected = selectedDate === dateKey;
+          const isInspected = selectedDate === dateKey;
+          const isTouchSelected = selectedTouchDates.has(dateKey);
           const isRangeStart = rangeStart === dateKey;
           const isPast = isPastDate(dateKey);
+
+          function activateDate() {
+            if (isPast) return;
+            if (touchMode) {
+              onToggleTouchDate(dateKey);
+              return;
+            }
+            if (selectionMode === "range") {
+              onRangeClick(dateKey);
+            }
+          }
 
           return (
             <div
@@ -166,43 +183,47 @@ export function PlannerCalendar({
               role="button"
               tabIndex={isPast ? -1 : 0}
               aria-disabled={isPast}
+              aria-pressed={touchMode ? isTouchSelected : undefined}
               title={isPast ? "Past dates cannot be edited." : undefined}
-              onPointerDown={(event: ReactPointerEvent<HTMLDivElement>) =>
-                !isPast && selectionMode === "paint"
-                  ? onPaintPointerDown(dateKey, event)
-                  : undefined
-              }
-              onPointerEnter={(event: ReactPointerEvent<HTMLDivElement>) =>
-                !isPast && selectionMode === "paint"
-                  ? onPaintPointerEnter(dateKey, event)
-                  : undefined
-              }
-              onClick={() =>
-                !isPast && selectionMode === "range"
-                  ? onRangeClick(dateKey)
-                  : undefined
-              }
+              onPointerDown={(event: ReactPointerEvent<HTMLDivElement>) => {
+                if (
+                  !isPast &&
+                  !touchMode &&
+                  selectionMode === "paint" &&
+                  event.pointerType === "mouse"
+                ) {
+                  onPaintPointerDown(dateKey, event);
+                }
+              }}
+              onPointerEnter={(event: ReactPointerEvent<HTMLDivElement>) => {
+                if (!isPast && !touchMode && selectionMode === "paint") {
+                  onPaintPointerEnter(dateKey, event);
+                }
+              }}
+              onClick={() => activateDate()}
               onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
                 if (isPast || (event.key !== "Enter" && event.key !== " ")) {
                   return;
                 }
                 event.preventDefault();
-                if (selectionMode === "range") {
-                  onRangeClick(dateKey);
-                }
+                activateDate();
               }}
-              className={`group relative min-h-24 select-none border-b border-r p-2 text-left transition sm:min-h-32 sm:p-3 ${ownModeClasses(
-                ownMode
-              )} ${heatClasses(heatValue, members.length)} ${
-                isSelected ? "z-10 outline outline-2 outline-purple-400/70" : ""
-              } ${isRangeStart ? "outline outline-2 outline-yellow-300" : ""} ${
+              className={`group relative min-h-[5.4rem] select-none border-b border-r p-1.5 text-left transition sm:min-h-32 sm:p-3 ${theme.border} ${
+                ownMode ? ownModeClasses(ownMode) : "bg-black/10"
+              } ${heatClasses(heatValue, members.length, variant)} ${
+                isInspected ? `z-10 outline outline-2 ${theme.selectedOutline}` : ""
+              } ${
+                isTouchSelected
+                  ? `z-20 outline outline-[3px] ${theme.rangeOutline} brightness-125`
+                  : ""
+              } ${isRangeStart ? `outline outline-2 ${theme.rangeOutline}` : ""} ${
                 isPast
-                  ? "cursor-not-allowed opacity-45 grayscale-[0.35]"
-                  : "cursor-pointer"
+                  ? "cursor-not-allowed opacity-40 grayscale-[0.35]"
+                  : "cursor-pointer active:scale-[0.98]"
               }`}
             >
               <div className="flex items-start justify-between gap-1">
-                <span className="text-sm font-black text-slate-200 sm:text-base">
+                <span className={`text-sm font-black sm:text-base ${theme.heading}`}>
                   {dayNumber}
                 </span>
                 <button
@@ -214,46 +235,45 @@ export function PlannerCalendar({
                     event.stopPropagation();
                     onInspect(dateKey);
                   }}
-                  className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-700 bg-slate-950/70 text-[11px] text-slate-500 opacity-70 transition hover:border-purple-500/50 hover:text-purple-300 sm:opacity-0 sm:group-hover:opacity-100"
+                  className={`flex h-6 w-6 items-center justify-center rounded-full border bg-black/40 text-[11px] opacity-80 transition sm:opacity-0 sm:group-hover:opacity-100 ${theme.border} ${theme.subtle}`}
                   aria-label={`Inspect ${dateKey}`}
                 >
                   i
                 </button>
               </div>
 
-              <div className="mt-3 space-y-1.5 text-[10px] sm:text-xs">
-                <div className="flex items-center justify-between rounded-lg border border-blue-500/15 bg-blue-500/5 px-1.5 py-1 text-blue-300">
-                  <span>Online</span>
+              <div className="mt-1.5 space-y-1 text-[8px] sm:mt-3 sm:text-xs">
+                <div className="flex items-center justify-between rounded-md border border-blue-500/15 bg-blue-500/5 px-1 py-0.5 text-blue-300 sm:rounded-lg sm:px-1.5 sm:py-1">
+                  <span className="hidden sm:inline">Online</span>
+                  <span className="sm:hidden">O</span>
                   <strong>{onlineCount}</strong>
                 </div>
-                <div className="flex items-center justify-between rounded-lg border border-emerald-500/15 bg-emerald-500/5 px-1.5 py-1 text-emerald-300">
-                  <span className="truncate">In person</span>
+                <div className="flex items-center justify-between rounded-md border border-emerald-500/15 bg-emerald-500/5 px-1 py-0.5 text-emerald-300 sm:rounded-lg sm:px-1.5 sm:py-1">
+                  <span className="hidden sm:inline">In person</span>
+                  <span className="sm:hidden">P</span>
                   <strong>{inPersonCount}</strong>
                 </div>
               </div>
 
               {ownMode && (
-                <span className="absolute bottom-1.5 left-1.5 max-w-[calc(100%-3rem)] truncate rounded-full border border-slate-700 bg-slate-950/80 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-300 sm:bottom-2 sm:left-2 sm:text-[9px]">
-                  You: {ownMode.replace("_", " ")}
+                <span className="absolute bottom-1 left-1 max-w-[calc(100%-2rem)] truncate rounded-full border border-slate-700 bg-black/70 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wide text-slate-200 sm:bottom-2 sm:left-2 sm:px-2 sm:text-[9px]">
+                  {ownMode === "in_person" ? "Person" : ownMode}
                 </span>
               )}
 
               {isPast && !ownMode && (
-                <span className="absolute bottom-1.5 left-1.5 rounded-full border border-slate-700 bg-slate-950/80 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-500 sm:bottom-2 sm:left-2 sm:text-[9px]">
+                <span className={`absolute bottom-1 left-1 rounded-full border bg-black/55 px-1.5 py-0.5 text-[7px] font-bold uppercase sm:bottom-2 sm:left-2 sm:text-[9px] ${theme.border} ${theme.subtle}`}>
                   Past
                 </span>
               )}
 
-              {hasProposal && (
+              {(hasVotingProposal || isConfirmed) && (
                 <span
-                  className={`absolute bottom-1.5 right-1.5 rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide sm:bottom-2 sm:right-2 sm:px-2 sm:text-[9px] ${
-                    isConfirmed
-                      ? "border-yellow-400/50 bg-yellow-500/15 text-yellow-200"
-                      : "border-purple-400/50 bg-purple-500/15 text-purple-200"
+                  className={`absolute bottom-1 right-1 rounded-full border px-1 py-0.5 text-[7px] font-black uppercase tracking-wide sm:bottom-2 sm:right-2 sm:px-2 sm:text-[9px] ${
+                    isConfirmed ? theme.confirmAccent : theme.voteAccent
                   }`}
-                  title={isConfirmed ? "Confirmed session" : "Open proposal"}
                 >
-                  {isConfirmed ? "Session" : hasVotingProposal ? "Vote" : ""}
+                  {isConfirmed ? "Session" : "Vote"}
                 </span>
               )}
             </div>

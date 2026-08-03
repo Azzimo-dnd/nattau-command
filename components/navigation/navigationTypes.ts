@@ -18,7 +18,8 @@ export type NavigationIconName =
   | "logout"
   | "session"
   | "history"
-  | "spark";
+  | "spark"
+  | "campaigns";
 
 export type NavigationItem = {
   label: string;

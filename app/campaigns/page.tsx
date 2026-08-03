@@ -1,14 +1,20 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { CampaignSelector } from "@/components/campaigns/CampaignSelector";
 import { loadUserCampaignAccess } from "@/lib/campaigns/loadUserCampaigns";
 
-export default async function CampaignEntryPage() {
+export const metadata: Metadata = {
+  title: "Campaign Companion",
+  description: "Choose the campaign whose story you want to continue.",
+};
+
+export default async function CampaignSelectionPage() {
   const access = await loadUserCampaignAccess();
 
   if (!access) {
     redirect("/login");
   }
 
-  // Until the SQL migration is present, preserve the existing application.
   if (!access.sourceAvailable) {
     redirect("/campaigns/nattau");
   }
@@ -21,5 +27,10 @@ export default async function CampaignEntryPage() {
     redirect(access.campaigns[0].homeHref);
   }
 
-  redirect("/campaigns");
+  return (
+    <CampaignSelector
+      displayName={access.displayName}
+      campaigns={access.campaigns}
+    />
+  );
 }
