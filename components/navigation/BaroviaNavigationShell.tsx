@@ -139,8 +139,8 @@ function DesktopSidebar({
                 Campaign tools active
               </p>
               <p className="mt-2 text-xs leading-5 text-[#8f8187]">
-                The Gathering and The Duality now use campaign-specific data.
-                Tarokka, character cards and the Atlas remain in preparation.
+                The Gathering, The Duality, Tarokka and the Atlas now use
+                campaign-specific data. Character cards remain in preparation.
               </p>
             </div>
           </section>

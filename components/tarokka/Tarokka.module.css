@@ -1,0 +1,431 @@
+.moduleRoot {
+  --wine: #6c1e33;
+  --wine-bright: #a94d69;
+  --bone: #e6d7c1;
+  --ash: #ada2a7;
+  --silver: #bfc2c9;
+  --ink: #0b080b;
+  --surface: #151015;
+  position: relative;
+}
+
+.mistPanel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(111, 54, 71, 0.72);
+  background:
+    radial-gradient(circle at 82% 15%, rgba(115, 30, 53, 0.22), transparent 32%),
+    radial-gradient(circle at 12% 88%, rgba(184, 190, 203, 0.08), transparent 30%),
+    linear-gradient(155deg, rgba(24, 15, 21, 0.98), rgba(9, 7, 10, 0.98));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.35);
+}
+
+.mistPanel::before {
+  position: absolute;
+  inset: -30%;
+  content: "";
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 25% 40%, rgba(230, 220, 224, 0.09), transparent 25%),
+    radial-gradient(ellipse at 70% 62%, rgba(230, 220, 224, 0.06), transparent 27%);
+  filter: blur(26px);
+  animation: mistDrift 18s ease-in-out infinite alternate;
+}
+
+@keyframes mistDrift {
+  from { transform: translate3d(-2%, 1%, 0) scale(1); }
+  to { transform: translate3d(3%, -2%, 0) scale(1.08); }
+}
+
+.cardButton {
+  position: relative;
+  display: block;
+  width: min(280px, 72vw);
+  aspect-ratio: 5 / 8;
+  border: 0;
+  padding: 0;
+  border-radius: 1.25rem;
+  background: transparent;
+  color: inherit;
+  transition: transform 220ms ease, filter 220ms ease;
+}
+
+.cardButton:disabled {
+  opacity: 1;
+}
+
+.cardInteractive {
+  cursor: pointer;
+}
+
+.cardInteractive:hover:not(:disabled),
+.cardInteractive:focus-visible:not(:disabled) {
+  z-index: 4;
+  outline: none;
+  filter: brightness(1.08);
+  transform: translateY(-10px) scale(1.025);
+}
+
+.cardStatic {
+  cursor: default;
+}
+
+.cardSelected {
+  z-index: 5;
+  transform: translateY(-12px) scale(1.035);
+  filter: drop-shadow(0 0 24px rgba(174, 74, 105, 0.3));
+}
+
+.cardCompact {
+  width: min(168px, 42vw);
+  border-radius: 0.9rem;
+}
+
+.cardPerspective {
+  position: absolute;
+  inset: 0;
+  display: block;
+  perspective: 1500px;
+}
+
+.cardInner {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-style: preserve-3d;
+  transform: rotateY(0deg) rotateZ(0deg);
+  transition: transform 1150ms cubic-bezier(0.18, 0.78, 0.2, 1);
+  will-change: transform;
+}
+
+.cardRevealed {
+  transform: rotateY(180deg) rotateZ(0deg);
+}
+
+/* The entire physical card is rotated 180 degrees for a reversed draw.
+   The frame, illustration, title and all printed details turn together. */
+.cardRevealed.cardReversed {
+  transform: rotateY(180deg) rotateZ(180deg);
+}
+
+.cardFace {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.52),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.cardCompact .cardFace {
+  border-radius: 0.9rem;
+}
+
+.cardBack {
+  border: 1px solid rgba(172, 83, 109, 0.72);
+  background:
+    radial-gradient(circle at 50% 45%, rgba(117, 31, 55, 0.46), transparent 28%),
+    repeating-radial-gradient(circle at 50% 50%, transparent 0 17px, rgba(188, 174, 181, 0.045) 18px 19px),
+    linear-gradient(145deg, #24121b, #0b080c 62%, #180d13);
+}
+
+.backOuterFrame,
+.backInnerFrame,
+.frontOuterFrame,
+.frontInnerFrame {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 0.88rem;
+}
+
+.backOuterFrame {
+  inset: 5.5%;
+  border: 1px solid rgba(218, 184, 194, 0.38);
+  box-shadow: inset 0 0 22px rgba(130, 38, 63, 0.18);
+}
+
+.backInnerFrame {
+  inset: 9%;
+  border: 1px solid rgba(171, 80, 106, 0.38);
+}
+
+.backMoon {
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  display: grid;
+  width: 41%;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(224, 207, 213, 0.34);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 64% 39%, #150c12 0 45%, transparent 46%),
+    radial-gradient(circle, rgba(225, 210, 216, 0.78), rgba(152, 132, 142, 0.56) 70%, transparent 72%);
+  box-shadow: 0 0 42px rgba(181, 130, 146, 0.14);
+  transform: translate(-50%, -50%);
+}
+
+.backRaven {
+  font-size: clamp(1.5rem, 7vw, 3rem);
+  color: #160b11;
+  text-shadow: 0 0 12px rgba(0, 0, 0, 0.85);
+}
+
+.backMist {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 17%;
+  height: 22%;
+  opacity: 0.62;
+  background:
+    radial-gradient(ellipse at 30% 42%, rgba(222, 214, 218, 0.21), transparent 42%),
+    radial-gradient(ellipse at 70% 65%, rgba(222, 214, 218, 0.16), transparent 40%);
+  filter: blur(8px);
+}
+
+.backTitle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8.8%;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(0.62rem, 2.5vw, 0.9rem);
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  color: rgba(228, 205, 213, 0.7);
+  text-indent: 0.42em;
+}
+
+.cardFront {
+  transform: rotateY(180deg);
+  border: 1px solid rgba(166, 78, 104, 0.7);
+  background:
+    radial-gradient(circle at 50% 33%, rgba(100, 24, 46, 0.2), transparent 42%),
+    linear-gradient(155deg, #1c1117, #0a080b 65%, #170c12);
+  color: #d9c7cd;
+}
+
+.frontTexture {
+  position: absolute;
+  inset: 0;
+  opacity: 0.48;
+  background:
+    repeating-linear-gradient(94deg, transparent 0 5px, rgba(255, 255, 255, 0.012) 6px),
+    radial-gradient(circle at 15% 20%, rgba(227, 216, 221, 0.045), transparent 18%),
+    radial-gradient(circle at 85% 78%, rgba(227, 216, 221, 0.04), transparent 20%);
+}
+
+.frontOuterFrame {
+  inset: 4.6%;
+  border: 1px solid rgba(211, 176, 186, 0.43);
+}
+
+.frontInnerFrame {
+  inset: 7.6%;
+  border: 1px solid rgba(133, 61, 83, 0.52);
+}
+
+.cornerTopLeft,
+.cornerTopRight,
+.cornerBottomLeft,
+.cornerBottomRight {
+  position: absolute;
+  z-index: 3;
+  font-size: clamp(0.55rem, 2.5vw, 0.85rem);
+  color: rgba(205, 158, 172, 0.72);
+}
+
+.cornerTopLeft { left: 8.5%; top: 6%; }
+.cornerTopRight { right: 8.5%; top: 6%; transform: scaleX(-1); }
+.cornerBottomLeft { left: 8.5%; bottom: 6%; transform: scaleY(-1); }
+.cornerBottomRight { right: 8.5%; bottom: 6%; transform: scale(-1); }
+
+.cardNumber {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6.5%;
+  z-index: 2;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(0.62rem, 2.6vw, 0.86rem);
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  color: rgba(222, 190, 199, 0.85);
+  text-indent: 0.34em;
+}
+
+.cardArtwork {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 15%;
+  height: 54%;
+  color: rgba(220, 202, 208, 0.88);
+  filter: drop-shadow(0 0 18px rgba(141, 54, 81, 0.18));
+}
+
+.cardName {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 18%;
+  z-index: 2;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(0.84rem, 3.5vw, 1.25rem);
+  font-weight: 700;
+  letter-spacing: 0.075em;
+  color: #e4d2c9;
+}
+
+.cardSubtitle {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 11.5%;
+  z-index: 2;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(0.46rem, 2vw, 0.66rem);
+  font-style: italic;
+  line-height: 1.4;
+  color: rgba(185, 165, 173, 0.86);
+}
+
+.cardFooterSigil {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 5.5%;
+  z-index: 2;
+  text-align: center;
+  font-size: clamp(0.58rem, 2.2vw, 0.76rem);
+  color: rgba(201, 147, 164, 0.72);
+}
+
+.cardCompact .cardNumber {
+  font-size: 0.54rem;
+}
+
+.cardCompact .cardName {
+  bottom: 17%;
+  font-size: clamp(0.58rem, 2.4vw, 0.8rem);
+}
+
+.cardCompact .cardSubtitle {
+  display: none;
+}
+
+.cardCompact .cardArtwork {
+  top: 16%;
+  height: 58%;
+}
+
+.deckStage {
+  position: relative;
+  display: grid;
+  min-height: 470px;
+  place-items: center;
+  overflow: hidden;
+}
+
+.deckStage::before {
+  position: absolute;
+  left: 50%;
+  bottom: 11%;
+  width: min(680px, 92%);
+  height: 88px;
+  content: "";
+  border-radius: 999px;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.62), transparent 68%);
+  filter: blur(11px);
+  transform: translateX(-50%);
+}
+
+.dealRow {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.5rem, 3vw, 1.6rem);
+  padding: 2rem 0.5rem 3rem;
+}
+
+.dealRow > :nth-child(1) { transform: rotate(-5deg); }
+.dealRow > :nth-child(2) { transform: translateY(-8px); }
+.dealRow > :nth-child(3) { transform: rotate(5deg); }
+
+.dealRow > :nth-child(1):hover,
+.dealRow > :nth-child(1):focus-visible,
+.dealRow > :nth-child(3):hover,
+.dealRow > :nth-child(3):focus-visible {
+  transform: translateY(-10px) rotate(0deg) scale(1.025);
+}
+
+.readingGrid {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: start;
+}
+
+.readingPosition {
+  min-width: 0;
+}
+
+.readingCardWrap {
+  display: flex;
+  min-height: 292px;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 1100px) {
+  .readingGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .deckStage {
+    min-height: 390px;
+  }
+
+  .dealRow {
+    gap: 0.15rem;
+    padding-inline: 0;
+  }
+
+  .dealRow .cardButton {
+    width: min(31vw, 145px);
+  }
+
+  .readingGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .readingCardWrap {
+    min-height: 280px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mistPanel::before {
+    animation: none;
+  }
+
+  .cardInner,
+  .cardButton {
+    transition-duration: 1ms;
+  }
+}

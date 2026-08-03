@@ -36,7 +36,7 @@ const modules: Array<{
       "A Barovian interpretation of the campaign Tarot system, with its own deck, cycle and omens.",
     href: "/campaigns/barovia/tarokka",
     mark: "T",
-    status: "preview",
+    status: "active",
   },
   {
     eyebrow: "Party",
@@ -54,7 +54,7 @@ const modules: Array<{
       "A discoverable map of Barovia with hidden, rumored and revealed locations.",
     href: "/campaigns/barovia/map",
     mark: "A",
-    status: "preview",
+    status: "active",
   },
 ];
 
@@ -87,8 +87,8 @@ export function BaroviaDashboard({
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-7 text-[#b8adb1] sm:text-base">
             The first campaign tools are awake. Gather the party, roll Hope and
-            Fear, and let every result remain inscribed within Barovia's own
-            campaign space.
+            Fear, and draw the omens that follow every soul through Barovia's
+            private campaign space.
           </p>
         </div>
       </section>
@@ -104,7 +104,7 @@ export function BaroviaDashboard({
             </h2>
           </div>
           <span className="rounded-full border border-[#713143]/50 bg-[#35151f]/40 px-3 py-1 text-xs text-[#c48c9b]">
-            2 active modules
+            4 active modules
           </span>
         </div>
 

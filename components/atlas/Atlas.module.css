@@ -1,0 +1,386 @@
+.atlasShell {
+  position: relative;
+}
+
+.mapViewport {
+  position: relative;
+  width: 100%;
+  min-height: 470px;
+  height: min(72vh, 820px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  border-radius: 24px;
+  border: 1px solid rgba(114, 55, 71, 0.72);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(80, 38, 50, 0.24), transparent 58%),
+    #080608;
+  box-shadow:
+    inset 0 0 80px rgba(0, 0, 0, 0.72),
+    0 28px 70px rgba(0, 0, 0, 0.32);
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.mapViewport[data-dragging="true"] {
+  cursor: grabbing;
+}
+
+.mapViewport[data-placement="true"] {
+  cursor: crosshair;
+}
+
+.mapStage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2048px;
+  height: 1365px;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.mapImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.mapShade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(20, 5, 11, 0.03), rgba(24, 4, 12, 0.08)),
+    radial-gradient(circle at 50% 50%, transparent 54%, rgba(17, 5, 10, 0.18) 100%);
+  mix-blend-mode: multiply;
+}
+
+.mistLayer {
+  position: absolute;
+  inset: -8%;
+  pointer-events: none;
+  opacity: 0.2;
+  background:
+    radial-gradient(ellipse at 18% 22%, rgba(231, 223, 215, 0.34), transparent 24%),
+    radial-gradient(ellipse at 78% 18%, rgba(220, 214, 211, 0.2), transparent 26%),
+    radial-gradient(ellipse at 42% 82%, rgba(222, 216, 213, 0.2), transparent 30%);
+  filter: blur(35px);
+  animation: mistDrift 18s ease-in-out infinite alternate;
+}
+
+@keyframes mistDrift {
+  from {
+    transform: translate3d(-1.5%, 0, 0) scale(1.01);
+  }
+  to {
+    transform: translate3d(1.5%, -1%, 0) scale(1.03);
+  }
+}
+
+.markerAnchor {
+  position: absolute;
+  z-index: 10;
+  transform: translate(-50%, -50%);
+}
+
+.markerScale {
+  position: relative;
+  transform-origin: center;
+}
+
+.markerButton {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(238, 221, 208, 0.72);
+  background: rgba(31, 16, 21, 0.94);
+  color: #ead8cc;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  font-weight: 900;
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.54),
+    inset 0 0 0 3px rgba(105, 44, 61, 0.28);
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.markerButton:hover,
+.markerButton:focus-visible,
+.markerButton[data-selected="true"] {
+  transform: translateY(-2px) scale(1.08);
+  border-color: #e6afbe;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.64),
+    0 0 0 4px rgba(139, 56, 79, 0.28),
+    0 0 25px rgba(180, 72, 103, 0.34);
+  outline: none;
+}
+
+.markerButton[data-visibility="hidden"] {
+  border-style: dashed;
+  border-color: rgba(164, 151, 155, 0.72);
+  background: rgba(21, 18, 20, 0.9);
+  color: #a79ca0;
+}
+
+.markerButton[data-visibility="rumored"] {
+  border-color: #a56a9f;
+  background: rgba(62, 31, 61, 0.94);
+  color: #e6c7e4;
+}
+
+.markerButton[data-visibility="discovered"] {
+  border-color: #d6b79b;
+  background: rgba(73, 39, 31, 0.95);
+  color: #f0ddc9;
+}
+
+.markerButton[data-visibility="visited"] {
+  border-color: #bc9d62;
+  background: rgba(56, 48, 27, 0.96);
+  color: #f1d79a;
+}
+
+.markerPulse {
+  position: absolute;
+  inset: -8px;
+  z-index: -1;
+  border-radius: 999px;
+  border: 1px solid rgba(211, 129, 151, 0.44);
+  animation: markerPulse 2.5s ease-out infinite;
+}
+
+@keyframes markerPulse {
+  0% {
+    transform: scale(0.78);
+    opacity: 0.75;
+  }
+  75%,
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+.markerLabel {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 9px);
+  width: max-content;
+  max-width: 220px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(106, 54, 69, 0.82);
+  border-radius: 10px;
+  background: rgba(15, 9, 12, 0.95);
+  padding: 7px 10px;
+  color: #e9d9cf;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.mapControls {
+  position: absolute;
+  z-index: 30;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  gap: 8px;
+  padding: 7px;
+  border: 1px solid rgba(85, 45, 57, 0.82);
+  border-radius: 16px;
+  background: rgba(13, 8, 11, 0.9);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(14px);
+}
+
+.controlButton {
+  display: inline-flex;
+  min-width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(91, 52, 65, 0.8);
+  border-radius: 12px;
+  background: rgba(41, 20, 28, 0.82);
+  color: #dac4cb;
+  font-size: 14px;
+  font-weight: 800;
+  transition: 150ms ease;
+}
+
+.controlButton:hover,
+.controlButton:focus-visible {
+  border-color: #98536a;
+  background: rgba(83, 29, 45, 0.88);
+  color: #f3dfe5;
+  outline: none;
+}
+
+.zoomReadout {
+  display: inline-flex;
+  min-width: 58px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  color: #9d878e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.mapHint {
+  position: absolute;
+  z-index: 25;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 28px);
+  border: 1px solid rgba(95, 51, 65, 0.78);
+  border-radius: 999px;
+  background: rgba(13, 8, 11, 0.9);
+  padding: 8px 14px;
+  color: #bda9af;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(12px);
+}
+
+.editorGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 7px;
+  color: #a9939a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.textField,
+.selectField,
+.textArea {
+  width: 100%;
+  border: 1px solid rgba(80, 43, 54, 0.92);
+  border-radius: 13px;
+  background: rgba(9, 6, 8, 0.72);
+  color: #eadbd2;
+  font-size: 14px;
+  outline: none;
+  transition: 150ms ease;
+}
+
+.textField,
+.selectField {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.textArea {
+  min-height: 92px;
+  resize: vertical;
+  padding: 11px 12px;
+  line-height: 1.55;
+}
+
+.textField:focus,
+.selectField:focus,
+.textArea:focus {
+  border-color: #9e5369;
+  box-shadow: 0 0 0 3px rgba(116, 45, 65, 0.2);
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.statusButton {
+  min-height: 58px;
+  border: 1px solid rgba(72, 42, 51, 0.9);
+  border-radius: 13px;
+  background: rgba(9, 6, 8, 0.56);
+  padding: 9px 10px;
+  color: #9e8b91;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  transition: 150ms ease;
+}
+
+.statusButton[data-active="true"] {
+  border-color: #9b5369;
+  background: rgba(89, 27, 45, 0.44);
+  color: #efd4dc;
+  box-shadow: 0 0 0 2px rgba(128, 48, 70, 0.16);
+}
+
+@media (max-width: 767px) {
+  .mapViewport {
+    min-height: 420px;
+    height: 62vh;
+    max-height: 650px;
+    border-radius: 20px;
+  }
+
+  .mapControls {
+    top: 10px;
+    left: 10px;
+    gap: 5px;
+    padding: 5px;
+  }
+
+  .controlButton {
+    min-width: 38px;
+    height: 38px;
+  }
+
+  .zoomReadout {
+    min-width: 48px;
+    height: 38px;
+  }
+
+  .markerButton {
+    width: 38px;
+    height: 38px;
+  }
+
+  .mapHint {
+    bottom: 10px;
+    border-radius: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mistLayer,
+  .markerPulse {
+    animation: none;
+  }
+
+  .markerButton,
+  .controlButton {
+    transition: none;
+  }
+}
