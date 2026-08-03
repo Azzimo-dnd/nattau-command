@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatedDiceTray } from "./AnimatedDiceTray";
 import { CampaignDiceLog } from "./CampaignDiceLog";
+import { DualityDiceTray } from "./DualityDiceTray";
+import {
+  DICE_ANIMATION_MS,
+  flattenRolledGroups,
+  type AnimatedDieSpec,
+} from "./diceAnimation";
 import type {
   CampaignDiceRollRow,
   DiceAppRole,
@@ -26,6 +33,7 @@ type DualityOutcomeKey =
   | "failure_with_fear";
 
 type LocalResult = {
+  rollToken: number;
   savedRoll: CampaignDiceRollRow | null;
   mode: DaggerheartMode;
   title: string;
@@ -42,6 +50,9 @@ type LocalResult = {
     sides: number;
     results: number[];
   }>;
+  dice: AnimatedDieSpec[];
+  omittedCount: number;
+  critical?: boolean;
 };
 
 type DaggerheartDiceRollerProps = {
@@ -147,6 +158,8 @@ export function DaggerheartDiceRoller({
   const [visibility, setVisibility] =
     useState<RollVisibility>("campaign");
   const [rolling, setRolling] = useState(false);
+  const [animationKey, setAnimationKey] = useState(0);
+  const [pending, setPending] = useState<LocalResult | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [latest, setLatest] = useState<LocalResult | null>(null);
 
@@ -169,10 +182,8 @@ export function DaggerheartDiceRoller({
       return;
     }
 
-    setRolling(true);
     setLocalError(null);
     setError(null);
-    await wait(550);
 
     const hopeDie = rollDie(12);
     const fearDie = rollDie(12);
@@ -199,8 +210,30 @@ export function DaggerheartDiceRoller({
         ? ""
         : ` ${dualityMode === "advantage" ? "+" : "-"} d6`;
     const rollExpression = `Hope d12 + Fear d12 ${formatModifier(modifier)}${advantageExpression}`;
+    const rollToken = Date.now();
 
-    const savedRoll = await saveRoll({
+    const draft: LocalResult = {
+      rollToken,
+      savedRoll: null,
+      mode: rollMode,
+      title,
+      total,
+      outcome,
+      note,
+      hopeDie,
+      fearDie,
+      advantageDie,
+      advantageMode: dualityMode,
+      dice: [],
+      omittedCount: 0,
+      critical: outcomeKey === "critical_success",
+    };
+
+    setPending(draft);
+    setAnimationKey((current) => current + 1);
+    setRolling(true);
+
+    const savePromise = saveRoll({
       roll_kind:
         rollMode === "action"
           ? "daggerheart_action"
@@ -225,19 +258,15 @@ export function DaggerheartDiceRoller({
       },
     });
 
-    setLatest({
-      savedRoll,
-      mode: rollMode,
-      title,
-      total,
-      outcome,
-      note,
-      hopeDie,
-      fearDie,
-      advantageDie,
-      advantageMode: dualityMode,
-    });
+    await wait(DICE_ANIMATION_MS);
+    setLatest(draft);
+    setPending(null);
     setRolling(false);
+
+    const savedRoll = await savePromise;
+    setLatest((current) =>
+      current?.rollToken === rollToken ? { ...current, savedRoll } : current
+    );
   }
 
   async function rollGmAttack() {
@@ -247,10 +276,8 @@ export function DaggerheartDiceRoller({
       return;
     }
 
-    setRolling(true);
     setLocalError(null);
     setError(null);
-    await wait(500);
 
     const naturalD20 = rollDie(20);
     const total = naturalD20 + gmAttackBonus;
@@ -262,8 +289,31 @@ export function DaggerheartDiceRoller({
       : success
         ? "The attack meets or beats the target's Evasion. Roll damage."
         : "The attack total is lower than the target's Evasion.";
+    const visual = flattenRolledGroups(
+      [{ diceCount: 1, sides: 20, results: [naturalD20] }],
+      { tone: "barovia", idPrefix: `barovia-gm-${Date.now()}` }
+    );
+    const rollToken = Date.now();
 
-    const savedRoll = await saveRoll({
+    const draft: LocalResult = {
+      rollToken,
+      savedRoll: null,
+      mode: "gm",
+      title: "Adversary Attack",
+      total,
+      outcome,
+      note,
+      naturalD20,
+      dice: visual.dice,
+      omittedCount: visual.omittedCount,
+      critical,
+    };
+
+    setPending(draft);
+    setAnimationKey((current) => current + 1);
+    setRolling(true);
+
+    const savePromise = saveRoll({
       roll_kind: "daggerheart_gm",
       title: "Adversary Attack",
       expression: `d20 ${formatModifier(gmAttackBonus)} vs Evasion ${targetEvasion}`,
@@ -282,16 +332,15 @@ export function DaggerheartDiceRoller({
       },
     });
 
-    setLatest({
-      savedRoll,
-      mode: "gm",
-      title: "Adversary Attack",
-      total,
-      outcome,
-      note,
-      naturalD20,
-    });
+    await wait(DICE_ANIMATION_MS);
+    setLatest(draft);
+    setPending(null);
     setRolling(false);
+
+    const savedRoll = await savePromise;
+    setLatest((current) =>
+      current?.rollToken === rollToken ? { ...current, savedRoll } : current
+    );
   }
 
   async function rollDamage() {
@@ -305,10 +354,8 @@ export function DaggerheartDiceRoller({
       return;
     }
 
-    setRolling(true);
     setLocalError(null);
     setError(null);
-    await wait(450);
 
     const rolled = rollParsedExpression(parsed);
     const maximumDiceResult = parsed.groups.reduce(
@@ -320,8 +367,31 @@ export function DaggerheartDiceRoller({
     const note = criticalDamage
       ? `Critical damage adds the maximum possible result of the damage dice: +${maximumDiceResult}.`
       : "Apply the result using the target's damage thresholds, resistances and armor rules.";
+    const visual = flattenRolledGroups(rolled.groups, {
+      tone: "barovia",
+      idPrefix: `barovia-damage-${Date.now()}`,
+    });
+    const rollToken = Date.now();
 
-    const savedRoll = await saveRoll({
+    const draft: LocalResult = {
+      rollToken,
+      savedRoll: null,
+      mode: "damage",
+      title: outcome,
+      total,
+      outcome,
+      note,
+      damageGroups: rolled.groups,
+      dice: visual.dice,
+      omittedCount: visual.omittedCount,
+      critical: criticalDamage,
+    };
+
+    setPending(draft);
+    setAnimationKey((current) => current + 1);
+    setRolling(true);
+
+    const savePromise = saveRoll({
       roll_kind: "daggerheart_damage",
       title: outcome,
       expression: criticalDamage
@@ -340,16 +410,15 @@ export function DaggerheartDiceRoller({
       },
     });
 
-    setLatest({
-      savedRoll,
-      mode: "damage",
-      title: outcome,
-      total,
-      outcome,
-      note,
-      damageGroups: rolled.groups,
-    });
+    await wait(DICE_ANIMATION_MS);
+    setLatest(draft);
+    setPending(null);
     setRolling(false);
+
+    const savedRoll = await savePromise;
+    setLatest((current) =>
+      current?.rollToken === rollToken ? { ...current, savedRoll } : current
+    );
   }
 
   function performCurrentRoll() {
@@ -363,6 +432,10 @@ export function DaggerheartDiceRoller({
     if (!window.confirm("Delete all of your saved Barovia rolls?")) return;
     await clearMyRolls();
   }
+
+  const visualResult = pending ?? latest;
+  const visualMode = visualResult?.mode ?? mode;
+  const isDualityVisual = visualMode === "action" || visualMode === "reaction";
 
   return (
     <section className="space-y-6">
@@ -583,21 +656,44 @@ export function DaggerheartDiceRoller({
             Latest Outcome
           </h2>
 
-          {rolling ? (
-            <div className="mt-5 rounded-3xl border border-[#713143]/55 bg-[#5a1825]/15 p-6">
-              <p className="text-sm text-[#a9929a]">Hope and Fear are turning...</p>
-              <div className="mt-5 flex gap-3">
-                {[0, 1].map((entry) => (
-                  <span
-                    key={entry}
-                    className="flex h-16 w-16 animate-bounce items-center justify-center rounded-2xl border border-[#7c3b4e] bg-black/25 font-serif text-3xl font-black text-[#e3bcc6]"
-                  >
-                    ?
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : latest ? (
+          <div className="mt-5">
+            {isDualityVisual ? (
+              <DualityDiceTray
+                hope={visualResult?.hopeDie ?? null}
+                fear={visualResult?.fearDie ?? null}
+                advantage={visualResult?.advantageDie ?? null}
+                advantageMode={visualResult?.advantageMode ?? dualityMode}
+                rolling={rolling}
+                animationKey={animationKey}
+                outcome={!rolling ? visualResult?.outcome ?? null : null}
+                critical={!rolling && Boolean(visualResult?.critical)}
+                reaction={visualMode === "reaction"}
+              />
+            ) : (
+              <AnimatedDiceTray
+                variant="barovia"
+                dice={visualResult?.dice ?? []}
+                rolling={rolling}
+                animationKey={animationKey}
+                omittedCount={visualResult?.omittedCount ?? 0}
+                critical={!rolling && Boolean(visualResult?.critical)}
+                label={
+                  rolling
+                    ? visualMode === "gm"
+                      ? "The adversary strikes"
+                      : "Damage dice in motion"
+                    : visualResult?.title ?? "Stone dice tray"
+                }
+                emptyMessage={
+                  visualMode === "gm"
+                    ? "The adversary's d20 waits in shadow."
+                    : "Choose a damage formula and cast the dice into the Mists."
+                }
+              />
+            )}
+          </div>
+
+          {!rolling && latest ? (
             <div className="mt-5 rounded-3xl border border-[#713143]/55 bg-[radial-gradient(circle_at_80%_10%,rgba(118,30,51,0.28),transparent_38%),rgba(20,12,17,0.82)] p-5 sm:p-7">
               <div className="flex flex-wrap items-start justify-between gap-5">
                 <div>
@@ -614,87 +710,33 @@ export function DaggerheartDiceRoller({
                     {latest.total}
                   </p>
                   <p className="mt-2 text-xs text-[#765e67]">
-                    {latest.savedRoll
-                      ? latest.savedRoll.visibility === "private"
-                        ? "Saved as a private whisper"
-                        : "Saved to the Barovia campaign log"
-                      : "Rolled, but database saving failed"}
+                    {saving
+                      ? "The result is being inscribed..."
+                      : latest.savedRoll
+                        ? latest.savedRoll.visibility === "private"
+                          ? "Saved as a private whisper"
+                          : "Saved to the Barovia campaign log"
+                        : "Rolled, but database saving failed"}
                   </p>
                 </div>
               </div>
 
-              {latest.hopeDie !== undefined && latest.fearDie !== undefined && (
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-[#9d8e88]/45 bg-[#ded2bd]/10 p-5">
-                    <p className="text-xs uppercase tracking-[0.28em] text-[#bcae9c]">
-                      Hope
-                    </p>
-                    <p className="mt-2 font-serif text-5xl font-black text-[#e7dcc8]">
-                      {latest.hopeDie}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-[#8f4057]/60 bg-[#5a1825]/25 p-5">
-                    <p className="text-xs uppercase tracking-[0.28em] text-[#c9788e]">
-                      Fear
-                    </p>
-                    <p className="mt-2 font-serif text-5xl font-black text-[#e6a9b9]">
-                      {latest.fearDie}
-                    </p>
-                  </div>
-                  {latest.advantageDie !== undefined && (
-                    <div className="sm:col-span-2 rounded-xl border border-[#4d3d44] bg-black/20 px-4 py-3 text-sm text-[#9e9297]">
-                      {dualityModeLabel(latest.advantageMode ?? "normal")} d6:{" "}
-                      <strong className="text-[#d6c8cd]">
-                        {latest.advantageDie}
-                      </strong>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {latest.naturalD20 !== undefined && (
-                <div className="mt-6 rounded-2xl border border-[#8f4057]/60 bg-[#5a1825]/20 p-5">
-                  <p className="text-xs uppercase tracking-[0.28em] text-[#c9788e]">
-                    GM Die
-                  </p>
-                  <p className="mt-2 font-serif text-5xl font-black text-[#e6a9b9]">
-                    {latest.naturalD20}
-                  </p>
-                </div>
-              )}
-
-              {latest.damageGroups && (
-                <div className="mt-6 space-y-3">
-                  {latest.damageGroups.map((group, groupIndex) => (
-                    <div
-                      key={`${group.sides}-${groupIndex}`}
-                      className="rounded-2xl border border-[#432832] bg-black/20 p-4"
-                    >
-                      <p className="text-xs uppercase tracking-[0.22em] text-[#765e67]">
-                        {group.diceCount}d{group.sides}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {group.results.map((value, index) => (
-                          <span
-                            key={`${value}-${index}`}
-                            className="rounded-xl border border-[#774054] bg-[#5a1825]/25 px-4 py-2 font-bold text-[#e1b5c0]"
-                          >
-                            {value}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+              {latest.advantageDie !== undefined && (
+                <div className="mt-5 rounded-xl border border-[#4d3d44] bg-black/20 px-4 py-3 text-sm text-[#9e9297]">
+                  {dualityModeLabel(latest.advantageMode ?? "normal")} d6: {" "}
+                  <strong className="text-[#d6c8cd]">
+                    {latest.advantageDie}
+                  </strong>
                 </div>
               )}
             </div>
-          ) : (
+          ) : !rolling ? (
             <div className="mt-5 rounded-3xl border border-[#432832] bg-black/20 p-6 text-sm leading-6 text-[#8f8187]">
               Roll the Duality Dice to learn whether the Mists answer with Hope
               or Fear. Action and reaction rolls use two d12s; the Game Master
               uses a single d20 for adversary attacks.
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 

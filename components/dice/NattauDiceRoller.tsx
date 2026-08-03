@@ -1,7 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AnimatedDiceTray } from "./AnimatedDiceTray";
 import { CampaignDiceLog } from "./CampaignDiceLog";
+import {
+  DICE_ANIMATION_MS,
+  flattenRolledGroups,
+  type AnimatedDieSpec,
+} from "./diceAnimation";
 import type {
   CampaignDiceRollRow,
   DiceAppRole,
@@ -21,13 +27,17 @@ import { useCampaignDiceLog } from "./useCampaignDiceLog";
 type D20Mode = "normal" | "advantage" | "disadvantage";
 
 type LocalNattauResult = {
+  rollToken: number;
   savedRoll: CampaignDiceRollRow | null;
   expression: string;
   total: number;
   mode: D20Mode;
   groups: RolledGroup[];
   keptDie: number | null;
+  keptIndex: number | null;
   modifier: number;
+  dice: AnimatedDieSpec[];
+  omittedCount: number;
 };
 
 type NattauDiceRollerProps = {
@@ -66,6 +76,9 @@ export function NattauDiceRoller({
   const [visibility, setVisibility] =
     useState<RollVisibility>("campaign");
   const [rolling, setRolling] = useState(false);
+  const [animationKey, setAnimationKey] = useState(0);
+  const [activeDice, setActiveDice] = useState<AnimatedDieSpec[]>([]);
+  const [activeOmittedCount, setActiveOmittedCount] = useState(0);
   const [localError, setLocalError] = useState<string | null>(null);
   const [latest, setLatest] = useState<LocalNattauResult | null>(null);
 
@@ -100,10 +113,8 @@ export function NattauDiceRoller({
       return;
     }
 
-    setRolling(true);
     setLocalError(null);
     setError(null);
-    await wait(450);
 
     const finalModifier = parsed.modifier + extraModifier;
     const useD20Mode =
@@ -115,14 +126,20 @@ export function NattauDiceRoller({
     let groups: RolledGroup[];
     let total: number;
     let keptDie: number | null = null;
+    let keptIndex: number | null = null;
 
     if (useD20Mode && finalMode !== "normal") {
       const first = rollDie(20);
       const second = rollDie(20);
-      keptDie =
+      keptIndex =
         finalMode === "advantage"
-          ? Math.max(first, second)
-          : Math.min(first, second);
+          ? first >= second
+            ? 0
+            : 1
+          : first <= second
+            ? 0
+            : 1;
+      keptDie = keptIndex === 0 ? first : second;
       groups = [{ diceCount: 2, sides: 20, results: [first, second] }];
       total = keptDie + finalModifier;
     } else {
@@ -131,11 +148,41 @@ export function NattauDiceRoller({
       total = rolled.diceTotal + extraModifier + parsed.modifier;
     }
 
+    const discardedIndexes = new Set<number>();
+    if (keptIndex !== null) {
+      discardedIndexes.add(keptIndex === 0 ? 1 : 0);
+    }
+
+    const visual = flattenRolledGroups(groups, {
+      tone: "nattau",
+      discardedGlobalIndexes: discardedIndexes,
+      idPrefix: `nattau-${Date.now()}`,
+    });
+
     const expressionLabel = `${parsed.normalizedExpression}${
       extraModifier === 0 ? "" : formatModifier(extraModifier)
     }`;
+    const rollToken = Date.now();
+    const draft: LocalNattauResult = {
+      rollToken,
+      savedRoll: null,
+      expression: expressionLabel,
+      total,
+      mode: finalMode,
+      groups,
+      keptDie,
+      keptIndex,
+      modifier: finalModifier,
+      dice: visual.dice,
+      omittedCount: visual.omittedCount,
+    };
 
-    const savedRoll = await saveRoll({
+    setActiveDice(visual.dice);
+    setActiveOmittedCount(visual.omittedCount);
+    setAnimationKey((current) => current + 1);
+    setRolling(true);
+
+    const savePromise = saveRoll({
       roll_kind: "generic",
       title: `${expressionLabel} · ${modeLabel(finalMode)}`,
       expression: expressionLabel,
@@ -146,22 +193,21 @@ export function NattauDiceRoller({
         mode: finalMode,
         groups,
         kept_die: keptDie,
+        kept_index: keptIndex,
         formula_modifier: parsed.modifier,
         extra_modifier: extraModifier,
         final_modifier: finalModifier,
       },
     });
 
-    setLatest({
-      savedRoll,
-      expression: expressionLabel,
-      total,
-      mode: finalMode,
-      groups,
-      keptDie,
-      modifier: finalModifier,
-    });
+    await wait(DICE_ANIMATION_MS);
+    setLatest(draft);
     setRolling(false);
+
+    const savedRoll = await savePromise;
+    setLatest((current) =>
+      current?.rollToken === rollToken ? { ...current, savedRoll } : current
+    );
   }
 
   function rollQuickDie(sides: SupportedDie) {
@@ -174,6 +220,11 @@ export function NattauDiceRoller({
     if (!window.confirm("Delete all of your saved Nattau rolls?")) return;
     await clearMyRolls();
   }
+
+  const displayedDice = rolling ? activeDice : latest?.dice ?? [];
+  const displayedOmittedCount = rolling
+    ? activeOmittedCount
+    : latest?.omittedCount ?? 0;
 
   return (
     <section className="space-y-6">
@@ -271,7 +322,7 @@ export function NattauDiceRoller({
                 type="button"
                 disabled={rolling || saving}
                 onClick={() => void performRoll()}
-                className="w-full min-h-12 rounded-xl border border-yellow-500 bg-yellow-500 px-4 font-bold text-slate-950 transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-12 w-full rounded-xl border border-yellow-500 bg-yellow-500 px-4 font-bold text-slate-950 transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {rolling ? "Rolling..." : saving ? "Saving..." : "Roll Dice"}
               </button>
@@ -300,27 +351,31 @@ export function NattauDiceRoller({
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
           <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
-            Latest Result
+            Expedition Dice Tray
           </p>
           <h2 className="mt-3 text-2xl font-bold text-slate-100">
             Roll Outcome
           </h2>
 
-          {rolling ? (
-            <div className="mt-5 rounded-2xl border border-yellow-600/30 bg-yellow-500/10 p-5">
-              <p className="text-sm text-slate-400">The dice are rolling...</p>
-              <div className="mt-5 flex gap-3">
-                {[0, 1, 2].map((value) => (
-                  <span
-                    key={value}
-                    className="flex h-11 w-11 animate-bounce items-center justify-center rounded-xl border border-yellow-500 bg-yellow-500/15 text-2xl font-black text-yellow-300"
-                  >
-                    ?
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : latest ? (
+          <div className="mt-5">
+            <AnimatedDiceTray
+              variant="nattau"
+              dice={displayedDice}
+              rolling={rolling}
+              animationKey={animationKey}
+              omittedCount={displayedOmittedCount}
+              label={
+                rolling
+                  ? `${expression} is rolling`
+                  : latest
+                    ? `${latest.expression} · ${modeLabel(latest.mode)}`
+                    : "Command table"
+              }
+              emptyMessage="The expedition dice are waiting on the command table."
+            />
+          </div>
+
+          {!rolling && latest ? (
             <div className="mt-5 rounded-2xl border border-yellow-600/30 bg-yellow-500/10 p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -331,11 +386,14 @@ export function NattauDiceRoller({
                     {latest.total}
                   </p>
                   <p className="mt-2 text-xs text-slate-500">
-                    {latest.savedRoll
-                      ? latest.savedRoll.visibility === "private"
-                        ? "Saved privately in Supabase"
-                        : "Saved to the Nattau campaign log"
-                      : "The result was rolled, but saving failed"}
+                    {saving
+                      ? "The result is being saved..."
+                      : latest.savedRoll
+                        ? latest.savedRoll.visibility === "private"
+                          ? "Saved privately in Supabase"
+                          : "Saved to the Nattau campaign log"
+                        : "The result was rolled, but saving failed"
+                    }
                   </p>
                 </div>
                 {latest.modifier !== 0 && (
@@ -345,42 +403,17 @@ export function NattauDiceRoller({
                 )}
               </div>
 
-              <div className="mt-5 space-y-3">
-                {latest.groups.map((group, groupIndex) => (
-                  <div
-                    key={`${group.sides}-${groupIndex}`}
-                    className="rounded-xl border border-slate-800 bg-slate-950/60 p-3"
-                  >
-                    <p className="text-xs uppercase tracking-wide text-slate-500">
-                      {group.diceCount}d{group.sides}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {group.results.map((value, index) => {
-                        const kept =
-                          latest.keptDie === null || value === latest.keptDie;
-                        return (
-                          <span
-                            key={`${value}-${index}`}
-                            className={`rounded-xl border px-4 py-2 font-bold ${
-                              kept
-                                ? "border-yellow-500 bg-yellow-500/15 text-yellow-300"
-                                : "border-slate-700 bg-slate-950/70 text-slate-500"
-                            }`}
-                          >
-                            {value}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {latest.keptIndex !== null && (
+                <p className="mt-4 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-xs text-slate-400">
+                  The dimmed d20 was discarded by {modeLabel(latest.mode).toLowerCase()}.
+                </p>
+              )}
             </div>
-          ) : (
+          ) : !rolling ? (
             <p className="mt-5 rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-500">
               No roll yet. Prepare a formula and let the dice decide.
             </p>
-          )}
+          ) : null}
         </div>
       </div>
 
