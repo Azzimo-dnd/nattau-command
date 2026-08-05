@@ -1,13 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AnimatedDiceTray } from "./AnimatedDiceTray";
+import type { ChangeEvent } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CampaignDiceLog } from "./CampaignDiceLog";
-import {
-  DICE_ANIMATION_MS,
-  flattenRolledGroups,
-  type AnimatedDieSpec,
-} from "./diceAnimation";
 import type {
   CampaignDiceRollRow,
   DiceAppRole,
@@ -16,18 +11,29 @@ import type {
 import {
   formatModifier,
   parseDiceExpression,
-  rollDie,
-  rollParsedExpression,
+  type ParsedExpression,
   type RolledGroup,
   type SupportedDie,
-  wait,
 } from "./diceUtils";
 import { useCampaignDiceLog } from "./useCampaignDiceLog";
+import { CampaignPhysicsDiceTrayClient } from "@/components/dice-physics/CampaignPhysicsDiceTrayClient";
+import { DiceAppearancePicker } from "@/components/dice-physics/DiceAppearancePicker";
+import {
+  buildPhysicsDiceFromGroups,
+  physicsResultToGroups,
+  totalRolledGroups,
+} from "@/components/dice-physics/diceRollPlan";
+import { createDiceRuntimeSettings } from "@/components/dice-physics/dicePhysicsDefaults";
+import { getSharedDiceSoundEngine } from "@/components/dice-physics/diceSound";
+import { useCampaignDiceConfiguration } from "@/components/dice-physics/useCampaignDiceConfiguration";
+import type {
+  PhysicsRollRequest,
+  PhysicsRollResult,
+} from "@/components/dice-physics/dicePhysicsTypes";
 
 type D20Mode = "normal" | "advantage" | "disadvantage";
 
 type LocalNattauResult = {
-  rollToken: number;
   savedRoll: CampaignDiceRollRow | null;
   expression: string;
   total: number;
@@ -36,8 +42,16 @@ type LocalNattauResult = {
   keptDie: number | null;
   keptIndex: number | null;
   modifier: number;
-  dice: AnimatedDieSpec[];
-  omittedCount: number;
+  physics: PhysicsRollResult;
+};
+
+type PendingNattauRoll = {
+  rollId: string;
+  parsed: ParsedExpression;
+  expressionLabel: string;
+  finalModifier: number;
+  finalMode: D20Mode;
+  visibility: RollVisibility;
 };
 
 type NattauDiceRollerProps = {
@@ -48,6 +62,11 @@ type NattauDiceRollerProps = {
 };
 
 const quickDice: SupportedDie[] = [4, 6, 8, 10, 12, 20, 100];
+
+function createRollId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 function modeLabel(mode: D20Mode) {
   if (mode === "advantage") return "Advantage";
@@ -73,38 +92,22 @@ export function NattauDiceRoller({
   const [expression, setExpression] = useState("1d20");
   const [extraModifier, setExtraModifier] = useState(0);
   const [mode, setMode] = useState<D20Mode>("normal");
-  const [visibility, setVisibility] =
-    useState<RollVisibility>("campaign");
+  const [visibility, setVisibility] = useState<RollVisibility>("campaign");
   const [rolling, setRolling] = useState(false);
-  const [animationKey, setAnimationKey] = useState(0);
-  const [activeDice, setActiveDice] = useState<AnimatedDieSpec[]>([]);
-  const [activeOmittedCount, setActiveOmittedCount] = useState(0);
+  const [request, setRequest] = useState<PhysicsRollRequest | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [latest, setLatest] = useState<LocalNattauResult | null>(null);
+  const pendingRef = useRef<PendingNattauRoll | null>(null);
 
-  const {
-    rolls,
-    loading,
-    saving,
-    error,
-    setError,
-    refresh,
-    saveRoll,
-    deleteRoll,
-    clearMyRolls,
-  } = useCampaignDiceLog({ campaignId, currentUserId });
-
-  const d20ModeAllowed = useMemo(
-    () => canUseD20Mode(expression),
-    [expression]
-  );
+  const configuration = useCampaignDiceConfiguration({ campaignId, currentUserId });
+  const diceLog = useCampaignDiceLog({ campaignId, currentUserId });
+  const d20ModeAllowed = useMemo(() => canUseD20Mode(expression), [expression]);
 
   async function performRoll(
     requestedExpression = expression,
     requestedMode = mode
   ) {
-    if (rolling || saving) return;
-
+    if (rolling || diceLog.saving) return;
     const parsed = parseDiceExpression(requestedExpression);
     if (!parsed) {
       setLocalError(
@@ -113,101 +116,127 @@ export function NattauDiceRoller({
       return;
     }
 
-    setLocalError(null);
-    setError(null);
-
-    const finalModifier = parsed.modifier + extraModifier;
     const useD20Mode =
       parsed.groups.length === 1 &&
       parsed.groups[0].diceCount === 1 &&
       parsed.groups[0].sides === 20;
     const finalMode = useD20Mode ? requestedMode : "normal";
+    const physicalGroups =
+      useD20Mode && finalMode !== "normal"
+        ? [{ diceCount: 2, sides: 20 as const }]
+        : parsed.groups;
+    const rollId = createRollId();
+
+    try {
+      const physicalDice = buildPhysicsDiceFromGroups(
+        physicalGroups,
+        `nattau-${rollId}`
+      );
+      const expressionLabel = `${parsed.normalizedExpression}${
+        extraModifier === 0 ? "" : formatModifier(extraModifier)
+      }`;
+      const finalModifier = parsed.modifier + extraModifier;
+
+      setLocalError(null);
+      diceLog.setError(null);
+      setLatest(null);
+      setRolling(true);
+      pendingRef.current = {
+        rollId,
+        parsed,
+        expressionLabel,
+        finalModifier,
+        finalMode,
+        visibility,
+      };
+
+      if (configuration.appearance.sound) {
+        await getSharedDiceSoundEngine().unlock();
+      }
+
+      setRequest({
+        rollId,
+        startedAt: performance.now(),
+        dice: physicalDice,
+        settings: createDiceRuntimeSettings(
+          configuration.physics,
+          configuration.appearance,
+          { cameraMode: "table" }
+        ),
+      });
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "The physical throw could not be prepared.");
+      setRolling(false);
+    }
+  }
+
+  async function handlePhysicsComplete(physicsResult: PhysicsRollResult) {
+    const pending = pendingRef.current;
+    if (!pending || pending.rollId !== physicsResult.rollId) return;
 
     let groups: RolledGroup[];
-    let total: number;
-    let keptDie: number | null = null;
     let keptIndex: number | null = null;
+    let keptDie: number | null = null;
+    let total: number;
 
-    if (useD20Mode && finalMode !== "normal") {
-      const first = rollDie(20);
-      const second = rollDie(20);
+    if (pending.finalMode !== "normal") {
+      const values = physicsResult.dice.map((die) => die.value).slice(0, 2);
       keptIndex =
-        finalMode === "advantage"
-          ? first >= second
+        pending.finalMode === "advantage"
+          ? values[0] >= values[1]
             ? 0
             : 1
-          : first <= second
+          : values[0] <= values[1]
             ? 0
             : 1;
-      keptDie = keptIndex === 0 ? first : second;
-      groups = [{ diceCount: 2, sides: 20, results: [first, second] }];
-      total = keptDie + finalModifier;
+      keptDie = values[keptIndex];
+      groups = [{ diceCount: 2, sides: 20, results: values }];
+      total = keptDie + pending.finalModifier;
     } else {
-      const rolled = rollParsedExpression(parsed);
-      groups = rolled.groups;
-      total = rolled.diceTotal + extraModifier + parsed.modifier;
+      groups = physicsResultToGroups(pending.parsed.groups, physicsResult);
+      total = totalRolledGroups(groups) + pending.finalModifier;
     }
 
-    const discardedIndexes = new Set<number>();
-    if (keptIndex !== null) {
-      discardedIndexes.add(keptIndex === 0 ? 1 : 0);
-    }
-
-    const visual = flattenRolledGroups(groups, {
-      tone: "nattau",
-      discardedGlobalIndexes: discardedIndexes,
-      idPrefix: `nattau-${Date.now()}`,
-    });
-
-    const expressionLabel = `${parsed.normalizedExpression}${
-      extraModifier === 0 ? "" : formatModifier(extraModifier)
-    }`;
-    const rollToken = Date.now();
-    const draft: LocalNattauResult = {
-      rollToken,
-      savedRoll: null,
-      expression: expressionLabel,
-      total,
-      mode: finalMode,
-      groups,
-      keptDie,
-      keptIndex,
-      modifier: finalModifier,
-      dice: visual.dice,
-      omittedCount: visual.omittedCount,
-    };
-
-    setActiveDice(visual.dice);
-    setActiveOmittedCount(visual.omittedCount);
-    setAnimationKey((current) => current + 1);
-    setRolling(true);
-
-    const savePromise = saveRoll({
+    const savedRoll = await diceLog.saveRoll({
       roll_kind: "generic",
-      title: `${expressionLabel} · ${modeLabel(finalMode)}`,
-      expression: expressionLabel,
+      title: `${pending.expressionLabel} · ${modeLabel(pending.finalMode)}`,
+      expression: pending.expressionLabel,
       total,
       outcome: `Rolled by ${currentUserName}`,
-      visibility,
+      visibility: pending.visibility,
       details: {
-        mode: finalMode,
+        mode: pending.finalMode,
         groups,
         kept_die: keptDie,
         kept_index: keptIndex,
-        formula_modifier: parsed.modifier,
+        formula_modifier: pending.parsed.modifier,
         extra_modifier: extraModifier,
-        final_modifier: finalModifier,
+        final_modifier: pending.finalModifier,
+        physics: {
+          engine: "rapier",
+          roll_id: physicsResult.rollId,
+          duration_ms: Math.round(physicsResult.durationMs),
+          peak_impact: physicsResult.peakImpact,
+          forced_settles: physicsResult.forcedSettles,
+          cosmetic_id: configuration.appearance.cosmeticId,
+          number_size: configuration.appearance.numberSize,
+        },
       },
     });
 
-    await wait(DICE_ANIMATION_MS);
-    setLatest(draft);
+    setLatest({
+      savedRoll,
+      expression: pending.expressionLabel,
+      total,
+      mode: pending.finalMode,
+      groups,
+      keptDie,
+      keptIndex,
+      modifier: pending.finalModifier,
+      physics: physicsResult,
+    });
+    pendingRef.current = null;
     setRolling(false);
-
-    const savedRoll = await savePromise;
-    setLatest((current) =>
-      current?.rollToken === rollToken ? { ...current, savedRoll } : current
-    );
   }
 
   function rollQuickDie(sides: SupportedDie) {
@@ -218,213 +247,185 @@ export function NattauDiceRoller({
 
   async function handleClearMine() {
     if (!window.confirm("Delete all of your saved Nattau rolls?")) return;
-    await clearMyRolls();
+    await diceLog.clearMyRolls();
   }
-
-  const displayedDice = rolling ? activeDice : latest?.dice ?? [];
-  const displayedOmittedCount = rolling
-    ? activeOmittedCount
-    : latest?.omittedCount ?? 0;
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
+      <div className="grid gap-6 xl:grid-cols-[390px_1fr]">
         <div className="space-y-6">
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
-              Roll Command
-            </p>
-            <h2 className="mt-3 text-2xl font-bold text-slate-100">
-              Prepare Roll
-            </h2>
+            <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">Roll Command</p>
+            <h2 className="mt-3 text-2xl font-bold text-slate-100">Prepare Physical Roll</h2>
 
             <div className="mt-5 space-y-4">
-              <div>
-                <label className="text-sm font-medium text-slate-300">
-                  Dice formula
-                </label>
+              <label className="block text-sm font-medium text-slate-300">
+                Dice formula
                 <input
                   value={expression}
-                  disabled={rolling || saving}
-                  onChange={(event) => setExpression(event.target.value)}
+                  disabled={rolling || diceLog.saving}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => setExpression(event.target.value)}
                   className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-yellow-500 disabled:opacity-60"
                   placeholder="1d20, 2d6+3, 2d4+3d8"
                 />
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  Supported dice: d4, d6, d8, d10, d12, d20 and d100.
-                </p>
-              </div>
+                <span className="mt-2 block text-xs leading-5 text-slate-500">
+                  Physical d4, d6, d8, d10, d12, d20 and percentile dice.
+                </span>
+              </label>
 
-              <div>
-                <label className="text-sm font-medium text-slate-300">
-                  Extra modifier
-                </label>
+              <label className="block text-sm font-medium text-slate-300">
+                Extra modifier
                 <input
                   type="number"
                   value={extraModifier}
-                  disabled={rolling || saving}
-                  onChange={(event) =>
-                    setExtraModifier(Number(event.target.value) || 0)
-                  }
-                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-500 disabled:opacity-60"
+                  disabled={rolling || diceLog.saving}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => setExtraModifier(Number(event.target.value) || 0)}
+                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none focus:border-yellow-500 disabled:opacity-60"
                 />
-              </div>
+              </label>
 
               <div>
                 <p className="text-sm font-medium text-slate-300">d20 mode</p>
                 <div className="mt-2 grid grid-cols-3 gap-2">
-                  {(["normal", "advantage", "disadvantage"] as D20Mode[]).map(
-                    (entry) => (
-                      <button
-                        key={entry}
-                        type="button"
-                        disabled={rolling || saving || !d20ModeAllowed}
-                        onClick={() => setMode(entry)}
-                        className={`min-h-11 rounded-xl border px-2 text-xs transition disabled:cursor-not-allowed disabled:opacity-35 ${
-                          mode === entry
-                            ? entry === "advantage"
-                              ? "border-green-500/60 bg-green-500/10 text-green-300"
-                              : entry === "disadvantage"
-                                ? "border-red-500/60 bg-red-500/10 text-red-300"
-                                : "border-yellow-500/50 bg-yellow-500/10 text-yellow-300"
-                            : "border-slate-700 bg-slate-950/70 text-slate-400 hover:border-yellow-600/40"
-                        }`}
-                      >
-                        {modeLabel(entry)}
-                      </button>
-                    )
-                  )}
+                  {(["normal", "advantage", "disadvantage"] as D20Mode[]).map((entry) => (
+                    <button
+                      key={entry}
+                      type="button"
+                      disabled={rolling || diceLog.saving || !d20ModeAllowed}
+                      onClick={() => setMode(entry)}
+                      className={`min-h-11 rounded-xl border px-2 text-xs transition disabled:opacity-35 ${
+                        mode === entry
+                          ? entry === "advantage"
+                            ? "border-green-500/60 bg-green-500/10 text-green-300"
+                            : entry === "disadvantage"
+                              ? "border-red-500/60 bg-red-500/10 text-red-300"
+                              : "border-yellow-500/50 bg-yellow-500/10 text-yellow-300"
+                          : "border-slate-700 bg-slate-950/70 text-slate-400 hover:border-yellow-600/40"
+                      }`}
+                    >
+                      {modeLabel(entry)}
+                    </button>
+                  ))}
                 </div>
-                <p className="mt-2 text-xs text-slate-500">
-                  Advantage and disadvantage apply only to a pure 1d20 roll.
-                </p>
               </div>
 
               <label className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-300">
                 <input
                   type="checkbox"
                   checked={visibility === "private"}
-                  onChange={(event) =>
-                    setVisibility(event.target.checked ? "private" : "campaign")
-                  }
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => setVisibility(event.target.checked ? "private" : "campaign")}
                   className="h-4 w-4 accent-yellow-500"
                 />
-                Private roll — hidden from other campaign members
+                Private roll
               </label>
 
-              {(localError || error) && (
+              {(localError || diceLog.error || configuration.error) && (
                 <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                  {localError || error}
+                  {localError || diceLog.error || configuration.error}
                 </p>
               )}
 
               <button
                 type="button"
-                disabled={rolling || saving}
+                disabled={rolling || diceLog.saving || configuration.loading}
                 onClick={() => void performRoll()}
-                className="min-h-12 w-full rounded-xl border border-yellow-500 bg-yellow-500 px-4 font-bold text-slate-950 transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-12 w-full rounded-xl border border-yellow-500 bg-yellow-500 px-4 font-bold text-slate-950 transition hover:bg-yellow-400 disabled:opacity-60"
               >
-                {rolling ? "Rolling..." : saving ? "Saving..." : "Roll Dice"}
+                {rolling ? "Dice in motion…" : diceLog.saving ? "Saving…" : "Roll Physical Dice"}
               </button>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
-              Quick Dice
-            </p>
+            <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">Quick Dice</p>
             <div className="mt-4 grid grid-cols-4 gap-2">
               {quickDice.map((sides) => (
                 <button
                   key={sides}
                   type="button"
-                  disabled={rolling || saving}
+                  disabled={rolling || diceLog.saving}
                   onClick={() => rollQuickDie(sides)}
-                  className="min-h-12 rounded-xl border border-slate-700 bg-slate-950/70 px-3 font-bold text-slate-200 transition hover:border-yellow-500 hover:text-yellow-300 disabled:opacity-50"
+                  className="min-h-11 rounded-xl border border-slate-700 bg-slate-950/70 text-sm font-bold text-slate-300 hover:border-yellow-600/50 hover:text-yellow-300 disabled:opacity-45"
                 >
                   d{sides}
                 </button>
               ))}
             </div>
           </div>
+
+          <DiceAppearancePicker
+            theme="nattau"
+            value={configuration.appearance}
+            disabled={rolling || configuration.loading}
+            saving={configuration.savingAppearance}
+            onChange={(value) => void configuration.saveAppearance(value)}
+          />
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
-            Expedition Dice Tray
-          </p>
-          <h2 className="mt-3 text-2xl font-bold text-slate-100">
-            Roll Outcome
-          </h2>
+        <div className="space-y-5">
+          <CampaignPhysicsDiceTrayClient
+            theme="nattau"
+            request={request}
+            onComplete={(result) => void handlePhysicsComplete(result)}
+          />
 
-          <div className="mt-5">
-            <AnimatedDiceTray
-              variant="nattau"
-              dice={displayedDice}
-              rolling={rolling}
-              animationKey={animationKey}
-              omittedCount={displayedOmittedCount}
-              label={
-                rolling
-                  ? `${expression} is rolling`
-                  : latest
-                    ? `${latest.expression} · ${modeLabel(latest.mode)}`
-                    : "Command table"
-              }
-              emptyMessage="The expedition dice are waiting on the command table."
-            />
-          </div>
-
-          {!rolling && latest ? (
-            <div className="mt-5 rounded-2xl border border-yellow-600/30 bg-yellow-500/10 p-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
+          {latest ? (
+            <div className="rounded-3xl border border-slate-700 bg-slate-900/85 p-5 sm:p-7">
+              <div className="flex flex-wrap items-start justify-between gap-5">
                 <div>
-                  <p className="text-sm text-slate-400">
-                    {latest.expression} · {modeLabel(latest.mode)}
-                  </p>
-                  <p className="mt-2 text-6xl font-black text-yellow-300">
-                    {latest.total}
-                  </p>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {saving
-                      ? "The result is being saved..."
-                      : latest.savedRoll
-                        ? latest.savedRoll.visibility === "private"
-                          ? "Saved privately in Supabase"
-                          : "Saved to the Nattau campaign log"
-                        : "The result was rolled, but saving failed"
-                    }
+                  <p className="text-sm text-slate-400">{latest.expression} · {modeLabel(latest.mode)}</p>
+                  <p className="mt-3 text-6xl font-black text-slate-100">{latest.total}</p>
+                  <p className="mt-3 text-xs text-slate-500">
+                    Physical resolution: {(latest.physics.durationMs / 1000).toFixed(2)}s
+                    {latest.savedRoll ? " · saved" : " · database save failed"}
                   </p>
                 </div>
-                {latest.modifier !== 0 && (
-                  <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs text-slate-300">
-                    Modifier {formatModifier(latest.modifier)}
-                  </span>
+                {latest.keptDie !== null && (
+                  <div className="rounded-2xl border border-yellow-500/25 bg-yellow-500/10 p-4 text-center">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-yellow-400">Kept d20</p>
+                    <p className="mt-2 text-4xl font-black text-yellow-200">{latest.keptDie}</p>
+                  </div>
                 )}
               </div>
 
-              {latest.keptIndex !== null && (
-                <p className="mt-4 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-xs text-slate-400">
-                  The dimmed d20 was discarded by {modeLabel(latest.mode).toLowerCase()}.
-                </p>
-              )}
+              <div className="mt-6 space-y-3">
+                {latest.groups.map((group, groupIndex) => (
+                  <div key={`${group.sides}-${groupIndex}`} className="rounded-2xl border border-slate-800 bg-slate-950/55 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{group.diceCount}d{group.sides}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {group.results.map((value, index) => (
+                        <span
+                          key={`${value}-${index}`}
+                          className={`rounded-xl border px-4 py-2 font-bold ${
+                            latest.keptIndex !== null && index !== latest.keptIndex
+                              ? "border-slate-800 bg-slate-900 text-slate-600 line-through"
+                              : "border-yellow-500/25 bg-yellow-500/10 text-yellow-200"
+                          }`}
+                        >
+                          {value}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          ) : !rolling ? (
-            <p className="mt-5 rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-500">
-              No roll yet. Prepare a formula and let the dice decide.
-            </p>
-          ) : null}
+          ) : (
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 text-sm leading-6 text-slate-400">
+              Your color and number-size choice is personal. Throw force, bounce, friction and gravity are loaded from the GM's campaign settings.
+            </div>
+          )}
         </div>
       </div>
 
       <CampaignDiceLog
         variant="nattau"
-        rolls={rolls}
-        loading={loading}
+        rolls={diceLog.rolls}
+        loading={diceLog.loading}
         currentUserId={currentUserId}
         role={role}
-        onRefresh={() => void refresh()}
-        onDelete={(rollId) => void deleteRoll(rollId)}
+        onRefresh={() => void diceLog.refresh()}
+        onDelete={(rollId) => void diceLog.deleteRoll(rollId)}
         onClearMine={() => void handleClearMine()}
       />
     </section>

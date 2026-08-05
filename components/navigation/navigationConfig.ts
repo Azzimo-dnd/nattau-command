@@ -115,6 +115,12 @@ export function getNavigationSections(
           description: "Manage Nattau members and invitation codes.",
         },
         {
+          label: "Dice Physics Lab",
+          href: "/campaigns/nattau/gm/dice-lab",
+          icon: "dice",
+          description: "Test genuine Rapier rigid-body dice before campaign rollout.",
+        },
+        {
           label: "Player Conversations",
           href: "/gm-chat",
           icon: "chat",

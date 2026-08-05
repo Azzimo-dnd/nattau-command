@@ -5,7 +5,7 @@ import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMember
 
 export const metadata: Metadata = {
   title: "Dice Roller | Nattau Command",
-  description: "Campaign dice roller with a shared Supabase roll history.",
+  description: "Physical campaign dice roller with a shared Supabase roll history.",
 };
 
 export default async function NattauDicePage() {
@@ -29,8 +29,8 @@ export default async function NattauDicePage() {
             Dice Roller
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-            Roll standard polyhedral dice, use d20 advantage or disadvantage,
-            and save the results in the shared Nattau campaign log.
+            Throw real simulated polyhedral dice, use d20 advantage or disadvantage,
+            and save the settled results in the shared Nattau campaign log.
           </p>
         </div>
 

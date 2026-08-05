@@ -5,7 +5,7 @@ import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMember
 
 export const metadata: Metadata = {
   title: "The Duality | Beyond the Mists",
-  description: "Daggerheart Duality Dice roller for the Barovia campaign.",
+  description: "Physical Daggerheart Duality Dice roller for the Barovia campaign.",
 };
 
 export default async function BaroviaDicePage() {
@@ -29,8 +29,8 @@ export default async function BaroviaDicePage() {
             The Duality
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-[#a9929a]">
-            Roll Daggerheart action and reaction checks with Hope and Fear,
-            resolve adversary attacks with the GM Die, and record every result
+            Physically throw Hope and Fear, resolve adversary attacks with the GM Die,
+            and record every settled result
             in Barovia's private campaign space.
           </p>
         </div>

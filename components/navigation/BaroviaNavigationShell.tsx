@@ -163,6 +163,20 @@ function DesktopSidebar({
                 <NavIcon name="account" className="h-5 w-5 shrink-0" />
                 <span>Souls & Invitations</span>
               </Link>
+              <Link
+                href="/campaigns/barovia/gm/dice-lab"
+                className={`relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
+                  pathname.startsWith("/campaigns/barovia/gm/dice-lab")
+                    ? "bg-[#5a1825]/45 text-[#efc7d1]"
+                    : "text-[#9f959a] hover:bg-[#2a171e]/80 hover:text-[#e5d6dc]"
+                }`}
+              >
+                {pathname.startsWith("/campaigns/barovia/gm/dice-lab") && (
+                  <span className="absolute left-0 h-6 w-0.5 rounded-r-full bg-[#b65e75]" />
+                )}
+                <NavIcon name="dice" className="h-5 w-5 shrink-0" />
+                <span>The Bone Yard</span>
+              </Link>
               <div className="rounded-2xl border border-[#4b2935] bg-black/15 p-4">
                 <p className="text-sm font-semibold text-[#d7bbc3]">
                   Campaign administration
@@ -362,13 +376,22 @@ function MobileMoreSheet({
           </Link>
 
           {role === "dm" && (
-            <Link
-              href="/campaigns/barovia/gm/members"
-              className="flex min-h-20 flex-col justify-between rounded-2xl border border-[#694053] bg-[#2a111a]/65 p-3 text-[#e2bdc7]"
-            >
-              <NavIcon name="account" className="h-5 w-5" />
-              <span className="mt-3 text-sm font-semibold">Souls & Invitations</span>
-            </Link>
+            <>
+              <Link
+                href="/campaigns/barovia/gm/members"
+                className="flex min-h-20 flex-col justify-between rounded-2xl border border-[#694053] bg-[#2a111a]/65 p-3 text-[#e2bdc7]"
+              >
+                <NavIcon name="account" className="h-5 w-5" />
+                <span className="mt-3 text-sm font-semibold">Souls & Invitations</span>
+              </Link>
+              <Link
+                href="/campaigns/barovia/gm/dice-lab"
+                className="flex min-h-20 flex-col justify-between rounded-2xl border border-[#694053] bg-[#2a111a]/65 p-3 text-[#e2bdc7]"
+              >
+                <NavIcon name="dice" className="h-5 w-5" />
+                <span className="mt-3 text-sm font-semibold">The Bone Yard</span>
+              </Link>
+            </>
           )}
 
           {canSwitchCampaign && (
