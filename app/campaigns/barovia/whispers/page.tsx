@@ -9,16 +9,16 @@ import {
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 
 export const metadata: Metadata = {
-  title: "GM Messages | Nattau Command",
-  description: "Private Nattau campaign conversations with the Game Master.",
+  title: "Whispers Through the Mists | Beyond the Mists",
+  description: "Private messages between a Barovian player and the Game Master.",
 };
 
 type PageProps = {
   searchParams: Promise<{ player?: string }>;
 };
 
-export default async function NattauGmChatPage({ searchParams }: PageProps) {
-  const access = await requireCampaignMembership("nattau");
+export default async function BaroviaWhispersPage({ searchParams }: PageProps) {
+  const access = await requireCampaignMembership("barovia");
   const currentUser = createCurrentChatParticipant({
     userId: access.userId,
     displayName: access.displayName,
@@ -26,18 +26,18 @@ export default async function NattauGmChatPage({ searchParams }: PageProps) {
   });
 
   if (access.membership.role === "player") {
-    const threadId = await getOrCreateCampaignChatThread("nattau");
+    const threadId = await getOrCreateCampaignChatThread("barovia");
     const thread = await loadCampaignChatThread({ threadId, currentUser });
 
     return (
       <CampaignChatScreen
-        theme="nattau"
+        theme="barovia"
         role="player"
-        title="Message the Game Master"
-        eyebrow="Private campaign channel"
-        description="Only you and the Game Master can read this conversation. Its history is saved with the Nattau campaign."
-        backHref="/campaigns/nattau"
-        backLabel="Back to Command Center"
+        title="Whispers Through the Mists"
+        eyebrow="A voice carried through the fog"
+        description="A private channel between you and the Game Master. No other soul in Barovia can read what is written here."
+        backHref="/campaigns/barovia"
+        backLabel="Return through the Mists"
         searchParamName="player"
         summaries={[]}
         selectedPlayerId={access.userId}
@@ -46,7 +46,7 @@ export default async function NattauGmChatPage({ searchParams }: PageProps) {
     );
   }
 
-  const summaries = await loadCampaignChatThreadSummaries("nattau");
+  const summaries = await loadCampaignChatThreadSummaries("barovia");
   const query = await searchParams;
   const selectedSummary =
     summaries.find((summary) => summary.playerId === query.player) ??
@@ -56,7 +56,7 @@ export default async function NattauGmChatPage({ searchParams }: PageProps) {
   let thread = null;
   if (selectedSummary) {
     const threadId = await getOrCreateCampaignChatThread(
-      "nattau",
+      "barovia",
       selectedSummary.playerId
     );
     thread = await loadCampaignChatThread({ threadId, currentUser });
@@ -64,13 +64,13 @@ export default async function NattauGmChatPage({ searchParams }: PageProps) {
 
   return (
     <CampaignChatScreen
-      theme="nattau"
+      theme="barovia"
       role="dm"
-      title="Player Conversations"
-      eyebrow="Game Master channel"
-      description="Private conversations with members of the Kainite expedition. Unread messages are shown first."
-      backHref="/campaigns/nattau"
-      backLabel="Back to Command Center"
+      title="Whispers Through the Mists"
+      eyebrow="Secrets entrusted to the Game Master"
+      description="Private conversations with the souls currently wandering your Barovia campaign. Unread whispers are gathered at the top."
+      backHref="/campaigns/barovia"
+      backLabel="Return through the Mists"
       searchParamName="player"
       summaries={summaries}
       selectedPlayerId={selectedSummary?.playerId ?? null}

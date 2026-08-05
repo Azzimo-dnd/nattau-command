@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { AppRole } from "@/components/navigation/navigationTypes";
+import { CampaignChatUnreadBadge } from "@/components/notifications/CampaignChatNotifications";
 
 type ModuleStatus = "active" | "preview";
 
@@ -18,6 +19,15 @@ const modules: Array<{
       "Mark available nights, compare the party's answers, open votes and choose the next descent into Barovia.",
     href: "/campaigns/barovia/session-planner",
     mark: "G",
+    status: "active",
+  },
+  {
+    eyebrow: "Private Messages",
+    title: "Whispers Through the Mists",
+    description:
+      "A private channel between each player and the Game Master, with unread-message notifications carried across Barovia.",
+    href: "/campaigns/barovia/whispers",
+    mark: "W",
     status: "active",
   },
   {
@@ -104,7 +114,7 @@ export function BaroviaDashboard({
             </h2>
           </div>
           <span className="rounded-full border border-[#713143]/50 bg-[#35151f]/40 px-3 py-1 text-xs text-[#c48c9b]">
-            4 active modules
+            5 active modules
           </span>
         </div>
 
@@ -125,14 +135,22 @@ export function BaroviaDashboard({
                     <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#9f5367]">
                       {module.eyebrow}
                     </p>
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] ${
-                        module.status === "active"
-                          ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
-                          : "border-[#5b414a] bg-black/20 text-[#8f7d83]"
-                      }`}
-                    >
-                      {module.status === "active" ? "Active" : "Preview"}
+                    <span className="flex items-center gap-2">
+                      {module.href === "/campaigns/barovia/whispers" && (
+                        <CampaignChatUnreadBadge
+                          campaignSlug="barovia"
+                          theme="barovia"
+                        />
+                      )}
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] ${
+                          module.status === "active"
+                            ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+                            : "border-[#5b414a] bg-black/20 text-[#8f7d83]"
+                        }`}
+                      >
+                        {module.status === "active" ? "Active" : "Preview"}
+                      </span>
                     </span>
                   </div>
                   <h3 className="mt-2 font-serif text-2xl font-black text-[#eadbd2]">

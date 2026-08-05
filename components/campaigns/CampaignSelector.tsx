@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CampaignMembership } from "@/lib/campaigns/campaignTypes";
+import { CampaignChatUnreadBadge } from "@/components/notifications/CampaignChatNotifications";
 
 function CampaignCard({ campaign }: { campaign: CampaignMembership }) {
   const isBarovia = campaign.themeKey === "barovia";
@@ -33,9 +34,15 @@ function CampaignCard({ campaign }: { campaign: CampaignMembership }) {
             {campaign.systemKey === "daggerheart" ? "Daggerheart" : "D&D 5e"}
           </span>
 
-          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
-            {campaign.role === "dm" ? "Game Master" : "Player"}
-          </span>
+          <div className="flex items-center gap-2">
+            <CampaignChatUnreadBadge
+              campaignSlug={campaign.slug}
+              theme={isBarovia ? "barovia" : "nattau"}
+            />
+            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
+              {campaign.role === "dm" ? "Game Master" : "Player"}
+            </span>
+          </div>
         </div>
 
         <div className="mt-auto pt-14">

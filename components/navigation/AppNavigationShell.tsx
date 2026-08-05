@@ -6,6 +6,11 @@ import type { ReactNode } from "react";
 import type { CampaignMembership } from "@/lib/campaigns/campaignTypes";
 import { useEffect, useMemo, useState } from "react";
 import { NavIcon } from "./NavIcon";
+import {
+  CampaignChatNotificationsProvider,
+  CampaignChatUnreadBadge,
+  useCampaignChatUnread,
+} from "@/components/notifications/CampaignChatNotifications";
 import { NavigationSignOut } from "./NavigationSignOut";
 import { BaroviaNavigationShell } from "./BaroviaNavigationShell";
 import {
@@ -65,9 +70,21 @@ function DesktopNavigationItem({
         className={`h-5 w-5 shrink-0 ${active ? "text-yellow-300" : ""}`}
       />
       {!collapsed && (
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">
-          {item.label}
-        </span>
+        <>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+            {item.label}
+          </span>
+          {item.href === "/gm-chat" && (
+            <CampaignChatUnreadBadge campaignSlug="nattau" theme="nattau" />
+          )}
+        </>
+      )}
+      {collapsed && item.href === "/gm-chat" && (
+        <CampaignChatUnreadBadge
+          campaignSlug="nattau"
+          theme="nattau"
+          className="absolute right-1 top-1"
+        />
       )}
     </Link>
   );
@@ -214,6 +231,8 @@ function MobileBottomNavigation({
   moreOpen: boolean;
   setMoreOpen: (value: boolean) => void;
 }) {
+  const { unreadMessages } = useCampaignChatUnread("nattau");
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800/90 bg-slate-950/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
       <div className="mx-auto grid max-w-xl grid-cols-5">
@@ -245,7 +264,16 @@ function MobileBottomNavigation({
               : "text-slate-500 active:bg-slate-800 active:text-slate-200"
           }`}
         >
-          <NavIcon name="more" className="h-5 w-5" />
+          <span className="relative">
+            <NavIcon name="more" className="h-5 w-5" />
+            {unreadMessages > 0 && (
+              <CampaignChatUnreadBadge
+                campaignSlug="nattau"
+                theme="nattau"
+                className="absolute -right-3 -top-2"
+              />
+            )}
+          </span>
           <span>More</span>
         </button>
       </div>
@@ -352,7 +380,15 @@ function MobileMoreSheet({
                           : "border-slate-800 bg-slate-950/50 text-slate-300"
                       }`}
                     >
-                      <NavIcon name={item.icon} className="h-5 w-5" />
+                      <div className="flex items-start justify-between gap-2">
+                        <NavIcon name={item.icon} className="h-5 w-5" />
+                        {item.href === "/gm-chat" && (
+                          <CampaignChatUnreadBadge
+                            campaignSlug="nattau"
+                            theme="nattau"
+                          />
+                        )}
+                      </div>
                       <span className="mt-3 text-sm font-semibold">{item.label}</span>
                     </Link>
                   );
@@ -489,13 +525,19 @@ export function AppNavigationShell({
   }
 
   return (
-    <NattauNavigationShell
-      role={activeRole}
-      displayName={displayName}
-      enableSignOut={enableSignOut}
-      campaigns={campaigns}
+    <CampaignChatNotificationsProvider
+      campaignSlug="nattau"
+      chatHref="/gm-chat"
+      theme="nattau"
     >
-      {children}
-    </NattauNavigationShell>
+      <NattauNavigationShell
+        role={activeRole}
+        displayName={displayName}
+        enableSignOut={enableSignOut}
+        campaigns={campaigns}
+      >
+        {children}
+      </NattauNavigationShell>
+    </CampaignChatNotificationsProvider>
   );
 }

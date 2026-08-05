@@ -5,6 +5,11 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { NavIcon } from "./NavIcon";
+import {
+  CampaignChatNotificationsProvider,
+  CampaignChatUnreadBadge,
+  useCampaignChatUnread,
+} from "@/components/notifications/CampaignChatNotifications";
 import { NavigationSignOut } from "./NavigationSignOut";
 import type {
   AppRole,
@@ -47,6 +52,11 @@ const primaryItems: NavigationItem[] = [
 const desktopItems: NavigationItem[] = [
   ...primaryItems,
   {
+    label: "Whispers",
+    href: "/campaigns/barovia/whispers",
+    icon: "chat",
+  },
+  {
     label: "The Duality",
     href: "/campaigns/barovia/dice",
     icon: "dice",
@@ -85,7 +95,10 @@ function DesktopItem({
         <span className="absolute left-0 h-6 w-0.5 rounded-r-full bg-[#b65e75]" />
       )}
       <NavIcon name={item.icon} className="h-5 w-5 shrink-0" />
-      <span className="truncate">{item.label}</span>
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {item.href === "/campaigns/barovia/whispers" && (
+        <CampaignChatUnreadBadge campaignSlug="barovia" theme="barovia" />
+      )}
     </Link>
   );
 }
@@ -139,8 +152,7 @@ function DesktopSidebar({
                 Campaign tools active
               </p>
               <p className="mt-2 text-xs leading-5 text-[#8f8187]">
-                The Gathering, The Duality, Tarokka and the Atlas now use
-                campaign-specific data. Character cards remain in preparation.
+                The Gathering, The Duality, Tarokka, the Atlas and private Whispers now use campaign-specific data. Character cards remain in preparation.
               </p>
             </div>
           </section>
@@ -210,6 +222,8 @@ function MobileBottomNavigation({
   moreOpen: boolean;
   setMoreOpen: (value: boolean) => void;
 }) {
+  const { unreadMessages } = useCampaignChatUnread("barovia");
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-[#3d252f] bg-[#0c080b]/96 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
       <div className="mx-auto grid max-w-xl grid-cols-5">
@@ -219,7 +233,7 @@ function MobileBottomNavigation({
             <Link
               key={item.href}
               href={item.href}
-              className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-medium transition ${
+              className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-medium transition ${
                 active
                   ? "bg-[#5a1825]/40 text-[#efc7d1]"
                   : "text-[#77666c] active:bg-[#2a171e] active:text-[#ddd0d4]"
@@ -240,7 +254,16 @@ function MobileBottomNavigation({
               : "text-[#77666c] active:bg-[#2a171e] active:text-[#ddd0d4]"
           }`}
         >
-          <NavIcon name="more" className="h-5 w-5" />
+          <span className="relative">
+            <NavIcon name="more" className="h-5 w-5" />
+            {unreadMessages > 0 && (
+              <CampaignChatUnreadBadge
+                campaignSlug="barovia"
+                theme="barovia"
+                className="absolute -right-3 -top-2"
+              />
+            )}
+          </span>
           <span>More</span>
         </button>
       </div>
@@ -295,6 +318,17 @@ function MobileMoreSheet({
 
         <div className="mt-5 grid grid-cols-2 gap-2">
           <Link
+            href="/campaigns/barovia/whispers"
+            className="relative flex min-h-20 flex-col justify-between rounded-2xl border border-[#432832] bg-black/20 p-3 text-[#d1b6be]"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <NavIcon name="chat" className="h-5 w-5" />
+              <CampaignChatUnreadBadge campaignSlug="barovia" theme="barovia" />
+            </div>
+            <span className="mt-3 text-sm font-semibold">Whispers</span>
+          </Link>
+
+          <Link
             href="/campaigns/barovia/dice"
             className="flex min-h-20 flex-col justify-between rounded-2xl border border-[#432832] bg-black/20 p-3 text-[#d1b6be]"
           >
@@ -348,7 +382,7 @@ function MobileMoreSheet({
   );
 }
 
-export function BaroviaNavigationShell({
+function BaroviaNavigationContent({
   children,
   role,
   displayName,
@@ -405,5 +439,18 @@ export function BaroviaNavigationShell({
         enableSignOut={enableSignOut}
       />
     </div>
+  );
+}
+
+
+export function BaroviaNavigationShell(props: BaroviaNavigationShellProps) {
+  return (
+    <CampaignChatNotificationsProvider
+      campaignSlug="barovia"
+      chatHref="/campaigns/barovia/whispers"
+      theme="barovia"
+    >
+      <BaroviaNavigationContent {...props} />
+    </CampaignChatNotificationsProvider>
   );
 }

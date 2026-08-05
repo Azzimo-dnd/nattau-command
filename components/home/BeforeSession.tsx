@@ -5,6 +5,7 @@ import type {
   NavigationIconName,
 } from "@/components/navigation/navigationTypes";
 import type { FateState } from "@/lib/home/loadCommandCenterData";
+import { CampaignChatUnreadBadge } from "@/components/notifications/CampaignChatNotifications";
 
 type BeforeSessionProps = {
   role: AppRole;
@@ -31,6 +32,7 @@ type PreparationItem = {
   icon: NavigationIconName;
   badge: string;
   needsAttention: boolean;
+  chatCampaignSlug?: string;
 };
 
 function plural(value: number, singular: string, pluralForm = `${singular}s`) {
@@ -137,6 +139,7 @@ export function BeforeSession({
       icon: "chat",
       badge: "Open",
       needsAttention: false,
+      chatCampaignSlug: "nattau",
     },
   ];
 
@@ -212,6 +215,7 @@ export function BeforeSession({
       icon: "chat",
       badge: "Open",
       needsAttention: false,
+      chatCampaignSlug: "nattau",
     },
   ];
 
@@ -264,7 +268,17 @@ export function BeforeSession({
                   : "border-green-500/20 bg-green-500/5 text-green-300"
               }`}
             >
-              {item.badge}
+              {item.chatCampaignSlug ? (
+                <span className="flex items-center gap-1.5">
+                  <CampaignChatUnreadBadge
+                    campaignSlug={item.chatCampaignSlug}
+                    theme="nattau"
+                  />
+                  <span>{item.badge}</span>
+                </span>
+              ) : (
+                item.badge
+              )}
             </span>
           </Link>
         ))}
