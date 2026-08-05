@@ -12,6 +12,7 @@ import {
   useCampaignChatUnread,
 } from "@/components/notifications/CampaignChatNotifications";
 import { NavigationSignOut } from "./NavigationSignOut";
+import { CampaignActivityHeartbeat } from "@/components/campaign-admin/CampaignActivityHeartbeat";
 import { BaroviaNavigationShell } from "./BaroviaNavigationShell";
 import {
   getNavigationSections,
@@ -499,7 +500,12 @@ export function AppNavigationShell({
 }: AppNavigationShellProps) {
   const pathname = usePathname();
 
-  if (pathname === "/campaigns" || pathname === "/no-campaign-access") {
+  if (
+    pathname === "/campaigns" ||
+    pathname === "/no-campaign-access" ||
+    pathname.startsWith("/gm/campaigns") ||
+    pathname.startsWith("/campaign-invite")
+  ) {
     return <>{children}</>;
   }
 
@@ -530,6 +536,7 @@ export function AppNavigationShell({
       chatHref="/gm-chat"
       theme="nattau"
     >
+      <CampaignActivityHeartbeat campaignSlug="nattau" />
       <NattauNavigationShell
         role={activeRole}
         displayName={displayName}

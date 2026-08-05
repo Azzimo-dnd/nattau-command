@@ -109,6 +109,12 @@ export function getNavigationSections(
           description: "Review draws and begin the next Fate Cycle.",
         },
         {
+          label: "Expedition Roster",
+          href: "/campaigns/nattau/gm/members",
+          icon: "account",
+          description: "Manage Nattau members and invitation codes.",
+        },
+        {
           label: "Player Conversations",
           href: "/gm-chat",
           icon: "chat",

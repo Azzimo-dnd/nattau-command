@@ -11,6 +11,7 @@ import {
   useCampaignChatUnread,
 } from "@/components/notifications/CampaignChatNotifications";
 import { NavigationSignOut } from "./NavigationSignOut";
+import { CampaignActivityHeartbeat } from "@/components/campaign-admin/CampaignActivityHeartbeat";
 import type {
   AppRole,
   NavigationItem,
@@ -147,13 +148,29 @@ function DesktopSidebar({
             <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#76515d]">
               Game Master
             </p>
-            <div className="rounded-2xl border border-[#4b2935] bg-black/15 p-4">
-              <p className="text-sm font-semibold text-[#d7bbc3]">
-                Campaign tools active
-              </p>
-              <p className="mt-2 text-xs leading-5 text-[#8f8187]">
-                The Gathering, The Duality, Tarokka, the Atlas and private Whispers now use campaign-specific data. Character cards remain in preparation.
-              </p>
+            <div className="space-y-2">
+              <Link
+                href="/campaigns/barovia/gm/members"
+                className={`relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
+                  pathname.startsWith("/campaigns/barovia/gm/members")
+                    ? "bg-[#5a1825]/45 text-[#efc7d1]"
+                    : "text-[#9f959a] hover:bg-[#2a171e]/80 hover:text-[#e5d6dc]"
+                }`}
+              >
+                {pathname.startsWith("/campaigns/barovia/gm/members") && (
+                  <span className="absolute left-0 h-6 w-0.5 rounded-r-full bg-[#b65e75]" />
+                )}
+                <NavIcon name="account" className="h-5 w-5 shrink-0" />
+                <span>Souls & Invitations</span>
+              </Link>
+              <div className="rounded-2xl border border-[#4b2935] bg-black/15 p-4">
+                <p className="text-sm font-semibold text-[#d7bbc3]">
+                  Campaign administration
+                </p>
+                <p className="mt-2 text-xs leading-5 text-[#8f8187]">
+                  Manage access, test accounts, planning participation and player invitation codes.
+                </p>
+              </div>
             </div>
           </section>
         )}
@@ -344,6 +361,16 @@ function MobileMoreSheet({
             <span className="mt-3 text-sm font-semibold">Atlas</span>
           </Link>
 
+          {role === "dm" && (
+            <Link
+              href="/campaigns/barovia/gm/members"
+              className="flex min-h-20 flex-col justify-between rounded-2xl border border-[#694053] bg-[#2a111a]/65 p-3 text-[#e2bdc7]"
+            >
+              <NavIcon name="account" className="h-5 w-5" />
+              <span className="mt-3 text-sm font-semibold">Souls & Invitations</span>
+            </Link>
+          )}
+
           {canSwitchCampaign && (
             <Link
               href="/campaigns"
@@ -411,6 +438,7 @@ function BaroviaNavigationContent({
 
   return (
     <div className={`min-h-screen text-[#eadfe3] ${styles.shell}`}>
+      <CampaignActivityHeartbeat campaignSlug="barovia" />
       <DesktopSidebar
         pathname={pathname}
         role={role}
