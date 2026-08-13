@@ -142,8 +142,10 @@ export function DicePhysicsLab({
     setSaveMessage(null);
   }
 
-  async function startRoll() {
+  async function startRoll(requestedCount = count) {
     if (webglError || isBusy) return;
+    const safeCount = Math.min(24, Math.max(1, requestedCount));
+    setCount(safeCount);
     if (configuration.appearance.sound) await soundEngine.unlock();
     const rollId = createRollId();
     const startedAt = performance.now();
@@ -152,7 +154,7 @@ export function DicePhysicsLab({
     setRequest({
       rollId,
       startedAt,
-      dice: Array.from({ length: count }, (_, index) => ({
+      dice: Array.from({ length: safeCount }, (_, index) => ({
         id: `${rollId}-${index}`,
         kind: dieKind,
         groupIndex: 0,
@@ -189,7 +191,7 @@ export function DicePhysicsLab({
       )}
 
       <div className="grid gap-5 2xl:grid-cols-[360px_minmax(0,1fr)_330px]">
-        <aside className={`rounded-3xl border p-4 sm:p-5 ${themeClasses.panel}`}>
+        <aside className={`order-2 rounded-3xl border p-4 sm:p-5 2xl:order-1 ${themeClasses.panel}`}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className={`text-xs font-bold uppercase tracking-[0.26em] ${themeClasses.accent}`}>
@@ -227,11 +229,11 @@ export function DicePhysicsLab({
               <input
                 type="number"
                 min={1}
-                max={12}
+                max={24}
                 value={count}
                 disabled={isBusy}
                 onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                  setCount(Math.min(12, Math.max(1, Number(event.target.value) || 1)))
+                  setCount(Math.min(24, Math.max(1, Number(event.target.value) || 1)))
                 }
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 font-mono outline-none"
               />
@@ -241,6 +243,29 @@ export function DicePhysicsLab({
               <p className={`mt-3 text-sm font-black uppercase ${themeClasses.accent}`}>
                 {status}
               </p>
+            </div>
+          </div>
+
+          <div className={`mt-4 rounded-2xl border p-3 ${themeClasses.soft}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold opacity-75">Stress tests</p>
+                <p className="mt-1 text-[10px] opacity-50">Same engine limit as player rolls: 24 physical bodies.</p>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-55">1–24</span>
+            </div>
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {[6, 12, 18, 24].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  disabled={isBusy || Boolean(webglError)}
+                  onClick={() => void startRoll(preset)}
+                  className={`min-h-10 rounded-xl border text-xs font-black ${themeClasses.secondary}`}
+                >
+                  {preset}d
+                </button>
+              ))}
             </div>
           </div>
 
@@ -262,8 +287,8 @@ export function DicePhysicsLab({
           </button>
         </aside>
 
-        <div className="min-w-0">
-          <div className={`relative h-[520px] overflow-hidden rounded-3xl border shadow-2xl sm:h-[620px] ${themeClasses.panel}`}>
+        <div className="order-1 min-w-0 2xl:order-2">
+          <div className={`relative h-[clamp(320px,48dvh,470px)] overflow-hidden rounded-3xl border shadow-2xl sm:h-[620px] ${themeClasses.panel}`}>
             {webglError ? (
               <div className="flex h-full items-center justify-center p-8 text-center text-red-300">
                 {webglError}
@@ -332,7 +357,7 @@ export function DicePhysicsLab({
                   </p>
                 </div>
                 <p className="text-xs opacity-60">
-                  {(result.durationMs / 1000).toFixed(2)}s · peak {result.peakImpact.toFixed(1)}
+                  {(result.durationMs / 1000).toFixed(2)}s · peak {result.peakImpact.toFixed(1)} · {result.simulationProfile}
                 </p>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -342,11 +367,20 @@ export function DicePhysicsLab({
                   </span>
                 ))}
               </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+                <div className={`rounded-xl border p-3 ${themeClasses.soft}`}><span className="opacity-55">Profile</span><strong className="mt-1 block">{result.simulationProfile}</strong></div>
+                <div className={`rounded-xl border p-3 ${themeClasses.soft}`}><span className="opacity-55">Die scale</span><strong className="mt-1 block">{Math.round(result.dieScale * 100)}%</strong></div>
+                <div className={`rounded-xl border p-3 ${themeClasses.soft}`}><span className="opacity-55">Tray</span><strong className="mt-1 block">{result.trayWidth.toFixed(1)} × {result.trayDepth.toFixed(1)}</strong></div>
+                <div className={`rounded-xl border p-3 ${themeClasses.soft}`}><span className="opacity-55">Escapes</span><strong className="mt-1 block">{result.escapeCount}</strong></div>
+                <div className={`rounded-xl border p-3 ${themeClasses.soft}`}><span className="opacity-55">Rescued dice</span><strong className="mt-1 block">{result.rescuedDice}</strong></div>
+                <div className={`rounded-xl border p-3 ${themeClasses.soft}`}><span className="opacity-55">Timeout rescues</span><strong className="mt-1 block">{result.timeoutRescues}</strong></div>
+              </div>
             </div>
           )}
         </div>
 
-        <aside className="space-y-5">
+        <aside className="order-3 space-y-5">
           <DiceAppearancePicker
             theme={theme}
             value={configuration.appearance}

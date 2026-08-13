@@ -15,7 +15,7 @@ const DynamicTray = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[430px] items-center justify-center rounded-3xl border border-white/10 bg-black/25 sm:h-[520px]">
+      <div className="flex h-[clamp(300px,43dvh,380px)] items-center justify-center rounded-3xl border border-white/10 bg-black/25 sm:h-[520px]">
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-white/70" />
           <p className="mt-4 text-sm opacity-60">Loading the physics engine…</p>

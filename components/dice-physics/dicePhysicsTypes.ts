@@ -6,6 +6,12 @@ export type DiceNumberSize = "standard" | "large" | "extra-large";
 export type DiceCosmeticId = string;
 export type PhysicsDieTone = "normal" | "hope" | "fear";
 export type PercentilePart = "tens" | "ones";
+export type DiceSimulationProfileId =
+  | "showcase"
+  | "standard"
+  | "crowded"
+  | "mass-roll"
+  | "stress";
 
 export type CampaignDicePhysicsSettings = {
   throwForce: number;
@@ -69,6 +75,13 @@ export type PhysicsRollResult = {
   physicalTotal: number;
   peakImpact: number;
   forcedSettles: number;
+  escapeCount: number;
+  rescuedDice: number;
+  timeoutRescues: number;
+  simulationProfile: DiceSimulationProfileId;
+  dieScale: number;
+  trayWidth: number;
+  trayDepth: number;
 };
 
 export type PhysicsRollRequest = {

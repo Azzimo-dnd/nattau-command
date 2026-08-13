@@ -14,7 +14,7 @@ export function CampaignPhysicsDiceTray({
   theme,
   request,
   onComplete,
-  heightClass = "h-[430px] sm:h-[520px]",
+  heightClass = "h-[clamp(300px,43dvh,380px)] sm:h-[520px]",
 }: {
   theme: DiceLabTheme;
   request: PhysicsRollRequest | null;

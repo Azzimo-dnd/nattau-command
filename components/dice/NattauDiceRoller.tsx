@@ -3,6 +3,7 @@
 import type { ChangeEvent } from "react";
 import { useMemo, useRef, useState } from "react";
 import { CampaignDiceLog } from "./CampaignDiceLog";
+import { MobileDiceSheet } from "./MobileDiceSheet";
 import type {
   CampaignDiceRollRow,
   DiceAppRole,
@@ -98,10 +99,22 @@ export function NattauDiceRoller({
   const [localError, setLocalError] = useState<string | null>(null);
   const [latest, setLatest] = useState<LocalNattauResult | null>(null);
   const pendingRef = useRef<PendingNattauRoll | null>(null);
+  const trayRef = useRef<HTMLDivElement | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const configuration = useCampaignDiceConfiguration({ campaignId, currentUserId });
   const diceLog = useCampaignDiceLog({ campaignId, currentUserId });
   const d20ModeAllowed = useMemo(() => canUseD20Mode(expression), [expression]);
+
+  function focusTrayOnMobile() {
+    if (typeof window === "undefined" || !window.matchMedia("(max-width: 1279px)").matches) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+    window.setTimeout(() => {
+      trayRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  }
 
   async function performRoll(
     requestedExpression = expression,
@@ -154,6 +167,7 @@ export function NattauDiceRoller({
         await getSharedDiceSoundEngine().unlock();
       }
 
+      focusTrayOnMobile();
       setRequest({
         rollId,
         startedAt: performance.now(),
@@ -218,6 +232,13 @@ export function NattauDiceRoller({
           duration_ms: Math.round(physicsResult.durationMs),
           peak_impact: physicsResult.peakImpact,
           forced_settles: physicsResult.forcedSettles,
+          escape_count: physicsResult.escapeCount,
+          rescued_dice: physicsResult.rescuedDice,
+          timeout_rescues: physicsResult.timeoutRescues,
+          simulation_profile: physicsResult.simulationProfile,
+          die_scale: physicsResult.dieScale,
+          tray_width: physicsResult.trayWidth,
+          tray_depth: physicsResult.trayDepth,
           cosmetic_id: configuration.appearance.cosmeticId,
           number_size: configuration.appearance.numberSize,
         },
@@ -251,38 +272,62 @@ export function NattauDiceRoller({
   }
 
   return (
-    <section className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-[390px_1fr]">
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">Roll Command</p>
-            <h2 className="mt-3 text-2xl font-bold text-slate-100">Prepare Physical Roll</h2>
+    <section className="space-y-4 pb-24 xl:space-y-6 xl:pb-0">
+      <div className="grid gap-4 xl:grid-cols-[390px_1fr] xl:gap-6">
+        <div className="contents xl:block xl:space-y-6">
+          <div className="order-1 rounded-2xl border border-slate-800 bg-slate-900 p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.28em] text-yellow-500 sm:text-xs sm:tracking-[0.35em]">Roll Command</p>
+                <h2 className="mt-2 text-xl font-bold text-slate-100 sm:mt-3 sm:text-2xl">Prepare Physical Roll</h2>
+              </div>
+              <div className="flex gap-2 xl:hidden">
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen(true)}
+                  className="min-h-11 rounded-xl border border-slate-700 bg-slate-950/70 px-3 text-xs font-bold text-slate-300"
+                >
+                  History
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className="min-h-11 rounded-xl border border-yellow-500/35 bg-yellow-500/10 px-3 text-xs font-bold text-yellow-300"
+                >
+                  My Dice
+                </button>
+              </div>
+            </div>
 
-            <div className="mt-5 space-y-4">
-              <label className="block text-sm font-medium text-slate-300">
-                Dice formula
-                <input
-                  value={expression}
-                  disabled={rolling || diceLog.saving}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => setExpression(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-yellow-500 disabled:opacity-60"
-                  placeholder="1d20, 2d6+3, 2d4+3d8"
-                />
-                <span className="mt-2 block text-xs leading-5 text-slate-500">
-                  Physical d4, d6, d8, d10, d12, d20 and percentile dice.
-                </span>
-              </label>
+            <div className="mt-4 space-y-3 sm:mt-5 sm:space-y-4">
+              <div className="grid grid-cols-[minmax(0,1fr)_92px] gap-3">
+                <label className="block text-sm font-medium text-slate-300">
+                  Dice formula
+                  <input
+                    value={expression}
+                    inputMode="text"
+                    disabled={rolling || diceLog.saving}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) => setExpression(event.target.value)}
+                    className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-yellow-500 disabled:opacity-60 sm:px-4"
+                    placeholder="1d20"
+                  />
+                </label>
 
-              <label className="block text-sm font-medium text-slate-300">
-                Extra modifier
-                <input
-                  type="number"
-                  value={extraModifier}
-                  disabled={rolling || diceLog.saving}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => setExtraModifier(Number(event.target.value) || 0)}
-                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none focus:border-yellow-500 disabled:opacity-60"
-                />
-              </label>
+                <label className="block text-sm font-medium text-slate-300">
+                  Modifier
+                  <input
+                    type="number"
+                    value={extraModifier}
+                    disabled={rolling || diceLog.saving}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) => setExtraModifier(Number(event.target.value) || 0)}
+                    className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-slate-100 outline-none focus:border-yellow-500 disabled:opacity-60"
+                  />
+                </label>
+              </div>
+
+              <p className="hidden text-xs leading-5 text-slate-500 xl:block">
+                Physical d4, d6, d8, d10, d12, d20 and percentile dice. The engine automatically adapts tray size and die scale for large throws.
+              </p>
 
               <div>
                 <p className="text-sm font-medium text-slate-300">d20 mode</p>
@@ -293,7 +338,7 @@ export function NattauDiceRoller({
                       type="button"
                       disabled={rolling || diceLog.saving || !d20ModeAllowed}
                       onClick={() => setMode(entry)}
-                      className={`min-h-11 rounded-xl border px-2 text-xs transition disabled:opacity-35 ${
+                      className={`min-h-11 rounded-xl border px-2 text-[11px] transition disabled:opacity-35 sm:text-xs ${
                         mode === entry
                           ? entry === "advantage"
                             ? "border-green-500/60 bg-green-500/10 text-green-300"
@@ -309,7 +354,24 @@ export function NattauDiceRoller({
                 </div>
               </div>
 
-              <label className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-300">
+              <div className="xl:hidden">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Quick Dice</p>
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {quickDice.map((sides) => (
+                    <button
+                      key={sides}
+                      type="button"
+                      disabled={rolling || diceLog.saving}
+                      onClick={() => rollQuickDie(sides)}
+                      className="min-h-11 min-w-14 shrink-0 rounded-xl border border-slate-700 bg-slate-950/70 px-3 text-sm font-bold text-slate-300 active:border-yellow-500 active:text-yellow-300 disabled:opacity-45"
+                    >
+                      d{sides}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2.5 text-sm text-slate-300 sm:px-4 sm:py-3">
                 <input
                   type="checkbox"
                   checked={visibility === "private"}
@@ -329,14 +391,14 @@ export function NattauDiceRoller({
                 type="button"
                 disabled={rolling || diceLog.saving || configuration.loading}
                 onClick={() => void performRoll()}
-                className="min-h-12 w-full rounded-xl border border-yellow-500 bg-yellow-500 px-4 font-bold text-slate-950 transition hover:bg-yellow-400 disabled:opacity-60"
+                className="hidden min-h-12 w-full rounded-xl border border-yellow-500 bg-yellow-500 px-4 font-bold text-slate-950 transition hover:bg-yellow-400 disabled:opacity-60 xl:block"
               >
                 {rolling ? "Dice in motion…" : diceLog.saving ? "Saving…" : "Roll Physical Dice"}
               </button>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <div className="order-4 hidden rounded-2xl border border-slate-800 bg-slate-900 p-5 xl:block">
             <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">Quick Dice</p>
             <div className="mt-4 grid grid-cols-4 gap-2">
               {quickDice.map((sides) => (
@@ -353,81 +415,151 @@ export function NattauDiceRoller({
             </div>
           </div>
 
-          <DiceAppearancePicker
-            theme="nattau"
-            value={configuration.appearance}
-            disabled={rolling || configuration.loading}
-            saving={configuration.savingAppearance}
-            onChange={(value) => void configuration.saveAppearance(value)}
-          />
+          <div className="order-5 hidden xl:block">
+            <DiceAppearancePicker
+              theme="nattau"
+              value={configuration.appearance}
+              disabled={rolling || configuration.loading}
+              saving={configuration.savingAppearance}
+              onChange={(value) => void configuration.saveAppearance(value)}
+            />
+          </div>
         </div>
 
-        <div className="space-y-5">
-          <CampaignPhysicsDiceTrayClient
-            theme="nattau"
-            request={request}
-            onComplete={(result) => void handlePhysicsComplete(result)}
-          />
+        <div className="contents xl:block xl:space-y-5">
+          <div ref={trayRef} className="relative order-2 min-w-0 scroll-mt-4">
+            <CampaignPhysicsDiceTrayClient
+              theme="nattau"
+              request={request}
+              onComplete={(result) => void handlePhysicsComplete(result)}
+            />
 
-          {latest ? (
-            <div className="rounded-3xl border border-slate-700 bg-slate-900/85 p-5 sm:p-7">
-              <div className="flex flex-wrap items-start justify-between gap-5">
-                <div>
-                  <p className="text-sm text-slate-400">{latest.expression} · {modeLabel(latest.mode)}</p>
-                  <p className="mt-3 text-6xl font-black text-slate-100">{latest.total}</p>
-                  <p className="mt-3 text-xs text-slate-500">
-                    Physical resolution: {(latest.physics.durationMs / 1000).toFixed(2)}s
-                    {latest.savedRoll ? " · saved" : " · database save failed"}
-                  </p>
-                </div>
-                {latest.keptDie !== null && (
-                  <div className="rounded-2xl border border-yellow-500/25 bg-yellow-500/10 p-4 text-center">
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-yellow-400">Kept d20</p>
-                    <p className="mt-2 text-4xl font-black text-yellow-200">{latest.keptDie}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {latest.groups.map((group, groupIndex) => (
-                  <div key={`${group.sides}-${groupIndex}`} className="rounded-2xl border border-slate-800 bg-slate-950/55 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{group.diceCount}d{group.sides}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {group.results.map((value, index) => (
-                        <span
-                          key={`${value}-${index}`}
-                          className={`rounded-xl border px-4 py-2 font-bold ${
-                            latest.keptIndex !== null && index !== latest.keptIndex
-                              ? "border-slate-800 bg-slate-900 text-slate-600 line-through"
-                              : "border-yellow-500/25 bg-yellow-500/10 text-yellow-200"
-                          }`}
-                        >
-                          {value}
-                        </span>
+            {!rolling && latest && (
+              <div className="absolute inset-x-3 bottom-3 z-10 rounded-2xl border border-yellow-500/25 bg-slate-950/88 p-3 shadow-2xl backdrop-blur-md xl:hidden">
+                <div className="flex items-end justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-yellow-400">{latest.expression} · {modeLabel(latest.mode)}</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-slate-300">
+                      {latest.groups.flatMap((group) => group.results).slice(0, 10).map((value, index) => (
+                        <span key={`${value}-${index}`} className="rounded-lg border border-white/10 bg-black/30 px-2 py-1">{value}</span>
                       ))}
+                      {latest.groups.flatMap((group) => group.results).length > 10 && (
+                        <span className="px-1 py-1 text-slate-500">+more</span>
+                      )}
                     </div>
                   </div>
-                ))}
+                  <div className="shrink-0 text-right">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Total</p>
+                    <p className="text-4xl font-black leading-none text-white">{latest.total}</p>
+                  </div>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 text-sm leading-6 text-slate-400">
-              Your color and number-size choice is personal. Throw force, bounce, friction and gravity are loaded from the GM's campaign settings.
-            </div>
-          )}
+            )}
+          </div>
+
+          <div className="order-3 hidden xl:block">
+            {latest ? (
+              <div className="rounded-3xl border border-slate-700 bg-slate-900/85 p-5 sm:p-7">
+                <div className="flex flex-wrap items-start justify-between gap-5">
+                  <div>
+                    <p className="text-sm text-slate-400">{latest.expression} · {modeLabel(latest.mode)}</p>
+                    <p className="mt-3 text-6xl font-black text-slate-100">{latest.total}</p>
+                    <p className="mt-3 text-xs text-slate-500">
+                      Physical resolution: {(latest.physics.durationMs / 1000).toFixed(2)}s · profile {latest.physics.simulationProfile}
+                      {latest.savedRoll ? " · saved" : " · database save failed"}
+                    </p>
+                  </div>
+                  {latest.keptDie !== null && (
+                    <div className="rounded-2xl border border-yellow-500/25 bg-yellow-500/10 p-4 text-center">
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-yellow-400">Kept d20</p>
+                      <p className="mt-2 text-4xl font-black text-yellow-200">{latest.keptDie}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 space-y-3">
+                  {latest.groups.map((group, groupIndex) => (
+                    <div key={`${group.sides}-${groupIndex}`} className="rounded-2xl border border-slate-800 bg-slate-950/55 p-4">
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{group.diceCount}d{group.sides}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {group.results.map((value, index) => (
+                          <span
+                            key={`${value}-${index}`}
+                            className={`rounded-xl border px-4 py-2 font-bold ${
+                              latest.keptIndex !== null && index !== latest.keptIndex
+                                ? "border-slate-800 bg-slate-900 text-slate-600 line-through"
+                                : "border-yellow-500/25 bg-yellow-500/10 text-yellow-200"
+                            }`}
+                          >
+                            {value}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 text-sm leading-6 text-slate-400">
+                Your color and number-size choice is personal. Throw force, bounce, friction and gravity are loaded from the GM&apos;s campaign settings.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <CampaignDiceLog
-        variant="nattau"
-        rolls={diceLog.rolls}
-        loading={diceLog.loading}
-        currentUserId={currentUserId}
-        role={role}
-        onRefresh={() => void diceLog.refresh()}
-        onDelete={(rollId) => void diceLog.deleteRoll(rollId)}
-        onClearMine={() => void handleClearMine()}
-      />
+      <div className="hidden xl:block">
+        <CampaignDiceLog
+          variant="nattau"
+          rolls={diceLog.rolls}
+          loading={diceLog.loading}
+          currentUserId={currentUserId}
+          role={role}
+          onRefresh={() => void diceLog.refresh()}
+          onDelete={(rollId) => void diceLog.deleteRoll(rollId)}
+          onClearMine={() => void handleClearMine()}
+        />
+      </div>
+
+      <MobileDiceSheet open={settingsOpen} title="My Dice" onClose={() => setSettingsOpen(false)} tone="nattau">
+        <DiceAppearancePicker
+          theme="nattau"
+          value={configuration.appearance}
+          disabled={rolling || configuration.loading}
+          saving={configuration.savingAppearance}
+          onChange={(value) => void configuration.saveAppearance(value)}
+        />
+      </MobileDiceSheet>
+
+      <MobileDiceSheet open={historyOpen} title="Roll History" onClose={() => setHistoryOpen(false)} tone="nattau">
+        <CampaignDiceLog
+          variant="nattau"
+          rolls={diceLog.rolls}
+          loading={diceLog.loading}
+          currentUserId={currentUserId}
+          role={role}
+          onRefresh={() => void diceLog.refresh()}
+          onDelete={(rollId) => void diceLog.deleteRoll(rollId)}
+          onClearMine={() => void handleClearMine()}
+        />
+      </MobileDiceSheet>
+
+      <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-slate-700/80 bg-slate-950/92 px-3 pt-2 shadow-2xl backdrop-blur-xl xl:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-3 pb-[max(0.6rem,env(safe-area-inset-bottom))]">
+          <div className="min-w-0 flex-1 pl-1">
+            <p className="truncate text-xs font-bold text-slate-200">{expression}{extraModifier === 0 ? "" : formatModifier(extraModifier)}</p>
+            <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-500">{modeLabel(mode)} · {visibility === "private" ? "Private" : "Campaign"}</p>
+          </div>
+          <button
+            type="button"
+            disabled={rolling || diceLog.saving || configuration.loading}
+            onClick={() => void performRoll()}
+            className="min-h-12 min-w-36 rounded-xl border border-yellow-500 bg-yellow-500 px-5 text-sm font-black text-slate-950 disabled:opacity-50"
+          >
+            {rolling ? "ROLLING…" : diceLog.saving ? "SAVING…" : "ROLL"}
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

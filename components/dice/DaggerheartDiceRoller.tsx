@@ -3,6 +3,7 @@
 import type { ChangeEvent } from "react";
 import { useRef, useState } from "react";
 import { CampaignDiceLog } from "./CampaignDiceLog";
+import { MobileDiceSheet } from "./MobileDiceSheet";
 import type {
   CampaignDiceRollRow,
   DiceAppRole,
@@ -189,6 +190,13 @@ function physicsMetadata(
     duration_ms: Math.round(result.durationMs),
     peak_impact: result.peakImpact,
     forced_settles: result.forcedSettles,
+    escape_count: result.escapeCount,
+    rescued_dice: result.rescuedDice,
+    timeout_rescues: result.timeoutRescues,
+    simulation_profile: result.simulationProfile,
+    die_scale: result.dieScale,
+    tray_width: result.trayWidth,
+    tray_depth: result.trayDepth,
     cosmetic_id: appearance.cosmeticId,
     number_size: appearance.numberSize,
   };
@@ -215,9 +223,21 @@ export function DaggerheartDiceRoller({
   const [localError, setLocalError] = useState<string | null>(null);
   const [latest, setLatest] = useState<LocalResult | null>(null);
   const pendingRef = useRef<PendingRoll | null>(null);
+  const trayRef = useRef<HTMLDivElement | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const configuration = useCampaignDiceConfiguration({ campaignId, currentUserId });
   const diceLog = useCampaignDiceLog({ campaignId, currentUserId });
+
+  function focusTrayOnMobile() {
+    if (typeof window === "undefined" || !window.matchMedia("(max-width: 1279px)").matches) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+    window.setTimeout(() => {
+      trayRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  }
 
   async function beginPhysicalRoll(pending: PendingRoll, dice: PhysicsDieRequest[]) {
     setLocalError(null);
@@ -230,6 +250,7 @@ export function DaggerheartDiceRoller({
       await getSharedDiceSoundEngine().unlock();
     }
 
+    focusTrayOnMobile();
     setRequest({
       rollId: pending.rollId,
       startedAt: performance.now(),
@@ -527,33 +548,53 @@ export function DaggerheartDiceRoller({
   }
 
   return (
-    <section className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-[410px_1fr]">
-        <div className="space-y-6">
-          <div className="rounded-3xl border border-[#4b2935] bg-[#120d11]/90 p-5 sm:p-6">
-            <p className="text-xs uppercase tracking-[0.35em] text-[#a7566d]">The Duality</p>
-            <h2 className="mt-3 font-serif text-2xl font-black text-[#eadbd2]">Choose the Physical Roll</h2>
+    <section className="space-y-4 pb-24 xl:space-y-6 xl:pb-0">
+      <div className="grid gap-4 xl:grid-cols-[410px_1fr] xl:gap-6">
+        <div className="contents xl:block xl:space-y-6">
+          <div className="order-1 rounded-3xl border border-[#4b2935] bg-[#120d11]/90 p-4 sm:p-5 xl:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.28em] text-[#a7566d] sm:text-xs sm:tracking-[0.35em]">The Duality</p>
+                <h2 className="mt-2 font-serif text-xl font-black text-[#eadbd2] sm:mt-3 sm:text-2xl">Choose the Physical Roll</h2>
+              </div>
+              <div className="flex gap-2 xl:hidden">
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen(true)}
+                  className="min-h-11 rounded-xl border border-[#432832] bg-black/25 px-3 text-xs font-bold text-[#c7b6bc]"
+                >
+                  History
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className="min-h-11 rounded-xl border border-[#9b4860]/60 bg-[#5a1825]/30 px-3 text-xs font-bold text-[#efc7d1]"
+                >
+                  My Dice
+                </button>
+              </div>
+            </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   disabled={rolling || diceLog.saving || (tab.key === "gm" && role !== "dm")}
                   onClick={() => setMode(tab.key)}
-                  className={`min-h-16 rounded-2xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                  className={`min-h-14 rounded-2xl border p-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-16 sm:p-3 ${
                     mode === tab.key
                       ? "border-[#a14b63] bg-[#5a1825]/35 text-[#efd2da]"
                       : "border-[#432832] bg-black/20 text-[#a9929a] hover:border-[#6f3547]"
                   }`}
                 >
                   <span className="block text-sm font-semibold">{tab.label}</span>
-                  <span className="mt-1 block text-[10px] uppercase tracking-wide opacity-70">{tab.hint}</span>
+                  <span className="mt-1 hidden text-[10px] uppercase tracking-wide opacity-70 sm:block">{tab.hint}</span>
                 </button>
               ))}
             </div>
 
-            <div className="mt-5 space-y-4">
+            <div className="mt-4 space-y-3 sm:mt-5 sm:space-y-4">
               {(mode === "action" || mode === "reaction") && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
@@ -564,7 +605,7 @@ export function DaggerheartDiceRoller({
                         value={modifier}
                         disabled={rolling || diceLog.saving}
                         onChange={(event: ChangeEvent<HTMLInputElement>) => setModifier(Number(event.target.value) || 0)}
-                        className="mt-2 w-full rounded-xl border border-[#4a2c37] bg-black/30 px-4 py-3 text-[#eadbd2] outline-none focus:border-[#9b4860]"
+                        className="mt-2 w-full rounded-xl border border-[#4a2c37] bg-black/30 px-3 py-3 text-[#eadbd2] outline-none focus:border-[#9b4860] sm:px-4"
                       />
                     </label>
                     <label className="text-sm text-[#c7b6bc]">
@@ -576,7 +617,7 @@ export function DaggerheartDiceRoller({
                         value={difficulty}
                         disabled={rolling || diceLog.saving}
                         onChange={(event: ChangeEvent<HTMLInputElement>) => setDifficulty(Number(event.target.value) || 1)}
-                        className="mt-2 w-full rounded-xl border border-[#4a2c37] bg-black/30 px-4 py-3 text-[#eadbd2] outline-none focus:border-[#9b4860]"
+                        className="mt-2 w-full rounded-xl border border-[#4a2c37] bg-black/30 px-3 py-3 text-[#eadbd2] outline-none focus:border-[#9b4860] sm:px-4"
                       />
                     </label>
                   </div>
@@ -590,7 +631,7 @@ export function DaggerheartDiceRoller({
                           type="button"
                           disabled={rolling || diceLog.saving}
                           onClick={() => setDualityMode(entry)}
-                          className={`min-h-11 rounded-xl border px-2 text-xs transition ${
+                          className={`min-h-11 rounded-xl border px-2 text-[11px] transition sm:text-xs ${
                             dualityMode === entry
                               ? "border-[#9b4860] bg-[#5a1825]/35 text-[#efc7d1]"
                               : "border-[#432832] bg-black/20 text-[#8f8187] hover:border-[#6f3547]"
@@ -600,11 +641,11 @@ export function DaggerheartDiceRoller({
                         </button>
                       ))}
                     </div>
-                    <p className="mt-2 text-xs leading-5 text-[#7e7076]">Advantage adds a physical d6. Disadvantage subtracts it.</p>
+                    <p className="mt-2 hidden text-xs leading-5 text-[#7e7076] xl:block">Advantage adds a physical d6. Disadvantage subtracts it.</p>
                   </div>
 
                   {mode === "action" && (
-                    <label className="flex items-center gap-3 rounded-xl border border-[#432832] bg-black/20 px-4 py-3 text-sm text-[#bda5ad]">
+                    <label className="flex items-center gap-3 rounded-xl border border-[#432832] bg-black/20 px-3 py-2.5 text-sm text-[#bda5ad] sm:px-4 sm:py-3">
                       <input
                         type="checkbox"
                         checked={isAttack}
@@ -626,7 +667,7 @@ export function DaggerheartDiceRoller({
                       value={gmAttackBonus}
                       disabled={rolling || diceLog.saving}
                       onChange={(event: ChangeEvent<HTMLInputElement>) => setGmAttackBonus(Number(event.target.value) || 0)}
-                      className="mt-2 w-full rounded-xl border border-[#4a2c37] bg-black/30 px-4 py-3 text-[#eadbd2] outline-none focus:border-[#9b4860]"
+                      className="mt-2 w-full rounded-xl border border-[#4a2c37] bg-black/30 px-3 py-3 text-[#eadbd2] outline-none focus:border-[#9b4860] sm:px-4"
                     />
                   </label>
                   <label className="text-sm text-[#c7b6bc]">
@@ -637,7 +678,7 @@ export function DaggerheartDiceRoller({
                       value={targetEvasion}
                       disabled={rolling || diceLog.saving}
                       onChange={(event: ChangeEvent<HTMLInputElement>) => setTargetEvasion(Number(event.target.value) || 1)}
-                      className="mt-2 w-full rounded-xl border border-[#4a2c37] bg-black/30 px-4 py-3 text-[#eadbd2] outline-none focus:border-[#9b4860]"
+                      className="mt-2 w-full rounded-xl border border-[#4a2c37] bg-black/30 px-3 py-3 text-[#eadbd2] outline-none focus:border-[#9b4860] sm:px-4"
                     />
                   </label>
                 </div>
@@ -655,32 +696,32 @@ export function DaggerheartDiceRoller({
                       className="mt-2 w-full rounded-xl border border-[#4a2c37] bg-black/30 px-4 py-3 text-[#eadbd2] outline-none placeholder:text-[#654c55] focus:border-[#9b4860]"
                     />
                   </label>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
                     {["1d6", "1d8+3", "2d10+4", "3d12"].map((formula) => (
                       <button
                         key={formula}
                         type="button"
                         disabled={rolling || diceLog.saving}
                         onClick={() => setDamageExpression(formula)}
-                        className="rounded-lg border border-[#432832] bg-black/20 px-3 py-2 text-xs text-[#a9929a] hover:border-[#7d3b50] disabled:opacity-40"
+                        className="min-h-10 shrink-0 rounded-lg border border-[#432832] bg-black/20 px-3 text-xs text-[#a9929a] hover:border-[#7d3b50] disabled:opacity-40"
                       >
                         {formula}
                       </button>
                     ))}
                   </div>
-                  <label className="mt-3 flex items-center gap-3 rounded-xl border border-[#432832] bg-black/20 px-4 py-3 text-sm text-[#bda5ad]">
+                  <label className="mt-3 flex items-center gap-3 rounded-xl border border-[#432832] bg-black/20 px-3 py-2.5 text-sm text-[#bda5ad] sm:px-4 sm:py-3">
                     <input
                       type="checkbox"
                       checked={criticalDamage}
                       onChange={(event: ChangeEvent<HTMLInputElement>) => setCriticalDamage(event.target.checked)}
                       className="h-4 w-4 accent-[#8a2638]"
                     />
-                    Critical damage — add the maximum result of all damage dice
+                    Critical damage
                   </label>
                 </div>
               )}
 
-              <label className="flex items-center gap-3 rounded-xl border border-[#432832] bg-black/20 px-4 py-3 text-sm text-[#bda5ad]">
+              <label className="flex items-center gap-3 rounded-xl border border-[#432832] bg-black/20 px-3 py-2.5 text-sm text-[#bda5ad] sm:px-4 sm:py-3">
                 <input
                   type="checkbox"
                   checked={visibility === "private"}
@@ -700,7 +741,7 @@ export function DaggerheartDiceRoller({
                 type="button"
                 disabled={rolling || diceLog.saving || configuration.loading || (mode === "gm" && role !== "dm")}
                 onClick={performCurrentRoll}
-                className="min-h-12 w-full rounded-xl border border-[#a14b63] bg-[#7a2236] px-4 font-bold text-[#f2dfe4] transition hover:bg-[#8a2940] disabled:cursor-not-allowed disabled:opacity-50"
+                className="hidden min-h-12 w-full rounded-xl border border-[#a14b63] bg-[#7a2236] px-4 font-bold text-[#f2dfe4] transition hover:bg-[#8a2940] disabled:cursor-not-allowed disabled:opacity-50 xl:block"
               >
                 {rolling
                   ? "The physical dice turn…"
@@ -717,98 +758,177 @@ export function DaggerheartDiceRoller({
             </div>
           </div>
 
-          <DiceAppearancePicker
-            theme="barovia"
-            value={configuration.appearance}
-            disabled={rolling || configuration.loading}
-            saving={configuration.savingAppearance}
-            onChange={(value) => void configuration.saveAppearance(value)}
-          />
+          <div className="order-4 hidden xl:block">
+            <DiceAppearancePicker
+              theme="barovia"
+              value={configuration.appearance}
+              disabled={rolling || configuration.loading}
+              saving={configuration.savingAppearance}
+              onChange={(value) => void configuration.saveAppearance(value)}
+            />
+          </div>
         </div>
 
-        <div className="space-y-5">
-          <CampaignPhysicsDiceTrayClient
-            theme="barovia"
-            request={request}
-            onComplete={(result) => void handlePhysicsComplete(result)}
-          />
+        <div className="contents xl:block xl:space-y-5">
+          <div ref={trayRef} className="relative order-2 min-w-0 scroll-mt-4">
+            <CampaignPhysicsDiceTrayClient
+              theme="barovia"
+              request={request}
+              onComplete={(result) => void handlePhysicsComplete(result)}
+            />
 
-          {!rolling && latest ? (
-            <div className="rounded-3xl border border-[#713143]/55 bg-[radial-gradient(circle_at_80%_10%,rgba(118,30,51,0.28),transparent_38%),rgba(20,12,17,0.82)] p-5 sm:p-7">
-              <div className="flex flex-wrap items-start justify-between gap-5">
-                <div>
-                  <p className="text-sm text-[#a9929a]">{latest.title}</p>
-                  <p className="mt-2 font-serif text-3xl font-black text-[#edcbd4]">{latest.outcome}</p>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-[#a99da1]">{latest.note}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-6xl font-black text-[#ead7dc]">{latest.total}</p>
-                  <p className="mt-2 text-xs text-[#765e67]">
-                    Physical resolution: {(latest.physics.durationMs / 1000).toFixed(2)}s · {latest.savedRoll ? "saved" : "database save failed"}
-                  </p>
+            {!rolling && latest && (
+              <div className="absolute inset-x-3 bottom-3 z-10 rounded-2xl border border-[#8f4057]/60 bg-[#120a0f]/90 p-3 shadow-2xl backdrop-blur-md xl:hidden">
+                <div className="flex items-end justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-[#c9788d]">{latest.title}</p>
+                    <p className="mt-1 truncate font-serif text-lg font-black text-[#f0d4dc]">{latest.outcome}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
+                      {latest.hopeDie !== undefined && latest.fearDie !== undefined && (
+                        <>
+                          <span className="rounded-lg border border-[#c6ad73]/30 bg-[#e8d9af]/10 px-2 py-1 text-[#fff1bf]">Hope {latest.hopeDie}</span>
+                          <span className="rounded-lg border border-[#8f4057]/50 bg-[#5a1825]/25 px-2 py-1 text-[#f0b8c6]">Fear {latest.fearDie}</span>
+                        </>
+                      )}
+                      {latest.naturalD20 !== undefined && (
+                        <span className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-[#d6c8cd]">d20 {latest.naturalD20}</span>
+                      )}
+                      {latest.damageGroups?.flatMap((group) => group.results).slice(0, 8).map((value, index) => (
+                        <span key={`${value}-${index}`} className="rounded-lg border border-[#713143]/40 bg-[#5a1825]/20 px-2 py-1 text-[#edcbd4]">{value}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-[#765e67]">Total</p>
+                    <p className="text-4xl font-black leading-none text-[#ead7dc]">{latest.total}</p>
+                  </div>
                 </div>
               </div>
+            )}
+          </div>
 
-              {latest.hopeDie !== undefined && latest.fearDie !== undefined && (
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-[#c6ad73]/40 bg-[#e8d9af]/10 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-[#d8c18b]">Hope d12</p>
-                    <p className="mt-2 text-4xl font-black text-[#fff1bf]">{latest.hopeDie}</p>
+          <div className="order-3 hidden xl:block">
+            {!rolling && latest ? (
+              <div className="rounded-3xl border border-[#713143]/55 bg-[radial-gradient(circle_at_80%_10%,rgba(118,30,51,0.28),transparent_38%),rgba(20,12,17,0.82)] p-5 sm:p-7">
+                <div className="flex flex-wrap items-start justify-between gap-5">
+                  <div>
+                    <p className="text-sm text-[#a9929a]">{latest.title}</p>
+                    <p className="mt-2 font-serif text-3xl font-black text-[#edcbd4]">{latest.outcome}</p>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-[#a99da1]">{latest.note}</p>
                   </div>
-                  <div className="rounded-2xl border border-[#8f4057]/60 bg-[#5a1825]/25 p-4">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-[#c9788d]">Fear d12</p>
-                    <p className="mt-2 text-4xl font-black text-[#f0b8c6]">{latest.fearDie}</p>
+                  <div className="text-right">
+                    <p className="text-6xl font-black text-[#ead7dc]">{latest.total}</p>
+                    <p className="mt-2 text-xs text-[#765e67]">
+                      Physical resolution: {(latest.physics.durationMs / 1000).toFixed(2)}s · profile {latest.physics.simulationProfile} · {latest.savedRoll ? "saved" : "database save failed"}
+                    </p>
                   </div>
                 </div>
-              )}
 
-              {latest.advantageDie !== undefined && (
-                <div className="mt-4 rounded-xl border border-[#4d3d44] bg-black/20 px-4 py-3 text-sm text-[#9e9297]">
-                  {dualityModeLabel(latest.advantageMode ?? "normal")} d6: <strong className="text-[#d6c8cd]">{latest.advantageDie}</strong>
-                </div>
-              )}
-
-              {latest.naturalD20 !== undefined && (
-                <div className="mt-4 rounded-xl border border-[#4d3d44] bg-black/20 px-4 py-3 text-sm text-[#9e9297]">
-                  Natural d20: <strong className="text-[#d6c8cd]">{latest.naturalD20}</strong>
-                </div>
-              )}
-
-              {latest.damageGroups && (
-                <div className="mt-5 space-y-3">
-                  {latest.damageGroups.map((group, groupIndex) => (
-                    <div key={`${group.sides}-${groupIndex}`} className="rounded-2xl border border-[#432832] bg-black/20 p-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-[#765e67]">{group.diceCount}d{group.sides}</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {group.results.map((value, index) => (
-                          <span key={`${value}-${index}`} className="rounded-xl border border-[#713143]/45 bg-[#5a1825]/20 px-4 py-2 font-bold text-[#edcbd4]">
-                            {value}
-                          </span>
-                        ))}
-                      </div>
+                {latest.hopeDie !== undefined && latest.fearDie !== undefined && (
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-[#c6ad73]/40 bg-[#e8d9af]/10 p-4">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[#d8c18b]">Hope d12</p>
+                      <p className="mt-2 text-4xl font-black text-[#fff1bf]">{latest.hopeDie}</p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : !rolling ? (
-            <div className="rounded-3xl border border-[#432832] bg-black/20 p-6 text-sm leading-6 text-[#8f8187]">
-              Your color, texture and number size are personal. Hope and Fear remain visually distinct, while throw force, bounce, friction and gravity come from the GM's Barovia settings.
-            </div>
-          ) : null}
+                    <div className="rounded-2xl border border-[#8f4057]/60 bg-[#5a1825]/25 p-4">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[#c9788d]">Fear d12</p>
+                      <p className="mt-2 text-4xl font-black text-[#f0b8c6]">{latest.fearDie}</p>
+                    </div>
+                  </div>
+                )}
+
+                {latest.advantageDie !== undefined && (
+                  <div className="mt-4 rounded-xl border border-[#4d3d44] bg-black/20 px-4 py-3 text-sm text-[#9e9297]">
+                    {dualityModeLabel(latest.advantageMode ?? "normal")} d6: <strong className="text-[#d6c8cd]">{latest.advantageDie}</strong>
+                  </div>
+                )}
+
+                {latest.naturalD20 !== undefined && (
+                  <div className="mt-4 rounded-xl border border-[#4d3d44] bg-black/20 px-4 py-3 text-sm text-[#9e9297]">
+                    Natural d20: <strong className="text-[#d6c8cd]">{latest.naturalD20}</strong>
+                  </div>
+                )}
+
+                {latest.damageGroups && (
+                  <div className="mt-5 space-y-3">
+                    {latest.damageGroups.map((group, groupIndex) => (
+                      <div key={`${group.sides}-${groupIndex}`} className="rounded-2xl border border-[#432832] bg-black/20 p-4">
+                        <p className="text-xs uppercase tracking-[0.2em] text-[#765e67]">{group.diceCount}d{group.sides}</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {group.results.map((value, index) => (
+                            <span key={`${value}-${index}`} className="rounded-xl border border-[#713143]/45 bg-[#5a1825]/20 px-4 py-2 font-bold text-[#edcbd4]">
+                              {value}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : !rolling ? (
+              <div className="rounded-3xl border border-[#432832] bg-black/20 p-6 text-sm leading-6 text-[#8f8187]">
+                Your color, texture and number size are personal. Hope and Fear remain visually distinct, while throw force, bounce, friction and gravity come from the GM&apos;s Barovia settings.
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <CampaignDiceLog
-        variant="barovia"
-        rolls={diceLog.rolls}
-        loading={diceLog.loading}
-        currentUserId={currentUserId}
-        role={role}
-        onRefresh={() => void diceLog.refresh()}
-        onDelete={(rollId) => void diceLog.deleteRoll(rollId)}
-        onClearMine={() => void handleClearMine()}
-      />
+      <div className="hidden xl:block">
+        <CampaignDiceLog
+          variant="barovia"
+          rolls={diceLog.rolls}
+          loading={diceLog.loading}
+          currentUserId={currentUserId}
+          role={role}
+          onRefresh={() => void diceLog.refresh()}
+          onDelete={(rollId) => void diceLog.deleteRoll(rollId)}
+          onClearMine={() => void handleClearMine()}
+        />
+      </div>
+
+      <MobileDiceSheet open={settingsOpen} title="My Dice" onClose={() => setSettingsOpen(false)} tone="barovia">
+        <DiceAppearancePicker
+          theme="barovia"
+          value={configuration.appearance}
+          disabled={rolling || configuration.loading}
+          saving={configuration.savingAppearance}
+          onChange={(value) => void configuration.saveAppearance(value)}
+        />
+      </MobileDiceSheet>
+
+      <MobileDiceSheet open={historyOpen} title="Roll History" onClose={() => setHistoryOpen(false)} tone="barovia">
+        <CampaignDiceLog
+          variant="barovia"
+          rolls={diceLog.rolls}
+          loading={diceLog.loading}
+          currentUserId={currentUserId}
+          role={role}
+          onRefresh={() => void diceLog.refresh()}
+          onDelete={(rollId) => void diceLog.deleteRoll(rollId)}
+          onClearMine={() => void handleClearMine()}
+        />
+      </MobileDiceSheet>
+
+      <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-[#4b2935] bg-[#120d11]/94 px-3 pt-2 shadow-2xl backdrop-blur-xl xl:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-3 pb-[max(0.6rem,env(safe-area-inset-bottom))]">
+          <div className="min-w-0 flex-1 pl-1">
+            <p className="truncate text-xs font-bold text-[#eadbd2]">
+              {mode === "action" ? "Action Roll" : mode === "reaction" ? "Reaction Roll" : mode === "gm" ? "Adversary Attack" : damageExpression}
+            </p>
+            <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-[#765e67]">{visibility === "private" ? "Private" : "Campaign"}</p>
+          </div>
+          <button
+            type="button"
+            disabled={rolling || diceLog.saving || configuration.loading || (mode === "gm" && role !== "dm")}
+            onClick={performCurrentRoll}
+            className="min-h-12 min-w-36 rounded-xl border border-[#a14b63] bg-[#7a2236] px-4 text-sm font-black text-[#f2dfe4] disabled:opacity-50"
+          >
+            {rolling ? "ROLLING…" : diceLog.saving ? "SAVING…" : "ROLL"}
+          </button>
+        </div>
+      </div>
     </section>
   );
 }
