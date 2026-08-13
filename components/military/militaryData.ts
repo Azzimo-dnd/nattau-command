@@ -43,6 +43,18 @@ export type DeploymentCost =
 
 export type MilitaryTheme = "standard" | "azzimo";
 
+export type MilitaryDurability =
+  | {
+      type: "finite";
+      current: number;
+      max: number;
+    }
+  | {
+      type: "infinite";
+      label: string;
+      description: string;
+    };
+
 export type MilitaryUnit = {
   name: string;
   commander: string;
@@ -50,8 +62,7 @@ export type MilitaryUnit = {
   cost: DeploymentCost;
   status: MilitaryStatus;
   detail: string;
-  durability: number;
-  maxDurability: number;
+  durability: MilitaryDurability;
   headquarters: Headquarters;
   members: string[];
   theme?: MilitaryTheme;
@@ -83,8 +94,7 @@ export const militaryUnits: MilitaryUnit[] = [
     },
     status: "Ready",
     detail: "Fighters, battle mages and line support.",
-    durability: 1,
-    maxDurability: 1,
+    durability: { type: "finite", current: 1, max: 1 },
     headquarters: {
       state: "available",
       constructionCost: "3 RP",
@@ -108,8 +118,7 @@ export const militaryUnits: MilitaryUnit[] = [
     },
     status: "Ready",
     detail: "Artificers, heavy weapons, traps and prototypes.",
-    durability: 1,
-    maxDurability: 1,
+    durability: { type: "finite", current: 1, max: 1 },
     headquarters: {
       state: "available",
       constructionCost: "3 RP",
@@ -128,8 +137,7 @@ export const militaryUnits: MilitaryUnit[] = [
     status: "On Mission",
     detail:
       "Scouts and trackers. The unit has doubled in size and established a new headquarters.",
-    durability: 2,
-    maxDurability: 2,
+    durability: { type: "finite", current: 2, max: 2 },
     headquarters: {
       state: "built",
       name: "Hunter's Lodge",
@@ -155,8 +163,7 @@ export const militaryUnits: MilitaryUnit[] = [
     status: "Inactive",
     detail:
       "Faith, battlefield support and morale control. Currently inactive due to Mother Tyllen's poor health.",
-    durability: 4,
-    maxDurability: 4,
+    durability: { type: "finite", current: 4, max: 4 },
     headquarters: {
       state: "unavailable",
       reason: "Unavailable while Mother Tyllen is in poor health.",
@@ -174,8 +181,7 @@ export const militaryUnits: MilitaryUnit[] = [
     },
     status: "Ready",
     detail: "Heavy shield infantry and defensive formation troops.",
-    durability: 1,
-    maxDurability: 1,
+    durability: { type: "finite", current: 1, max: 1 },
     headquarters: {
       state: "available",
       constructionCost: "3 RP",
@@ -200,8 +206,7 @@ export const militaryUnits: MilitaryUnit[] = [
     },
     status: "Garrisoned",
     detail: "Line guards, officers and limited magical support.",
-    durability: 1,
-    maxDurability: 1,
+    durability: { type: "finite", current: 1, max: 1 },
     headquarters: {
       state: "available",
       constructionCost: "3 RP",
@@ -232,8 +237,7 @@ export const militaryUnits: MilitaryUnit[] = [
     },
     status: "Supporting",
     detail: "Repairs, logistics, field maintenance and emergency fixes.",
-    durability: 1,
-    maxDurability: 1,
+    durability: { type: "finite", current: 1, max: 1 },
     headquarters: {
       state: "available",
       constructionCost: "3 RP",
@@ -251,9 +255,13 @@ export const militaryUnits: MilitaryUnit[] = [
     },
     status: "Ready",
     detail:
-      "A grotesque travelling circus devoted to Azzimo. The Carnival asks for no Expedition resources — its price is paid by the Kainites during the next session.",
-    durability: 2,
-    maxDurability: 2,
+      "A grotesque travelling circus devoted to Azzimo. The Carnival asks for no Expedition resources — its price is paid by the Kainites during the next session. Killing its horrors offers only a temporary reprieve: they always return.",
+    durability: {
+      type: "infinite",
+      label: "Eternal",
+      description:
+        "The Carnival cannot be permanently destroyed. Its horrors return after death and are always available to serve Azzimo again.",
+    },
     headquarters: {
       state: "unavailable",
       reason: "The Carnival is nomadic and maintains no permanent headquarters.",

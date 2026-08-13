@@ -120,7 +120,26 @@ export function MilitaryCard({ unit }: Props) {
         ) : null}
 
         <div className="mt-4">
-          <DurabilityBar current={unit.durability} max={unit.maxDurability} />
+          {unit.durability.type === "infinite" ? (
+            <div className="rounded-xl border border-fuchsia-500/35 bg-fuchsia-500/10 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-200">
+                  Durability
+                </span>
+                <span className="text-lg font-black text-rose-200">
+                  ∞ {unit.durability.label}
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-fuchsia-100/70">
+                {unit.durability.description}
+              </p>
+            </div>
+          ) : (
+            <DurabilityBar
+              current={unit.durability.current}
+              max={unit.durability.max}
+            />
+          )}
         </div>
       </summary>
 
