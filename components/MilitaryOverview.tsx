@@ -12,10 +12,26 @@ function countUnitsByStatuses(statuses: string[]) {
 function getDeploymentCapacityCost() {
   return militaryUnits
     .filter((unit) => availableStatuses.includes(unit.status))
-    .reduce((sum, unit) => {
-      const match = unit.cost.match(/\d+/);
-      return sum + (match ? Number(match[0]) : 0);
-    }, 0);
+    .reduce(
+      (summary, unit) => {
+        if (unit.cost.type === "session-debuff") {
+          summary.debuffs += unit.cost.amount;
+          return summary;
+        }
+
+        const amounts = unit.cost.options.map((option) => option.amount);
+        if (amounts.length === 0) return summary;
+
+        summary.rpMin += Math.min(...amounts);
+        summary.rpMax += Math.max(...amounts);
+        return summary;
+      },
+      { rpMin: 0, rpMax: 0, debuffs: 0 },
+    );
+}
+
+function formatRpCost(min: number, max: number) {
+  return min === max ? `${min} RP` : `${min}–${max} RP`;
 }
 
 export function MilitaryOverview() {
@@ -24,6 +40,16 @@ export function MilitaryOverview() {
   const missionUnits = countUnitsByStatuses(missionStatuses);
   const unavailableUnits = countUnitsByStatuses(unavailableStatuses);
   const deploymentCapacityCost = getDeploymentCapacityCost();
+  const deploymentCostLabel = [
+    formatRpCost(deploymentCapacityCost.rpMin, deploymentCapacityCost.rpMax),
+    deploymentCapacityCost.debuffs > 0
+      ? `${deploymentCapacityCost.debuffs} ${
+          deploymentCapacityCost.debuffs === 1 ? "Debuff" : "Debuffs"
+        }`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" + ");
 
   const overviewItems = [
     {
@@ -52,10 +78,11 @@ export function MilitaryOverview() {
     },
     {
       title: "Deployment Cost",
-      value: `${deploymentCapacityCost} RP`,
+      value: deploymentCostLabel,
       label: "All available units",
       className: "text-yellow-300",
       highlighted: true,
+      compactValue: true,
     },
   ];
 
@@ -71,7 +98,6 @@ export function MilitaryOverview() {
             Compact summary of unit availability and current deployment status.
           </p>
         </div>
-
         <Link
           href="#war-room"
           className="text-sm font-medium text-yellow-400 transition hover:text-yellow-300"
@@ -79,7 +105,6 @@ export function MilitaryOverview() {
           Open War Room →
         </Link>
       </div>
-
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {overviewItems.map((item) => (
           <div
@@ -91,8 +116,11 @@ export function MilitaryOverview() {
             }`}
           >
             <p className="text-sm text-slate-400">{item.title}</p>
-
-            <p className={`mt-2 text-3xl font-black ${item.className}`}>
+            <p
+              className={`mt-2 font-black ${
+                item.compactValue ? "text-2xl" : "text-3xl"
+              } ${item.className}`}
+            >
               {item.value}
             </p>
 

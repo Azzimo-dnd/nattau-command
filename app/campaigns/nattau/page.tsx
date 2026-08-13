@@ -9,13 +9,15 @@ import { loadCommandCenterData } from "@/lib/home/loadCommandCenterData";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 
 export default async function CommandCenterPage() {
-  await requireCampaignMembership("nattau");
-  const data = await loadCommandCenterData();
+  const access = await requireCampaignMembership("nattau");
+  const data = await loadCommandCenterData({
+    campaignId: access.membership.campaignId,
+    campaignSlug: access.membership.slug,
+  });
 
   if (!data) {
     redirect("/login");
   }
-
   const fateStatus =
     data.role === "dm"
       ? data.activeFateCycle
@@ -31,7 +33,6 @@ export default async function CommandCenterPage() {
     data.role === "dm"
       ? `${data.activeProposalCount} active`
       : `${data.proposalsAwaitingVote} to review`;
-
   const plannerStatus = !data.plannerSummaryLoaded
     ? "Open planner"
     : data.role === "dm"
@@ -48,7 +49,6 @@ export default async function CommandCenterPage() {
         : !data.plannerHasAvailability
           ? "Mark dates"
           : `${data.plannerAvailabilityDays} days marked`;
-
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 xl:px-8">
       <CommandCenterHero
@@ -57,8 +57,8 @@ export default async function CommandCenterPage() {
         sessionStatus={data.sessionStatus}
         nextSessionAt={data.nextSessionAt}
         sessionMessage={data.sessionMessage}
+        sessionDebuffs={data.sessionDebuffs}
       />
-
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <BeforeSession
           role={data.role}
@@ -77,7 +77,6 @@ export default async function CommandCenterPage() {
           plannerPromisingDateCount={data.plannerPromisingDateCount}
           plannerResponseWindowDays={data.plannerResponseWindowDays}
         />
-
         {data.role === "dm" ? (
           <GmOverview
             activeFateCycle={data.activeFateCycle}
@@ -92,7 +91,6 @@ export default async function CommandCenterPage() {
           <RecentCampaignEvents events={campaignConfig.recentEvents} />
         )}
       </div>
-
       {data.role === "dm" && (
         <div className="mt-6">
           <RecentCampaignEvents events={campaignConfig.recentEvents} />

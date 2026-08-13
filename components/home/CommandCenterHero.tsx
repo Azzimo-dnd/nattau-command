@@ -1,5 +1,6 @@
 import { NavIcon } from "@/components/navigation/NavIcon";
 import type { AppRole } from "@/components/navigation/navigationTypes";
+import { AzzimosPricePanel } from "@/components/session/AzzimosPricePanel";
 import type { CampaignSessionStatus } from "@/lib/campaign/sessionTypes";
 import { NextSessionCountdown } from "./NextSessionCountdown";
 
@@ -9,14 +10,15 @@ type CommandCenterHeroProps = {
   sessionStatus: CampaignSessionStatus;
   nextSessionAt: string | null;
   sessionMessage: string;
+  sessionDebuffs: string[];
 };
-
 export function CommandCenterHero({
   displayName,
   role,
   sessionStatus,
   nextSessionAt,
   sessionMessage,
+  sessionDebuffs,
 }: CommandCenterHeroProps) {
   return (
     <header className="relative overflow-hidden rounded-3xl border border-yellow-500/15 bg-slate-900/70 p-6 sm:p-8">
@@ -46,6 +48,12 @@ export function CommandCenterHero({
           />
         </div>
       </div>
+
+      {sessionDebuffs.length > 0 && (
+        <div className="relative mt-6">
+          <AzzimosPricePanel debuffs={sessionDebuffs} compact />
+        </div>
+      )}
     </header>
   );
 }

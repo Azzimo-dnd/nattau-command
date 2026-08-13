@@ -4,6 +4,7 @@ export type CampaignSessionSettings = {
   status: CampaignSessionStatus;
   nextSessionAt: string | null;
   message: string;
+  debuffs: string[];
   updatedAt: string | null;
   updatedBy: string | null;
   databaseReady: boolean;

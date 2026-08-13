@@ -5,7 +5,6 @@ import type { CampaignSessionStatus } from "@/lib/campaign/sessionTypes";
 import { createClient } from "@/lib/supabase/server";
 
 export type FateState = "available" | "drawn" | "inactive";
-
 export type CommandCenterData = {
   userId: string;
   displayName: string;
@@ -20,6 +19,7 @@ export type CommandCenterData = {
   sessionStatus: CampaignSessionStatus;
   nextSessionAt: string | null;
   sessionMessage: string;
+  sessionDebuffs: string[];
   plannerSummaryLoaded: boolean;
   plannerAvailabilityDays: number;
   plannerHasAvailability: boolean;
@@ -48,6 +48,7 @@ type SessionRow = {
   status: string;
   next_session_at: string | null;
   message: string | null;
+  debuffs: unknown;
 };
 
 type PlannerHomeSummary = {
@@ -64,10 +65,16 @@ type PlannerHomeSummary = {
 
 function readStringArray(value: unknown) {
   if (!Array.isArray(value)) return [];
-  return value.filter((entry): entry is string => typeof entry === "string");
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
-export async function loadCommandCenterData(): Promise<CommandCenterData | null> {
+export async function loadCommandCenterData(options: {
+  campaignId: string;
+  campaignSlug: string;
+}): Promise<CommandCenterData | null> {
   const currentUser = await getCurrentAppUser();
 
   if (!currentUser) {
@@ -75,7 +82,6 @@ export async function loadCommandCenterData(): Promise<CommandCenterData | null>
   }
 
   const supabase = await createClient();
-
   let activeProposalCount = 0;
   let proposalsAwaitingVote = 0;
   let activeFateCycle = false;
@@ -86,6 +92,7 @@ export async function loadCommandCenterData(): Promise<CommandCenterData | null>
   let sessionStatus: CampaignSessionStatus = "tba";
   let nextSessionAt: string | null = null;
   let sessionMessage = DEFAULT_SESSION_MESSAGE;
+  let sessionDebuffs: string[] = [];
   let plannerSummaryLoaded = false;
   let plannerAvailabilityDays = 0;
   let plannerHasAvailability = false;
@@ -98,35 +105,40 @@ export async function loadCommandCenterData(): Promise<CommandCenterData | null>
 
   const { data: sessionData, error: sessionError } = await supabase
     .from("campaign_session_settings")
-    .select("status, next_session_at, message")
-    .eq("id", 1)
+    .select("status, next_session_at, message, debuffs")
+    .eq("campaign_id", options.campaignId)
     .maybeSingle();
 
   if (!sessionError && sessionData) {
     const session = sessionData as SessionRow;
     const hasScheduledDate =
       session.status === "scheduled" && Boolean(session.next_session_at);
-
     sessionStatus = hasScheduledDate ? "scheduled" : "tba";
     nextSessionAt = hasScheduledDate ? session.next_session_at : null;
-    sessionMessage = session.message?.trim() || DEFAULT_SESSION_MESSAGE;
+    const trimmedMessage = session.message?.trim() ?? "";
+    sessionMessage =
+      sessionStatus === "scheduled"
+        ? trimmedMessage
+        : trimmedMessage || DEFAULT_SESSION_MESSAGE;
+    sessionDebuffs = readStringArray(session.debuffs);
   }
 
   const { data: plannerSummaryData, error: plannerSummaryError } =
-    await supabase.rpc("get_session_planner_home_summary");
+    await supabase.rpc("get_session_planner_home_summary", {
+      p_campaign_slug: options.campaignSlug,
+    });
 
   if (!plannerSummaryError && plannerSummaryData) {
     const summary = plannerSummaryData as PlannerHomeSummary;
-
     plannerSummaryLoaded = true;
     playerCount = Number(summary.player_count ?? 0);
     plannerPlayersResponded = Number(summary.players_responded ?? 0);
     plannerMissingPlayerNames = readStringArray(summary.missing_player_names);
     plannerAvailabilityDays = Number(
-      summary.current_user_availability_days ?? 0
+      summary.current_user_availability_days ?? 0,
     );
     plannerHasAvailability = Boolean(
-      summary.current_user_has_availability ?? plannerAvailabilityDays > 0
+      summary.current_user_has_availability ?? plannerAvailabilityDays > 0,
     );
     plannerOpenProposalCount = Number(summary.open_proposal_count ?? 0);
     plannerVotesAwaiting = Number(summary.proposals_awaiting_vote ?? 0);
@@ -142,7 +154,6 @@ export async function loadCommandCenterData(): Promise<CommandCenterData | null>
   if (!proposalError) {
     const proposalRows = (activeProposals ?? []) as ProposalIdRow[];
     activeProposalCount = proposalRows.length;
-
     if (currentUser.role === "player" && proposalRows.length > 0) {
       const proposalIds = proposalRows.map((proposal) => proposal.id);
       const { data: ownVotes, error: voteError } = await supabase
@@ -150,13 +161,12 @@ export async function loadCommandCenterData(): Promise<CommandCenterData | null>
         .select("proposal_id")
         .eq("voter_id", currentUser.id)
         .in("proposal_id", proposalIds);
-
       if (!voteError) {
         const votedIds = new Set(
-          ((ownVotes ?? []) as VoteRow[]).map((vote) => vote.proposal_id)
+          ((ownVotes ?? []) as VoteRow[]).map((vote) => vote.proposal_id),
         );
         proposalsAwaitingVote = proposalIds.filter(
-          (proposalId) => !votedIds.has(proposalId)
+          (proposalId) => !votedIds.has(proposalId),
         ).length;
       } else {
         proposalsAwaitingVote = activeProposalCount;
@@ -174,7 +184,6 @@ export async function loadCommandCenterData(): Promise<CommandCenterData | null>
     const cycle = cycleData as ActiveCycleRow;
     activeFateCycle = true;
     fateCycleNumber = Number(cycle.cycle_number);
-
     if (currentUser.role === "player") {
       const { data: draw, error: drawError } = await supabase
         .from("fate_draws")
@@ -182,7 +191,6 @@ export async function loadCommandCenterData(): Promise<CommandCenterData | null>
         .eq("cycle_id", cycle.id)
         .eq("player_id", currentUser.id)
         .maybeSingle();
-
       fateState = !drawError && draw ? "drawn" : "available";
     } else {
       const { count: drawsCount, error: drawsError } = await supabase
@@ -198,10 +206,12 @@ export async function loadCommandCenterData(): Promise<CommandCenterData | null>
 
   if (currentUser.role === "dm" && !plannerSummaryLoaded) {
     const { count, error } = await supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
+      .from("campaign_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("campaign_id", options.campaignId)
       .eq("role", "player")
-      .eq("planning_enabled", true);
+      .eq("planning_enabled", true)
+      .eq("is_active", true);
 
     if (!error) {
       playerCount = count ?? 0;
@@ -222,6 +232,7 @@ export async function loadCommandCenterData(): Promise<CommandCenterData | null>
     sessionStatus,
     nextSessionAt,
     sessionMessage,
+    sessionDebuffs,
     plannerSummaryLoaded,
     plannerAvailabilityDays,
     plannerHasAvailability,
