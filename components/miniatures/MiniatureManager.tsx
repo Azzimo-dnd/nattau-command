@@ -81,6 +81,12 @@ export function MiniatureManager({ campaignId }: Props) {
     [roster, selectedPlayerId],
   );
 
+  const handleLocalFileLoaded = useCallback((file: File, info: MiniatureModelInfo) => {
+    setCandidate({ file, info });
+    setMessage(null);
+    setError(null);
+  }, []);
+
   const refreshRoster = useCallback(async () => {
     const { data, error: rpcError } = await supabase.rpc("list_campaign_miniature_roster", {
       p_campaign_id: campaignId,
@@ -294,11 +300,7 @@ export function MiniatureManager({ campaignId }: Props) {
             allowFilePicker
             emptyTitle={`Choose ${selectedPlayer.display_name}'s STL`}
             emptyCopy="Drop a miniature here or choose an STL. It stays a local preview until you press Upload & set current."
-            onLocalFileLoaded={(file, info) => {
-              setCandidate({ file, info });
-              setMessage(null);
-              setError(null);
-            }}
+            onLocalFileLoaded={handleLocalFileLoaded}
           />
 
           <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
