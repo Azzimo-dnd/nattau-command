@@ -86,9 +86,16 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
   const visibleCount = useMemo(() => vault.puzzles.filter((puzzle) => puzzle.is_visible).length, [vault.puzzles]);
 
   const regenerate = (type = editor.type, difficulty = editor.difficulty) => {
-    setEditor(presetToEditor(type, buildPuzzlePreset(type, difficulty), editor.id));
+    const preset = buildPuzzlePreset(type, difficulty);
+    setEditor((current) => ({
+      ...presetToEditor(type, preset, current.id),
+      title: current.title,
+      description: current.description,
+      failureMessage: current.failureMessage,
+      sortOrder: current.sortOrder,
+    }));
     setFormError(null);
-    setMessage(`Generated a fresh ${difficulty} ${PUZZLE_TYPE_LABELS[type]} template.`);
+    setMessage(`Generated another verified ${difficulty} ${PUZZLE_TYPE_LABELS[type]} variant.`);
   };
 
   const changeType = (type: PuzzleType) => {
@@ -262,7 +269,18 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
             <div className="mt-5">
               <p className="text-xs font-semibold text-slate-400">Difficulty preset</p>
               <div className="mt-2 grid grid-cols-4 gap-2">{DIFFICULTIES.map((difficulty) => <button key={difficulty} type="button" onClick={() => changeDifficulty(difficulty)} className={`min-h-11 rounded-xl border text-xs font-bold ${editor.difficulty === difficulty ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-200" : "border-slate-800 text-slate-500"}`}>{difficulty}</button>)}</div>
-              <button type="button" onClick={() => regenerate()} className="mt-2 text-xs font-semibold text-yellow-300">↻ Regenerate layout / secret for this preset</button>
+              <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-950/35 p-3">
+                <button
+                  type="button"
+                  onClick={() => regenerate()}
+                  className={`min-h-11 w-full rounded-xl border px-4 text-sm font-black transition ${barovia ? "border-[#7c4455] bg-[#6a2034]/15 text-[#efc7d1] hover:bg-[#6a2034]/25" : "border-yellow-500/35 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15"}`}
+                >
+                  ↻ {editor.id ? "Generate another variant" : "Generate new variant"}
+                </button>
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  Creates a new solvable puzzle for the selected difficulty. Your title, description and campaign ordering stay unchanged.
+                </p>
+              </div>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
