@@ -11,6 +11,17 @@ import styles from "./ShatteredSigilPuzzle.module.css";
 type SigilVariant = "tide" | "spiral" | "star" | "weave" | "sun";
 type ReferenceMode = "open" | "hold" | "none";
 
+const SIGIL_VARIANTS: SigilVariant[] = ["tide", "spiral", "star", "weave", "sun"];
+
+function stableHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
 function motif(variant: SigilVariant) {
   if (variant === "tide") {
     return (
@@ -160,11 +171,34 @@ export function ShatteredSigilPuzzle({
     () => (Array.isArray(run.state.order) ? (run.state.order as string[]) : []),
     [run.state.order],
   );
-  const variant = String(puzzle.public_config.art_variant ?? "spiral") as SigilVariant;
-  const rotation = Number(puzzle.public_config.art_rotation ?? 0);
-  const mirror = Boolean(puzzle.public_config.art_mirror ?? false);
-  const referenceMode = String(puzzle.public_config.reference_mode ?? "open") as ReferenceMode;
-  const assistCorrect = Boolean(puzzle.public_config.assist_correct ?? false);
+  const signature = String(
+    puzzle.public_config.variant_id ??
+      (Array.isArray(puzzle.public_config.symbols)
+        ? puzzle.public_config.symbols.join("|")
+        : puzzle.id),
+  );
+  const signatureHash = stableHash(signature);
+  const explicitVariant = puzzle.public_config.art_variant;
+  const variant = (
+    typeof explicitVariant === "string" && SIGIL_VARIANTS.includes(explicitVariant as SigilVariant)
+      ? explicitVariant
+      : SIGIL_VARIANTS[signatureHash % SIGIL_VARIANTS.length]
+  ) as SigilVariant;
+  const rotation = Number(
+    puzzle.public_config.art_rotation ?? ((signatureHash >>> 3) % 4) * 90,
+  );
+  const mirror = Boolean(
+    puzzle.public_config.art_mirror ?? ((signatureHash >>> 6) & 1) === 1,
+  );
+  const difficulty = puzzle.difficulty_label.toLowerCase();
+  const defaultReferenceMode: ReferenceMode =
+    difficulty === "easy" ? "open" : difficulty === "insane" ? "none" : "hold";
+  const referenceMode = String(
+    puzzle.public_config.reference_mode ?? defaultReferenceMode,
+  ) as ReferenceMode;
+  const assistCorrect = Boolean(
+    puzzle.public_config.assist_correct ?? difficulty === "easy",
+  );
   const [selected, setSelected] = useState<number | null>(null);
   const [memoryVisible, setMemoryVisible] = useState(referenceMode === "open");
   const [pulse, setPulse] = useState<number[]>([]);
