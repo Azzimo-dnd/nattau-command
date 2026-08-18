@@ -16,7 +16,7 @@ import {
   type PuzzleTheme,
   type PuzzleType,
 } from "@/lib/puzzles/puzzleTypes";
-import { ShatteredSigilPreview } from "./engines/ShatteredSigilPuzzle";
+import { PuzzleWorkshopPreview } from "./PuzzleWorkshopPreview";
 import { usePuzzleVault } from "./usePuzzleVault";
 
 type Props = {
@@ -48,7 +48,9 @@ const TYPES: PuzzleType[] = [
   "arcane_circuit",
   "rune_sequence",
 ];
+
 const DIFFICULTIES = ["Easy", "Medium", "Hard", "Insane"];
+
 const SIGIL_MATERIAL_MODES: Array<{
   value: SigilMaterialMode;
   label: string;
@@ -61,7 +63,9 @@ const SIGIL_MATERIAL_MODES: Array<{
 
 function sigilMaterialModeFromConfig(config: JsonRecord): SigilMaterialMode {
   if (isSigilMaterialMode(config.material_mode)) return config.material_mode;
-  if (isSigilMaterialMode(config.material) && config.material !== "auto") return config.material;
+  if (isSigilMaterialMode(config.material) && config.material !== "auto") {
+    return config.material;
+  }
   return "auto";
 }
 
@@ -98,6 +102,10 @@ function parseJsonRecord(value: string, label: string): JsonRecord {
   return parsed as JsonRecord;
 }
 
+function nullableNumber(value: string) {
+  return value.trim() === "" ? null : Number(value);
+}
+
 function roomHref(slug: string, id: string) {
   return slug === "barovia" ? `/campaigns/barovia/puzzles/${id}` : `/puzzles/${id}`;
 }
@@ -121,14 +129,14 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
     () => vault.puzzles.filter((puzzle) => puzzle.is_visible).length,
     [vault.puzzles],
   );
-  const sigilPreviewConfig = useMemo(() => {
-    if (editor.type !== "shattered_sigil") return null;
+
+  const previewConfig = useMemo(() => {
     try {
       return parseJsonRecord(editor.publicConfig, "Public configuration");
     } catch {
       return null;
     }
-  }, [editor.publicConfig, editor.type]);
+  }, [editor.publicConfig]);
 
   const regenerate = (type = editor.type, difficulty = editor.difficulty) => {
     const preset = buildPuzzlePreset(type, difficulty, {
@@ -208,11 +216,9 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
         title: editor.title.trim(),
         description: editor.description,
         difficulty_label: editor.difficulty,
-        move_limit: editor.moveLimit.trim() === "" ? null : Number(editor.moveLimit),
-        attempt_limit:
-          editor.attemptLimit.trim() === "" ? null : Number(editor.attemptLimit),
-        time_limit_seconds:
-          editor.timeLimit.trim() === "" ? null : Number(editor.timeLimit),
+        move_limit: nullableNumber(editor.moveLimit),
+        attempt_limit: nullableNumber(editor.attemptLimit),
+        time_limit_seconds: nullableNumber(editor.timeLimit),
         failure_message: editor.failureMessage.trim() || null,
         sort_order: Number(editor.sortOrder || 500),
         public_config: publicConfig,
@@ -331,6 +337,14 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
     }
   };
 
+  const resetDraft = () => {
+    setEditor(
+      presetToEditor("rune_cipher", buildPuzzlePreset("rune_cipher", "Medium")),
+    );
+    setMessage(null);
+    setFormError(null);
+  };
+
   return (
     <main
       className={`min-h-screen px-4 py-7 sm:px-6 lg:py-9 ${barovia ? "bg-[#0b070a] text-[#eadfe3]" : ""}`}
@@ -352,8 +366,8 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                 Puzzle Workshop
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-                Create hidden puzzle templates, tune pressure, test them privately,
-                reveal them to players and watch the active solver in real time.
+                Create hidden puzzle templates, tune pressure, preview the generated
+                starting state, test privately and reveal them to players when ready.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -402,14 +416,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
               {editor.id ? (
                 <button
                   type="button"
-                  onClick={() =>
-                    setEditor(
-                      presetToEditor(
-                        "rune_cipher",
-                        buildPuzzlePreset("rune_cipher", "Medium"),
-                      ),
-                    )
-                  }
+                  onClick={resetDraft}
                   className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-400"
                 >
                   New draft
@@ -478,14 +485,10 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
 
               {editor.type === "shattered_sigil" ? (
                 <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/35 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold text-slate-300">Artifact material</p>
-                      <p className="mt-1 text-[11px] leading-4 text-slate-500">
-                        Choose the physical form of this ritual puzzle before generating it.
-                      </p>
-                    </div>
-                  </div>
+                  <p className="text-xs font-bold text-slate-300">Artifact material</p>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    Choose the physical form of this ritual puzzle before generating it.
+                  </p>
                   <div className="mt-3 grid grid-cols-3 gap-2">
                     {SIGIL_MATERIAL_MODES.map((mode) => (
                       <button
@@ -513,41 +516,53 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                   ↻ {editor.id ? "Generate another variant" : "Generate new variant"}
                 </button>
                 <p className="mt-2 text-xs leading-5 text-slate-500">
-                  Creates a new solvable puzzle for the selected difficulty. Your title,
+                  Creates a fresh verified puzzle for the selected difficulty. Your title,
                   description and campaign ordering stay unchanged.
                 </p>
               </div>
             </div>
 
-            {editor.type === "shattered_sigil" ? (
-              <div className="mt-5 rounded-2xl border border-slate-800 bg-black/15 p-4">
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.22em] text-amber-300/70">
-                      GM preview
-                    </p>
-                    <h3 className="mt-1 text-lg font-black text-slate-100">
-                      Preview before saving
-                    </h3>
-                  </div>
-                  <span className="text-[11px] text-slate-500">
-                    Players will receive this exact generated layout.
-                  </span>
-                </div>
-                {sigilPreviewConfig ? (
-                  <div className="mt-4">
-                    <ShatteredSigilPreview
-                      publicConfig={sigilPreviewConfig}
-                      difficultyLabel={editor.difficulty}
-                    />
-                  </div>
-                ) : (
-                  <p className="mt-4 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-                    Preview unavailable while Public config JSON is invalid.
+            <div className="mt-5 rounded-2xl border border-slate-800 bg-black/15 p-4">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-amber-300/70">
+                    GM preview
                   </p>
-                )}
+                  <h3 className="mt-1 text-lg font-black text-slate-100">
+                    Preview before saving
+                  </h3>
+                </div>
+                <div className="text-right text-[11px] leading-4 text-slate-500">
+                  <p>{PUZZLE_TYPE_LABELS[editor.type]} · {editor.difficulty}</p>
+                  {previewConfig && typeof previewConfig.variant_id === "string" ? (
+                    <p className="mt-1 max-w-[280px] truncate font-mono text-[10px] text-slate-600">
+                      {previewConfig.variant_id}
+                    </p>
+                  ) : null}
+                </div>
               </div>
-            ) : null}
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Read-only rendering of the exact generated starting presentation. Secret
+                answers remain hidden, just as they will be from players.
+              </p>
+              {previewConfig ? (
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-950/35 p-3 sm:p-4">
+                  <PuzzleWorkshopPreview
+                    type={editor.type}
+                    title={editor.title}
+                    difficultyLabel={editor.difficulty}
+                    publicConfig={previewConfig}
+                    moveLimit={nullableNumber(editor.moveLimit)}
+                    attemptLimit={nullableNumber(editor.attemptLimit)}
+                    timeLimitSeconds={nullableNumber(editor.timeLimit)}
+                  />
+                </div>
+              ) : (
+                <p className="mt-4 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                  Preview unavailable while Public config JSON is invalid.
+                </p>
+              )}
+            </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <label>
@@ -559,10 +574,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                   placeholder="∞"
                   value={editor.moveLimit}
                   onChange={(event) =>
-                    setEditor((current) => ({
-                      ...current,
-                      moveLimit: event.target.value,
-                    }))
+                    setEditor((current) => ({ ...current, moveLimit: event.target.value }))
                   }
                   className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-3 text-slate-100"
                 />
@@ -578,10 +590,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                   placeholder="∞"
                   value={editor.attemptLimit}
                   onChange={(event) =>
-                    setEditor((current) => ({
-                      ...current,
-                      attemptLimit: event.target.value,
-                    }))
+                    setEditor((current) => ({ ...current, attemptLimit: event.target.value }))
                   }
                   className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-3 text-slate-100"
                 />
@@ -595,10 +604,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                   placeholder="off"
                   value={editor.timeLimit}
                   onChange={(event) =>
-                    setEditor((current) => ({
-                      ...current,
-                      timeLimit: event.target.value,
-                    }))
+                    setEditor((current) => ({ ...current, timeLimit: event.target.value }))
                   }
                   className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-3 text-slate-100"
                 />
@@ -629,10 +635,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                   type="number"
                   value={editor.sortOrder}
                   onChange={(event) =>
-                    setEditor((current) => ({
-                      ...current,
-                      sortOrder: event.target.value,
-                    }))
+                    setEditor((current) => ({ ...current, sortOrder: event.target.value }))
                   }
                   className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-3 text-slate-100"
                 />
@@ -645,7 +648,8 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
               </summary>
               <p className="mt-2 text-xs leading-5 text-slate-500">
                 Public config is sent to players. Secret config is stored in a separate
-                DM-only table and is never selected by the player client.
+                DM-only table and is never selected by the player client. Changes to the
+                public JSON update the preview immediately when the JSON is valid.
               </p>
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 <label>
@@ -691,6 +695,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
             >
               {saving ? "Saving…" : editor.id ? "Save configuration" : "Save hidden draft"}
             </button>
+
             {formError ? (
               <p className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                 {formError}
@@ -730,6 +735,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                   : undefined;
                 const busy = actionId === puzzle.id;
                 const archived = puzzle.status === "archived";
+
                 return (
                   <article
                     key={puzzle.id}
@@ -757,6 +763,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                         </span>
                       </div>
                     </div>
+
                     <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-500">
                       <span className="rounded-xl border border-slate-800 bg-black/10 px-3 py-2">
                         Moves: {puzzle.move_limit ?? "∞"}
@@ -765,6 +772,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                         Attempts: {puzzle.attempt_limit ?? "∞"}
                       </span>
                     </div>
+
                     {run?.controller_name && run.status === "active" ? (
                       <p className="mt-3 text-xs font-semibold text-cyan-300">
                         ● {run.controller_name} currently has control
@@ -772,10 +780,11 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                     ) : null}
                     {run?.status === "solved" ? (
                       <p className="mt-3 text-xs font-semibold text-emerald-300">
-                        ✓ Solved{run.solved_by_name ? ` by ${run.solved_by_name}` : ""} ·{" "}
-                        {run.move_count} {run.move_count === 1 ? "move" : "moves"}
+                        ✓ Solved{run.solved_by_name ? ` by ${run.solved_by_name}` : ""} · {run.move_count}{" "}
+                        {run.move_count === 1 ? "move" : "moves"}
                       </p>
                     ) : null}
+
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <button
                         type="button"
@@ -910,6 +919,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
                 );
               })
             )}
+
             {vault.error && vault.error !== formError ? (
               <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
                 {vault.error}
