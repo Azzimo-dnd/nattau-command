@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { PuzzleMaintenancePanel } from "@/components/puzzles/PuzzleMaintenancePanel";
 import { PuzzleWorkshop } from "@/components/puzzles/PuzzleWorkshop";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 
@@ -9,13 +8,10 @@ export default async function BaroviaPuzzleWorkshopPage() {
   const access = await requireCampaignMembership("barovia");
   if (access.membership.role !== "dm") redirect(access.membership.homeHref);
   return (
-    <>
-      <PuzzleWorkshop
-        campaignId={access.membership.campaignId}
-        campaignSlug={access.membership.slug}
-        theme="barovia"
-      />
-      <PuzzleMaintenancePanel campaignId={access.membership.campaignId} />
-    </>
+    <PuzzleWorkshop
+      campaignId={access.membership.campaignId}
+      campaignSlug={access.membership.slug}
+      theme="barovia"
+    />
   );
 }
