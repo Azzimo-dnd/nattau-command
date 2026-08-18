@@ -40,7 +40,7 @@ export function usePuzzleRoom({
     const { data, error: puzzleError } = await supabase
       .from("campaign_puzzles")
       .select(
-        "id,campaign_id,title,description,puzzle_type,difficulty_label,public_config,move_limit,attempt_limit,time_limit_seconds,failure_message,is_visible,status,current_run_id,sort_order,created_at,updated_at"
+        "id,campaign_id,title,description,puzzle_type,difficulty_label,public_config,move_limit,attempt_limit,time_limit_seconds,failure_message,is_visible,is_test_visible,status,current_run_id,sort_order,created_at,updated_at"
       )
       .eq("id", puzzleId)
       .eq("campaign_id", campaignId)

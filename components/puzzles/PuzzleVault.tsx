@@ -80,14 +80,27 @@ export function PuzzleVault({ campaignId, campaignSlug, role, theme = "nattau" }
                 <Link
                   key={puzzle.id}
                   href={puzzleHref(campaignSlug, puzzle.id)}
-                  className={`group flex min-h-[250px] flex-col rounded-[28px] border p-5 transition hover:-translate-y-0.5 ${barovia ? "border-[#412832] bg-[#120c10] hover:border-[#704052]" : "border-slate-800 bg-slate-900/75 hover:border-yellow-600/40"}`}
+                  className={`group flex min-h-[250px] flex-col rounded-[28px] border p-5 transition hover:-translate-y-0.5 ${puzzle.is_test_visible ? "border-violet-500/35 bg-violet-950/15 hover:border-violet-400/50" : barovia ? "border-[#412832] bg-[#120c10] hover:border-[#704052]" : "border-slate-800 bg-slate-900/75 hover:border-yellow-600/40"}`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className={`text-[10px] font-black uppercase tracking-[0.24em] ${barovia ? "text-[#9c6372]" : "text-yellow-500"}`}>{PUZZLE_TYPE_LABELS[puzzle.puzzle_type]}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`text-[10px] font-black uppercase tracking-[0.24em] ${barovia ? "text-[#9c6372]" : "text-yellow-500"}`}>{PUZZLE_TYPE_LABELS[puzzle.puzzle_type]}</span>
+                      {puzzle.is_test_visible ? (
+                        <span className="rounded-full border border-violet-400/35 bg-violet-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-violet-200">
+                          Test only
+                        </span>
+                      ) : null}
+                    </div>
                     <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${status === "solved" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : status === "failed" ? "border-rose-500/30 bg-rose-500/10 text-rose-300" : barovia ? "border-[#633445] bg-[#5b1c2e]/20 text-[#d9aeb9]" : "border-cyan-500/25 bg-cyan-500/10 text-cyan-300"}`}>{status}</span>
                   </div>
                   <h2 className={`mt-4 text-2xl font-black ${barovia ? "font-serif text-[#ead7dc]" : "text-slate-100"}`}>{puzzle.title}</h2>
                   <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-500">{puzzle.description || "An unexplained mechanism awaits."}</p>
+
+                  {puzzle.is_test_visible ? (
+                    <p className="mt-3 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-[11px] font-semibold leading-4 text-violet-200/90">
+                      Test run · visible only to the GM and campaign test accounts.
+                    </p>
+                  ) : null}
 
                   <div className="mt-auto pt-5">
                     <div className="flex flex-wrap gap-2 text-xs text-slate-500">
@@ -106,7 +119,7 @@ export function PuzzleVault({ campaignId, campaignSlug, role, theme = "nattau" }
                           <p className="text-xs text-slate-600">{terminal ? "Final state available" : "Ready for a solver"}</p>
                         )}
                       </div>
-                      <span className={`text-sm font-black transition group-hover:translate-x-1 ${barovia ? "text-[#d8adb8]" : "text-yellow-300"}`}>{terminal ? "View" : "Enter"} →</span>
+                      <span className={`text-sm font-black transition group-hover:translate-x-1 ${puzzle.is_test_visible ? "text-violet-300" : barovia ? "text-[#d8adb8]" : "text-yellow-300"}`}>{terminal ? "View" : "Enter"} →</span>
                     </div>
                   </div>
                 </Link>
