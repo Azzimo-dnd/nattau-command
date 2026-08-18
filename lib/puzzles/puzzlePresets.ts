@@ -27,6 +27,15 @@ function randomRuneSequence(pool: string[], length: number, allowRepeats = true)
   return Array.from({ length }, () => pool[Math.floor(Math.random() * pool.length)]);
 }
 
+function freshPublicVariantId(prefix: string, difficulty: string, publicParts: Array<string | number | boolean>) {
+  return makeVariantId(prefix, [
+    difficulty,
+    ...publicParts,
+    Date.now(),
+    Math.random(),
+  ]);
+}
+
 function buildSigilConfig(difficulty: string) {
   const normalized = difficulty.toLowerCase();
   const size = normalized === "hard" || normalized === "insane" ? 4 : 3;
@@ -224,7 +233,7 @@ export function buildPuzzlePreset(
         runes: pool,
         code_length: codeLength,
         allow_repeats: allowRepeats,
-        variant_id: makeVariantId("tongue", [difficulty, ...pool, allowRepeats, ...solution]),
+        variant_id: freshPublicVariantId("tongue", difficulty, [...pool, allowRepeats, codeLength]),
         generation_rule: "direct-secret-code",
       },
       secretConfig: {
@@ -300,7 +309,7 @@ export function buildPuzzlePreset(
       flash_ms: insane ? 440 : hard ? 520 : 650,
       reveal_limit: maxLevel + (easy ? 3 : insane ? 0 : hard ? 1 : 2),
       reset_on_miss: hard,
-      variant_id: makeVariantId("echo", [difficulty, ...pool, ...sequence]),
+      variant_id: freshPublicVariantId("echo", difficulty, [...pool, baseLength, maxLevel]),
       generation_rule: "direct-memory-sequence",
     },
     secretConfig: {
