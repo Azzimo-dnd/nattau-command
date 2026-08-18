@@ -101,7 +101,8 @@ function tearProfile(seed: string, key: string, strength: number) {
     if (index === 0 || index === samples - 1) return 0;
     const primary = signedNoise(seed, key, index);
     const secondary = signedNoise(seed, `${key}:fibers`, index) * 0.38;
-    return Number(((primary + secondary) * strength).toFixed(2));
+    const raw = (primary + secondary) * strength;
+    return Number(Math.max(-2.75, Math.min(2.75, raw)).toFixed(2));
   });
 }
 
