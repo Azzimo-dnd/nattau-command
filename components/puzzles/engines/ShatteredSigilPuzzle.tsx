@@ -12,16 +12,18 @@ import type {
   CampaignPuzzleRunRow,
   JsonRecord,
 } from "@/lib/puzzles/puzzleTypes";
+import {
+  buildMatchedParchmentClipPath,
+  isSigilMaterial,
+  SIGIL_NAMES,
+  SIGIL_VARIANTS,
+  sigilPoolForMaterial,
+  stableSigilHash,
+  type SigilMaterial,
+  type SigilVariant,
+} from "@/lib/puzzles/shatteredSigil";
 import styles from "./ShatteredSigilPuzzle.module.css";
 
-type SigilVariant =
-  | "eclipse"
-  | "drowned_star"
-  | "serpent"
-  | "moon_gate"
-  | "thorn_crown"
-  | "first_flame";
-type SigilMaterial = "stone" | "parchment";
 type ReferenceMode = "open" | "hold" | "none";
 type DragState = {
   index: number;
@@ -30,32 +32,16 @@ type DragState = {
   startY: number;
 };
 
-const SIGIL_VARIANTS: SigilVariant[] = [
-  "eclipse",
-  "drowned_star",
-  "serpent",
-  "moon_gate",
-  "thorn_crown",
-  "first_flame",
-];
-
-const SIGIL_NAMES: Record<SigilVariant, string> = {
-  eclipse: "Seal of the Drowned Eclipse",
-  drowned_star: "The Nine-Tide Star",
-  serpent: "Coil of the First Serpent",
-  moon_gate: "The Moon Gate Diagram",
-  thorn_crown: "Crown of Thorns",
-  first_flame: "Circle of the First Flame",
+type SigilPresentation = {
+  signature: string;
+  tearSeed: string;
+  material: SigilMaterial;
+  variant: SigilVariant;
+  rotation: number;
+  mirror: boolean;
+  referenceMode: ReferenceMode;
+  assistCorrect: boolean;
 };
-
-function stableHash(value: string) {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
 
 function RitualMarks({
   count,
@@ -157,16 +143,112 @@ function motif(variant: SigilVariant) {
     );
   }
 
+  if (variant === "first_flame") {
+    return (
+      <>
+        <circle cx="200" cy="200" r="158" />
+        <circle cx="200" cy="200" r="126" />
+        <RitualMarks count={12} outer={156} inner={140} offset={15} />
+        <path d="M200 80 C220 119 249 142 249 181 C249 214 228 239 200 239 C172 239 151 218 151 190 C151 168 164 150 182 138 C177 163 184 182 200 194 C219 176 224 151 215 126" />
+        <path d="M200 239 C236 239 266 263 277 299 C250 282 224 279 200 291 C176 279 150 282 123 299 C134 263 164 239 200 239 Z" />
+        <path d="M116 188 L76 200 L116 212 M284 188 L324 200 L284 212" />
+        <path d="M166 105 L139 76 L151 118 M234 105 L261 76 L249 118" />
+        <circle cx="200" cy="200" r="31" />
+      </>
+    );
+  }
+
+  if (variant === "sun_compass") {
+    return (
+      <>
+        <circle cx="200" cy="200" r="159" />
+        <circle cx="200" cy="200" r="124" />
+        <circle cx="200" cy="200" r="57" />
+        <RitualMarks count={16} outer={157} inner={143} />
+        <path d="M200 73 L222 158 L327 200 L222 242 L200 327 L178 242 L73 200 L178 158 Z" />
+        <path d="M116 116 L164 174 M284 116 L236 174 M284 284 L236 226 M116 284 L164 226" />
+        <path d="M200 161 L239 200 L200 239 L161 200 Z" />
+        <circle cx="200" cy="200" r="20" />
+      </>
+    );
+  }
+
+  if (variant === "ancestral_eye") {
+    return (
+      <>
+        <circle cx="200" cy="200" r="159" />
+        <circle cx="200" cy="200" r="129" />
+        <RitualMarks count={10} outer={157} inner={141} offset={18} />
+        <path d="M82 200 C119 139 160 116 200 116 C240 116 281 139 318 200 C281 261 240 284 200 284 C160 284 119 261 82 200 Z" />
+        <circle cx="200" cy="200" r="58" />
+        <circle cx="200" cy="200" r="23" />
+        <path d="M200 72 L218 116 L200 101 L182 116 Z" />
+        <path d="M200 328 L218 284 L200 299 L182 284 Z" />
+        <path d="M111 126 L145 151 M289 126 L255 151 M111 274 L145 249 M289 274 L255 249" />
+      </>
+    );
+  }
+
+  if (variant === "storm_wheel") {
+    return (
+      <>
+        <circle cx="200" cy="200" r="159" />
+        <circle cx="200" cy="200" r="125" />
+        <RitualMarks count={8} outer={157} inner={140} offset={22.5} />
+        <circle cx="200" cy="200" r="39" />
+        {Array.from({ length: 8 }, (_, index) => (
+          <g key={index} transform={`rotate(${index * 45} 200 200)`}>
+            <path d="M200 161 C226 145 246 124 257 93 C249 128 253 151 269 176" />
+            <path d="M253 110 L276 102 L263 127" />
+          </g>
+        ))}
+        <path d="M158 200 L181 187 L175 213 L200 200 L225 187 L219 213 L242 200" />
+      </>
+    );
+  }
+
+  if (variant === "guardian_knot") {
+    return (
+      <>
+        <circle cx="200" cy="200" r="159" />
+        <circle cx="200" cy="200" r="128" />
+        <RitualMarks count={12} outer={157} inner={142} offset={15} />
+        <path d="M200 91 L309 200 L200 309 L91 200 Z" />
+        <path d="M200 122 L278 200 L200 278 L122 200 Z" />
+        <path d="M144 144 C166 123 188 126 200 145 C212 126 234 123 256 144 C277 166 274 188 255 200 C274 212 277 234 256 256 C234 277 212 274 200 255 C188 274 166 277 144 256 C123 234 126 212 145 200 C126 188 123 166 144 144 Z" />
+        <circle cx="200" cy="200" r="27" />
+      </>
+    );
+  }
+
+  if (variant === "twin_moons") {
+    return (
+      <>
+        <circle cx="200" cy="200" r="159" />
+        <circle cx="200" cy="200" r="126" />
+        <RitualMarks count={14} outer={157} inner={141} offset={12.8} />
+        <path d="M167 126 C132 139 110 167 110 201 C110 239 138 270 176 277 C152 260 141 235 141 208 C141 174 155 147 184 130" />
+        <path d="M233 126 C268 139 290 167 290 201 C290 239 262 270 224 277 C248 260 259 235 259 208 C259 174 245 147 216 130" />
+        <ellipse cx="200" cy="200" rx="44" ry="71" />
+        <path d="M129 200 H271 M200 83 V317" />
+        <circle cx="200" cy="200" r="17" />
+      </>
+    );
+  }
+
   return (
     <>
-      <circle cx="200" cy="200" r="158" />
-      <circle cx="200" cy="200" r="126" />
-      <RitualMarks count={12} outer={156} inner={140} offset={15} />
-      <path d="M200 80 C220 119 249 142 249 181 C249 214 228 239 200 239 C172 239 151 218 151 190 C151 168 164 150 182 138 C177 163 184 182 200 194 C219 176 224 151 215 126" />
-      <path d="M200 239 C236 239 266 263 277 299 C250 282 224 279 200 291 C176 279 150 282 123 299 C134 263 164 239 200 239 Z" />
-      <path d="M116 188 L76 200 L116 212 M284 188 L324 200 L284 212" />
-      <path d="M166 105 L139 76 L151 118 M234 105 L261 76 L249 118" />
-      <circle cx="200" cy="200" r="31" />
+      <circle cx="200" cy="200" r="159" />
+      <circle cx="200" cy="200" r="128" />
+      <circle cx="200" cy="200" r="92" />
+      <circle cx="200" cy="200" r="55" />
+      <RitualMarks count={12} outer={157} inner={141} offset={15} />
+      {Array.from({ length: 8 }, (_, index) => (
+        <path key={index} d="M200 72 L200 145" transform={`rotate(${index * 45} 200 200)`} />
+      ))}
+      <path d="M111 200 C139 177 167 166 200 166 C233 166 261 177 289 200 C261 223 233 234 200 234 C167 234 139 223 111 200 Z" />
+      <circle cx="200" cy="200" r="21" />
+      <path d="M151 151 L249 249 M249 151 L151 249" />
     </>
   );
 }
@@ -272,6 +354,155 @@ function dragTarget(index: number, size: number, dx: number, dy: number) {
   return null;
 }
 
+function resolvePresentation(
+  publicConfig: JsonRecord,
+  difficultyLabel: string,
+  fallbackSeed: string,
+): SigilPresentation {
+  const signature = String(
+    publicConfig.variant_id ??
+      (Array.isArray(publicConfig.symbols)
+        ? publicConfig.symbols.join("|")
+        : fallbackSeed),
+  );
+  const signatureHash = stableSigilHash(signature);
+  const explicitMaterial = publicConfig.material;
+  const material: SigilMaterial = isSigilMaterial(explicitMaterial)
+    ? explicitMaterial
+    : ((signatureHash >>> 8) % 3 === 0 ? "parchment" : "stone");
+
+  const explicitVariant = publicConfig.art_variant;
+  const materialPool = sigilPoolForMaterial(material);
+  const variant = (
+    typeof explicitVariant === "string" &&
+    SIGIL_VARIANTS.includes(explicitVariant as SigilVariant)
+      ? explicitVariant
+      : materialPool[signatureHash % materialPool.length]
+  ) as SigilVariant;
+
+  const rotation = Number(publicConfig.art_rotation ?? ((signatureHash >>> 3) % 8) * 45);
+  const mirror = Boolean(publicConfig.art_mirror ?? ((signatureHash >>> 7) & 1) === 1);
+  const difficulty = difficultyLabel.toLowerCase();
+  const defaultReferenceMode: ReferenceMode =
+    difficulty === "easy" ? "open" : difficulty === "insane" ? "none" : "hold";
+  const rawReferenceMode = String(publicConfig.reference_mode ?? defaultReferenceMode);
+  const referenceMode: ReferenceMode = ["open", "hold", "none"].includes(rawReferenceMode)
+    ? (rawReferenceMode as ReferenceMode)
+    : defaultReferenceMode;
+
+  return {
+    signature,
+    tearSeed: String(publicConfig.tear_seed ?? signature),
+    material,
+    variant,
+    rotation,
+    mirror,
+    referenceMode,
+    assistCorrect: Boolean(publicConfig.assist_correct ?? difficulty === "easy"),
+  };
+}
+
+function fragmentClipStyle(
+  material: SigilMaterial,
+  targetIndex: number,
+  size: number,
+  tearSeed: string,
+) {
+  return material === "parchment"
+    ? { clipPath: buildMatchedParchmentClipPath(targetIndex, size, tearSeed) }
+    : undefined;
+}
+
+function FragmentArtwork({
+  targetIndex,
+  size,
+  presentation,
+}: {
+  targetIndex: number;
+  size: number;
+  presentation: SigilPresentation;
+}) {
+  const cell = 400 / size;
+  const targetRow = Math.floor(targetIndex / size);
+  const targetCol = targetIndex % size;
+  const fragmentViewBox = `${targetCol * cell} ${targetRow * cell} ${cell} ${cell}`;
+
+  return (
+    <>
+      <SigilArtwork
+        variant={presentation.variant}
+        rotation={presentation.rotation}
+        mirror={presentation.mirror}
+        material={presentation.material}
+        viewBox={fragmentViewBox}
+        className={styles.art}
+      />
+      <span className={styles.surfaceNoise} />
+      <span className={styles.edgeWear} />
+      <span className={styles.dust} />
+    </>
+  );
+}
+
+export function ShatteredSigilPreview({
+  publicConfig,
+  difficultyLabel,
+}: {
+  publicConfig: JsonRecord;
+  difficultyLabel: string;
+}) {
+  const size = Number(publicConfig.size ?? 3);
+  const initialOrder = Array.isArray(publicConfig.initial_order)
+    ? (publicConfig.initial_order as string[])
+    : Array.from({ length: size * size }, (_, index) => String(index));
+  const presentation = resolvePresentation(publicConfig, difficultyLabel, "gm-preview");
+  const materialClass =
+    presentation.material === "parchment" ? styles.parchment : styles.stone;
+
+  return (
+    <div className={styles.preview}>
+      <div className={`${styles.shell} ${materialClass}`}>
+        <div className={styles.recess}>
+          <div
+            className={`${styles.board} ${presentation.material === "parchment" ? styles.parchmentBoard : ""}`}
+            style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
+            aria-label="GM preview of the generated Shattered Sigil"
+          >
+            {initialOrder.map((tileId, index) => {
+              const targetIndex = Number(tileId);
+              return (
+                <div
+                  key={`${tileId}-${index}`}
+                  className={`${styles.fragment} ${styles.previewFragment} ${materialClass}`}
+                  style={fragmentClipStyle(
+                    presentation.material,
+                    targetIndex,
+                    size,
+                    presentation.tearSeed,
+                  )}
+                >
+                  <FragmentArtwork
+                    targetIndex={targetIndex}
+                    size={size}
+                    presentation={presentation}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <div className={styles.previewMeta}>
+        <span>{presentation.material === "parchment" ? "Torn parchment" : "Carved stone"}</span>
+        <span>·</span>
+        <span>{SIGIL_NAMES[presentation.variant]}</span>
+        <span>·</span>
+        <span>{size}×{size}</span>
+      </div>
+    </div>
+  );
+}
+
 export function ShatteredSigilPuzzle({
   puzzle,
   run,
@@ -288,47 +519,15 @@ export function ShatteredSigilPuzzle({
     () => (Array.isArray(run.state.order) ? (run.state.order as string[]) : []),
     [run.state.order],
   );
-  const signature = String(
-    puzzle.public_config.variant_id ??
-      (Array.isArray(puzzle.public_config.symbols)
-        ? puzzle.public_config.symbols.join("|")
-        : puzzle.id),
+  const presentation = resolvePresentation(
+    puzzle.public_config,
+    puzzle.difficulty_label,
+    puzzle.id,
   );
-  const signatureHash = stableHash(signature);
-
-  const explicitVariant = puzzle.public_config.art_variant;
-  const variant = (
-    typeof explicitVariant === "string" &&
-    SIGIL_VARIANTS.includes(explicitVariant as SigilVariant)
-      ? explicitVariant
-      : SIGIL_VARIANTS[signatureHash % SIGIL_VARIANTS.length]
-  ) as SigilVariant;
-
-  const explicitMaterial = puzzle.public_config.material;
-  const material: SigilMaterial =
-    explicitMaterial === "parchment" || explicitMaterial === "stone"
-      ? explicitMaterial
-      : ((signatureHash >>> 8) % 3 === 0 ? "parchment" : "stone");
-
-  const rotation = Number(
-    puzzle.public_config.art_rotation ?? ((signatureHash >>> 3) % 8) * 45,
-  );
-  const mirror = Boolean(
-    puzzle.public_config.art_mirror ?? ((signatureHash >>> 7) & 1) === 1,
-  );
-
-  const difficulty = puzzle.difficulty_label.toLowerCase();
-  const defaultReferenceMode: ReferenceMode =
-    difficulty === "easy" ? "open" : difficulty === "insane" ? "none" : "hold";
-  const referenceMode = String(
-    puzzle.public_config.reference_mode ?? defaultReferenceMode,
-  ) as ReferenceMode;
-  const assistCorrect = Boolean(
-    puzzle.public_config.assist_correct ?? difficulty === "easy",
-  );
-
   const [selected, setSelected] = useState<number | null>(null);
-  const [memoryVisible, setMemoryVisible] = useState(referenceMode === "open");
+  const [memoryVisible, setMemoryVisible] = useState(
+    presentation.referenceMode === "open",
+  );
   const [pulse, setPulse] = useState<number[]>([]);
   const dragRef = useRef<DragState | null>(null);
   const suppressClickRef = useRef(false);
@@ -409,27 +608,25 @@ export function ShatteredSigilPuzzle({
     void performSwap(index, target);
   };
 
-  const fullReferenceVisible = referenceMode === "open" || memoryVisible;
+  const fullReferenceVisible =
+    presentation.referenceMode === "open" || memoryVisible;
   const solved = run.status === "solved";
-  const cell = 400 / size;
-  const materialClass = material === "parchment" ? styles.parchment : styles.stone;
+  const materialClass =
+    presentation.material === "parchment" ? styles.parchment : styles.stone;
 
   return (
     <div className="mx-auto max-w-[680px] space-y-4">
       <div className={`${styles.shell} ${materialClass}`}>
         <div className={styles.recess}>
           <div
-            className={`${styles.board} ${solved ? styles.boardSolved : ""}`}
+            className={`${styles.board} ${solved ? styles.boardSolved : ""} ${presentation.material === "parchment" ? styles.parchmentBoard : ""}`}
             style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
             aria-label="Shattered ritual image fragments"
           >
             {order.map((tileId, index) => {
               const targetIndex = Number(tileId);
-              const targetRow = Math.floor(targetIndex / size);
-              const targetCol = targetIndex % size;
               const isCorrect = targetIndex === index;
               const isNeighbor = selected !== null && isAdjacent(selected, index, size);
-              const fragmentViewBox = `${targetCol * cell} ${targetRow * cell} ${cell} ${cell}`;
 
               return (
                 <button
@@ -441,20 +638,20 @@ export function ShatteredSigilPuzzle({
                   onPointerDown={(event) => pointerDown(event, index)}
                   onPointerUp={(event) => pointerUp(event, index)}
                   onPointerCancel={pointerCancel}
-                  className={`${styles.fragment} ${materialClass} ${selected === index ? styles.selected : ""} ${isNeighbor ? styles.neighbor : ""} ${assistCorrect && isCorrect ? styles.correct : ""} ${pulse.includes(index) ? styles.swapPulse : ""}`}
+                  style={fragmentClipStyle(
+                    presentation.material,
+                    targetIndex,
+                    size,
+                    presentation.tearSeed,
+                  )}
+                  className={`${styles.fragment} ${materialClass} ${selected === index ? styles.selected : ""} ${isNeighbor ? styles.neighbor : ""} ${presentation.assistCorrect && isCorrect ? styles.correct : ""} ${pulse.includes(index) ? styles.swapPulse : ""}`}
                   aria-label={`Ritual fragment ${index + 1}${selected === index ? ", selected" : ""}`}
                 >
-                  <SigilArtwork
-                    variant={variant}
-                    rotation={rotation}
-                    mirror={mirror}
-                    material={material}
-                    viewBox={fragmentViewBox}
-                    className={styles.art}
+                  <FragmentArtwork
+                    targetIndex={targetIndex}
+                    size={size}
+                    presentation={presentation}
                   />
-                  <span className={styles.surfaceNoise} />
-                  <span className={styles.edgeWear} />
-                  <span className={styles.dust} />
                 </button>
               );
             })}
@@ -468,10 +665,10 @@ export function ShatteredSigilPuzzle({
           <div className="mx-auto shrink-0 sm:mx-0">
             <div className={`${styles.referenceMedallion} ${materialClass}`}>
               <SigilArtwork
-                variant={variant}
-                rotation={rotation}
-                mirror={mirror}
-                material={material}
+                variant={presentation.variant}
+                rotation={presentation.rotation}
+                mirror={presentation.mirror}
+                material={presentation.material}
                 className={`${styles.art} ${fullReferenceVisible ? styles.referenceVisible : styles.referenceHidden}`}
               />
             </div>
@@ -479,17 +676,19 @@ export function ShatteredSigilPuzzle({
 
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-200/45">
-              {material === "parchment" ? "Recovered ritual manuscript" : "Ceremonial stone seal"}
+              {presentation.material === "parchment"
+                ? "Recovered ritual manuscript"
+                : "Ceremonial stone seal"}
             </p>
             <h3 className="mt-1 text-base font-black text-stone-100">
-              {SIGIL_NAMES[variant]}
+              {SIGIL_NAMES[presentation.variant]}
             </h3>
             <p className="mt-2 text-xs leading-5 text-stone-400">
               This is one ritual image shattered into misplaced fragments. Match the
               broken lines, rings and symbols until the complete diagram is restored.
             </p>
 
-            {referenceMode === "hold" ? (
+            {presentation.referenceMode === "hold" ? (
               <button
                 type="button"
                 className={`${styles.memoryButton} mt-3`}
@@ -509,14 +708,14 @@ export function ShatteredSigilPuzzle({
               </button>
             ) : null}
 
-            {referenceMode === "none" ? (
+            {presentation.referenceMode === "none" ? (
               <p className="mt-3 rounded-xl border border-stone-700/45 bg-black/15 px-3 py-2 text-[11px] leading-5 text-stone-500">
                 The original diagram is lost. Reconstruct it from matching strokes,
                 circles and torn edges alone.
               </p>
             ) : null}
 
-            {assistCorrect ? (
+            {presentation.assistCorrect ? (
               <p className="mt-3 text-[11px] text-emerald-200/55">
                 Easy guidance: fragments already in their true position gain a faint
                 greenstone edge.
