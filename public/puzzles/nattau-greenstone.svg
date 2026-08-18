@@ -1,19 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="384" height="256" viewBox="0 0 384 256">
   <defs>
-    <filter id="jade" x="-10%" y="-10%" width="120%" height="120%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.025 0.045" numOctaves="4" seed="31" stitchTiles="stitch" result="noise"/>
-      <feColorMatrix in="noise" values=".22 0 0 0 0 .32 0 0 0 0 .18 0 0 0 0 0 0 0 .42 0" result="veins"/>
-      <feBlend in="SourceGraphic" in2="veins" mode="overlay"/>
+    <filter id="jade" x="-12%" y="-12%" width="124%" height="124%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.036" numOctaves="5" seed="31" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix in="noise" values=".18 0 0 0 0 .26 0 0 0 0 .14 0 0 0 0 0 0 0 .38 0" result="veins"/>
+      <feBlend in="SourceGraphic" in2="veins" mode="overlay" result="marbled"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.075" numOctaves="2" seed="17" result="fine"/>
+      <feDisplacementMap in="marbled" in2="fine" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
     <linearGradient id="shade" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#738978"/>
-      <stop offset=".45" stop-color="#4f6656"/>
-      <stop offset="1" stop-color="#26372e"/>
+      <stop offset="0" stop-color="#687a6c"/>
+      <stop offset=".42" stop-color="#4b5f52"/>
+      <stop offset=".72" stop-color="#34483d"/>
+      <stop offset="1" stop-color="#202e27"/>
     </linearGradient>
+    <radialGradient id="wear" cx="28%" cy="20%" r="78%">
+      <stop offset="0" stop-color="#d3ddd0" stop-opacity=".10"/>
+      <stop offset=".52" stop-color="#81907f" stop-opacity=".02"/>
+      <stop offset="1" stop-color="#0e1511" stop-opacity=".17"/>
+    </radialGradient>
   </defs>
-  <rect width="384" height="256" fill="url(#shade)" filter="url(#jade)"/>
-  <g fill="none" stroke="#b7c7b5" stroke-opacity=".08" stroke-width="1.2">
-    <path d="M-10 90 C70 36 130 124 206 69 S318 53 400 7"/>
-    <path d="M-12 193 C56 145 137 225 203 164 S320 146 401 112"/>
+  <g filter="url(#jade)">
+    <rect width="384" height="256" fill="url(#shade)"/>
+    <rect width="384" height="256" fill="url(#wear)"/>
+  </g>
+  <g fill="none" stroke-linecap="round">
+    <path d="M-10 84 C54 46 105 104 164 73 S271 46 401 12" stroke="#c3cec0" stroke-opacity=".07" stroke-width="1.2"/>
+    <path d="M-8 185 C46 154 116 218 186 169 S291 136 401 109" stroke="#d4ded1" stroke-opacity=".045" stroke-width="1.1"/>
+    <path d="M62 18 C87 62 65 92 97 126 S119 186 149 242" stroke="#17251d" stroke-opacity=".20" stroke-width="1.4"/>
+    <path d="M278 22 C249 59 273 92 247 126 S239 184 211 229" stroke="#142119" stroke-opacity=".17" stroke-width="1.2"/>
   </g>
 </svg>
