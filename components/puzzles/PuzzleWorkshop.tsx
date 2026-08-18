@@ -190,7 +190,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
     setFormError(null);
     setMessage(
       mode === "auto"
-        ? "Shattered Sigil will now choose stone or parchment when you generate a variant."
+        ? "Generated a fresh verified variant and returned future generations to automatic material choice."
         : `Generated a fresh verified ${mode} ritual variant.`,
     );
   };
