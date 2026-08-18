@@ -29,6 +29,10 @@ export const SIGIL_NAMES: Record<SigilVariant, string> = {
   oracle_web: "The Oracle's Web",
 };
 
+// Ten motifs are available for each material. The pools overlap where a design
+// reads well in both media, while the stone and parchment sets still retain
+// material-specific silhouettes so repeated sessions do not collapse into the
+// same handful of images.
 export const STONE_SIGIL_VARIANTS: SigilVariant[] = [
   "eclipse",
   "drowned_star",
