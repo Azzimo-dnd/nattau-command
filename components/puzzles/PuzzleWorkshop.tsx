@@ -146,11 +146,12 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
   };
 
   const changeType = (type: PuzzleType) => {
-    const sigilMaterial: SigilMaterialMode = type === "shattered_sigil" ? "auto" : "auto";
     setEditor(
       presetToEditor(
         type,
-        buildPuzzlePreset(type, editor.difficulty, { sigilMaterial }),
+        buildPuzzlePreset(type, editor.difficulty, {
+          sigilMaterial: type === "shattered_sigil" ? "auto" : undefined,
+        }),
         null,
       ),
     );
