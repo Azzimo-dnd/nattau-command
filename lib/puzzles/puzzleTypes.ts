@@ -35,6 +35,7 @@ export type CampaignPuzzleRow = {
   time_limit_seconds: number | null;
   failure_message: string | null;
   is_visible: boolean;
+  is_test_visible?: boolean;
   status: PuzzleLifecycleStatus;
   current_run_id: string | null;
   sort_order: number;
