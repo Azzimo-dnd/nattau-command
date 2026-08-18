@@ -1,0 +1,326 @@
+.shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(120, 113, 108, 0.42);
+  border-radius: 34px;
+  padding: clamp(12px, 2.5vw, 20px);
+  background:
+    linear-gradient(rgba(15, 18, 16, 0.16), rgba(6, 9, 8, 0.44)),
+    url('/puzzles/nattau-stone-slab.svg') center / cover;
+  box-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -20px 50px rgba(0, 0, 0, 0.28);
+}
+
+.shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    url('/puzzles/nattau-cracks.svg') center / cover no-repeat,
+    radial-gradient(circle at 18% 16%, rgba(159, 184, 130, 0.07), transparent 23%),
+    radial-gradient(circle at 82% 76%, rgba(8, 12, 10, 0.28), transparent 32%);
+  opacity: 0.82;
+  mix-blend-mode: multiply;
+}
+
+.shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url('/puzzles/nattau-moss.svg') center / cover no-repeat;
+  opacity: 0.34;
+}
+
+.recess {
+  position: relative;
+  border-radius: 28px;
+  padding: clamp(10px, 2vw, 15px);
+  background:
+    radial-gradient(circle at 50% 44%, rgba(100, 116, 96, 0.14), transparent 48%),
+    linear-gradient(145deg, rgba(13, 17, 15, 0.94), rgba(29, 30, 26, 0.96));
+  box-shadow:
+    inset 0 12px 26px rgba(0, 0, 0, 0.52),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.035),
+    0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.recess::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  pointer-events: none;
+  border: 1px solid rgba(168, 162, 158, 0.08);
+  border-radius: 23px;
+  box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.42);
+}
+
+.board {
+  position: relative;
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1;
+  gap: clamp(3px, 0.7vw, 6px);
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+.board::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  z-index: -1;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at center, rgba(5, 9, 8, 0.92), rgba(2, 4, 4, 0.98)),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.018) 0 2px, transparent 2px 9px);
+  box-shadow:
+    inset 0 0 24px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(120, 113, 108, 0.14);
+}
+
+.fragment {
+  --chip-a: 4%;
+  --chip-b: 97%;
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(214, 211, 209, 0.11);
+  border-radius: 9px 13px 8px 12px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.17)),
+    url('/puzzles/nattau-ward-stone.svg') center / cover;
+  color: #d6d3d1;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    inset 0 -8px 14px rgba(0, 0, 0, 0.17),
+    0 5px 10px rgba(0, 0, 0, 0.32);
+  clip-path: polygon(
+    var(--chip-a) 1%,
+    94% 0,
+    100% 7%,
+    var(--chip-b) 94%,
+    91% 100%,
+    7% 97%,
+    0 91%,
+    2% 8%
+  );
+  transition:
+    transform 150ms ease,
+    filter 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.fragment:nth-child(3n + 2) {
+  --chip-a: 1%;
+  --chip-b: 99%;
+  border-radius: 12px 7px 13px 8px;
+}
+
+.fragment:nth-child(4n) {
+  --chip-a: 7%;
+  --chip-b: 94%;
+  border-radius: 7px 12px 10px 6px;
+}
+
+.fragment:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.fragment:focus-visible {
+  outline: 2px solid rgba(250, 204, 21, 0.8);
+  outline-offset: 2px;
+}
+
+.selected {
+  z-index: 6;
+  transform: translateY(-3px) scale(1.025);
+  border-color: rgba(250, 204, 21, 0.42);
+  filter: brightness(1.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 22px rgba(0, 0, 0, 0.52),
+    0 0 0 2px rgba(250, 204, 21, 0.11);
+}
+
+.correct {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    inset 0 0 16px rgba(110, 231, 183, 0.055),
+    0 5px 10px rgba(0, 0, 0, 0.32);
+}
+
+.correct::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(167, 243, 208, 0.12);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  filter:
+    drop-shadow(0 1px 0 rgba(220, 252, 231, 0.08))
+    drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.58));
+  opacity: 0.94;
+}
+
+.surfaceNoise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 16% 21%, rgba(255, 255, 255, 0.04) 0 1px, transparent 2px),
+    radial-gradient(circle at 73% 69%, rgba(0, 0, 0, 0.18) 0 1px, transparent 2px),
+    linear-gradient(120deg, transparent 42%, rgba(255, 255, 255, 0.025) 48%, transparent 54%);
+  background-size: 31px 29px, 37px 41px, auto;
+  mix-blend-mode: overlay;
+}
+
+.swapPulse {
+  animation: fragment-settle 420ms cubic-bezier(.2,.8,.2,1);
+}
+
+.dust {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -5px;
+  height: 18px;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 18% 70%, rgba(192, 173, 143, 0.42), transparent 20%),
+    radial-gradient(circle at 43% 58%, rgba(175, 157, 128, 0.32), transparent 22%),
+    radial-gradient(circle at 70% 66%, rgba(203, 184, 151, 0.34), transparent 20%),
+    radial-gradient(circle at 88% 54%, rgba(157, 143, 119, 0.28), transparent 18%);
+  filter: blur(1.8px);
+}
+
+.swapPulse .dust {
+  animation: sigil-dust 460ms ease-out;
+}
+
+.solvedVeil {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  border-radius: 16px;
+  background: radial-gradient(circle at center, rgba(167, 243, 208, 0.08), transparent 58%);
+  box-shadow: inset 0 0 45px rgba(110, 231, 183, 0.1);
+  animation: solved-breathe 2.4s ease-in-out infinite;
+}
+
+.referenceCard {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(120, 113, 108, 0.28);
+  border-radius: 22px;
+  background: rgba(12, 16, 14, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.referenceMedallion {
+  position: relative;
+  width: min(180px, 42vw);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 7px solid rgba(68, 64, 60, 0.78);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(65, 76, 67, 0.68), rgba(21, 27, 23, 0.94) 72%);
+  box-shadow:
+    inset 0 0 22px rgba(0, 0, 0, 0.72),
+    0 7px 18px rgba(0, 0, 0, 0.28);
+}
+
+.referenceHidden {
+  filter: blur(10px) brightness(0.55);
+  opacity: 0.28;
+}
+
+.referenceVisible {
+  filter: none;
+  opacity: 0.9;
+  transition: opacity 150ms ease, filter 150ms ease;
+}
+
+.memoryButton {
+  min-height: 44px;
+  border: 1px solid rgba(250, 204, 21, 0.24);
+  border-radius: 12px;
+  background: rgba(113, 63, 18, 0.11);
+  padding: 0 14px;
+  color: rgba(254, 240, 138, 0.88);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  touch-action: manipulation;
+}
+
+.memoryButton:hover {
+  background: rgba(113, 63, 18, 0.16);
+}
+
+@keyframes fragment-settle {
+  0% { transform: translateY(-3px) scale(1.025); }
+  55% { transform: translateY(1px) scale(0.99); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes sigil-dust {
+  0% { opacity: 0; transform: translateY(1px) scale(.82); }
+  28% { opacity: .8; }
+  100% { opacity: 0; transform: translateY(-12px) scale(1.38); }
+}
+
+@keyframes solved-breathe {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    border-radius: 24px;
+    padding: 10px;
+  }
+
+  .recess {
+    border-radius: 19px;
+    padding: 9px;
+  }
+
+  .board {
+    gap: 3px;
+  }
+
+  .fragment {
+    border-radius: 6px 9px 6px 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fragment,
+  .referenceVisible {
+    transition: none;
+  }
+
+  .swapPulse,
+  .swapPulse .dust,
+  .solvedVeil {
+    animation: none;
+  }
+}
