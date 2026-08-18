@@ -169,6 +169,7 @@
 .art {
   position: absolute;
   inset: 0;
+  z-index: 1;
   width: 100%;
   height: 100%;
   filter:
@@ -180,6 +181,7 @@
 .surfaceNoise {
   position: absolute;
   inset: 0;
+  z-index: 2;
   pointer-events: none;
   background:
     radial-gradient(circle at 16% 21%, rgba(255, 255, 255, 0.04) 0 1px, transparent 2px),
@@ -198,6 +200,7 @@
   left: 8%;
   right: 8%;
   bottom: -5px;
+  z-index: 5;
   height: 18px;
   pointer-events: none;
   opacity: 0;
