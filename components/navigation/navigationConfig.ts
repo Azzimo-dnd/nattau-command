@@ -88,7 +88,15 @@ export function getNavigationSections(
     },
     {
       label: "Tools",
-      items: [{ label: "Dice Roller", href: "/dice", icon: "dice" }],
+      items: [
+        { label: "Dice Roller", href: "/dice", icon: "dice" },
+        {
+          label: "Puzzle Vault",
+          href: "/puzzles",
+          icon: "spark",
+          description: "Solve live campaign riddles, locks and arcane mechanisms.",
+        },
+      ],
     },
   ];
 
@@ -103,6 +111,12 @@ export function getNavigationSections(
           description: "Publish the next session date or a waiting message.",
         },
         {
+          label: "Puzzle Workshop",
+          href: "/gm/puzzles",
+          icon: "spark",
+          description: "Build, hide, reveal and supervise interactive puzzles.",
+        },
+        {
           label: "Fate Management",
           href: "/fate",
           icon: "fate",
@@ -113,12 +127,6 @@ export function getNavigationSections(
           href: "/campaigns/nattau/gm/members",
           icon: "account",
           description: "Manage Nattau members and invitation codes.",
-        },
-        {
-          label: "Dice Physics Lab",
-          href: "/campaigns/nattau/gm/dice-lab",
-          icon: "dice",
-          description: "Test genuine Rapier rigid-body dice before campaign rollout.",
         },
         {
           label: "Player Conversations",
