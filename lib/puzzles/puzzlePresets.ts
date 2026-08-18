@@ -5,6 +5,11 @@ import {
 } from "./arcaneCircuit";
 import type { JsonRecord, PuzzlePreset, PuzzleType } from "./puzzleTypes";
 import { NATTAU_RUNE_IDS } from "./nattauRunes";
+import {
+  buildCircuitPathVariant,
+  buildVerifiedSlidingVariant,
+  makeVariantId,
+} from "./puzzleVariants";
 
 export const DEFAULT_RUNES = ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ", "ᚷ", "ᚹ"];
 
@@ -17,44 +22,9 @@ function shuffle<T>(items: T[]) {
   return result;
 }
 
-function randomRuneSequence(pool: string[], length: number) {
+function randomRuneSequence(pool: string[], length: number, allowRepeats = true) {
+  if (!allowRepeats) return shuffle(pool).slice(0, length);
   return Array.from({ length }, () => pool[Math.floor(Math.random() * pool.length)]);
-}
-
-function buildSlidingConfig(difficulty: string) {
-  const normalized = difficulty.toLowerCase();
-  const hard = normalized === "hard" || normalized === "insane";
-  const medium = normalized === "medium";
-
-  const blocks = hard
-    ? [
-        { id: "A", x: 0, y: 2, w: 2, h: 1, axis: "h", target: true, label: "Koru Seal" },
-        { id: "B", x: 2, y: 1, w: 1, h: 3, axis: "v", label: "Awa Ward" },
-        { id: "C", x: 0, y: 4, w: 3, h: 1, axis: "h", label: "Matau Ward" },
-        { id: "D", x: 4, y: 0, w: 1, h: 2, axis: "v", label: "Tara Ward" },
-        { id: "E", x: 3, y: 5, w: 2, h: 1, axis: "h", label: "Whetu Ward" },
-      ]
-    : medium
-      ? [
-          { id: "A", x: 0, y: 2, w: 2, h: 1, axis: "h", target: true, label: "Koru Seal" },
-          { id: "B", x: 2, y: 1, w: 1, h: 3, axis: "v", label: "Awa Ward" },
-          { id: "C", x: 1, y: 4, w: 2, h: 1, axis: "h", label: "Matau Ward" },
-          { id: "D", x: 4, y: 0, w: 1, h: 2, axis: "v", label: "Tara Ward" },
-        ]
-      : [
-          { id: "A", x: 0, y: 2, w: 2, h: 1, axis: "h", target: true, label: "Koru Seal" },
-          { id: "B", x: 2, y: 1, w: 1, h: 2, axis: "v", label: "Awa Ward" },
-          { id: "C", x: 4, y: 3, w: 1, h: 2, axis: "v", label: "Matau Ward" },
-        ];
-
-  return {
-    width: 6,
-    height: 6,
-    exit_side: "right",
-    exit_row: 2,
-    target_block_id: "A",
-    blocks,
-  } satisfies JsonRecord;
 }
 
 function buildSigilConfig(difficulty: string) {
@@ -62,14 +32,18 @@ function buildSigilConfig(difficulty: string) {
   const size = normalized === "hard" || normalized === "insane" ? 4 : 3;
   const scrambleSteps =
     normalized === "easy" ? 8 : normalized === "medium" ? 14 : normalized === "hard" ? 22 : 30;
-  const symbols = [
+  const symbolPool = [
     "☉", "☽", "✦", "ᚦ", "ᛉ", "ᚱ", "ᚲ", "ᚷ",
     "ᚹ", "ᛏ", "ᛒ", "ᛗ", "ᛟ", "ᛞ", "ᛇ", "ᚾ",
-  ].slice(0, size * size);
+  ];
+  const symbols = shuffle(symbolPool).slice(0, size * size);
   const targetOrder = symbols.map((_, index) => String(index));
   const initialOrder = [...targetOrder];
   let previousPair = "";
 
+  // The board is scrambled exclusively through legal adjacent swaps starting
+  // from the solved order. Reversing those swaps is therefore always a valid
+  // solution, regardless of the random layout that was produced.
   for (let step = 0; step < scrambleSteps; step += 1) {
     const from = Math.floor(Math.random() * initialOrder.length);
     const row = Math.floor(from / size);
@@ -90,6 +64,8 @@ function buildSigilConfig(difficulty: string) {
     [initialOrder[0], initialOrder[1]] = [initialOrder[1], initialOrder[0]];
   }
 
+  const variantId = makeVariantId("sigil", [size, ...symbols, ...initialOrder]);
+
   return {
     publicConfig: {
       size,
@@ -97,6 +73,8 @@ function buildSigilConfig(difficulty: string) {
       initial_order: initialOrder,
       target_hint: "Restore the sigil to its canonical reading order.",
       scramble_steps: scrambleSteps,
+      variant_id: variantId,
+      generation_rule: "verified-by-reversible-adjacent-scramble",
     } satisfies JsonRecord,
     secretConfig: {
       target_order: targetOrder,
@@ -108,13 +86,7 @@ function buildSigilConfig(difficulty: string) {
 function buildCircuitConfig(difficulty: string) {
   const hard = ["hard", "insane"].includes(difficulty.toLowerCase());
   const size = hard ? 5 : 4;
-  const path: number[] = [];
-  for (let row = 0; row < size; row += 1) {
-    const cols = Array.from({ length: size }, (_, index) => index);
-    if (row % 2 === 1) cols.reverse();
-    cols.forEach((col) => path.push(row * size + col));
-  }
-
+  const { path, variantId } = buildCircuitPathVariant(size);
   const masks = Array.from({ length: size * size }, () => 0);
   const directionMask = (from: number, to: number) => {
     const fromRow = Math.floor(from / size);
@@ -133,8 +105,9 @@ function buildCircuitConfig(difficulty: string) {
     if (index < path.length - 1) masks[current] |= directionMask(current, path[index + 1]);
   }
 
-  // Each tile gets a random base orientation before it is sent to the client.
-  // That means inspecting public_config does not reveal that “rotation 0” is the solution.
+  // A full solved path is constructed first, so every generated circuit has a
+  // known valid solution. Public masks are then independently rotated so the
+  // solution cannot be inferred by looking for rotation zero.
   const baseRotations = masks.map(() => Math.floor(Math.random() * 4));
   const publicMasks = masks.map((mask, index) => rotateCircuitMask(mask, baseRotations[index]));
   const sourceIndex = path[0];
@@ -151,8 +124,6 @@ function buildCircuitConfig(difficulty: string) {
       : Math.floor(Math.random() * 4),
   );
 
-  // The anchors always begin in their correct orientation. Re-roll only the
-  // free tiles if a random scramble accidentally creates a complete circuit.
   for (
     let attempt = 0;
     attempt < 24 &&
@@ -170,7 +141,6 @@ function buildCircuitConfig(difficulty: string) {
     );
   }
 
-  // Extremely defensive fallback for a pathological random sequence.
   if (
     circuitReachesTargets(
       publicMasks,
@@ -193,9 +163,7 @@ function buildCircuitConfig(difficulty: string) {
   }
 
   const clockwiseDistance = publicMasks.reduce((sum, mask, index) => {
-    if (lockedSet.has(index)) {
-      return sum;
-    }
+    if (lockedSet.has(index)) return sum;
 
     for (let steps = 0; steps < 4; steps += 1) {
       if (
@@ -217,6 +185,8 @@ function buildCircuitConfig(difficulty: string) {
       source_index: sourceIndex,
       target_indices: targetIndices,
       locked_indices: lockedIndices,
+      variant_id: `${variantId}-${makeVariantId("rot", initialRotations)}`,
+      generation_rule: "known-solved-path-then-rotation-scramble",
       legend:
         "Rotate the free conduits until the live current reaches every anchored destination.",
     } satisfies JsonRecord,
@@ -238,36 +208,43 @@ export function buildPuzzlePreset(
 
   if (type === "rune_cipher") {
     const codeLength = easy ? 3 : insane ? 6 : hard ? 5 : 4;
-    const pool = NATTAU_RUNE_IDS.slice(0, hard ? 8 : easy ? 5 : 6);
+    const poolSize = hard ? 8 : easy ? 5 : 6;
+    const pool = shuffle(NATTAU_RUNE_IDS).slice(0, poolSize);
+    const allowRepeats = hard ? true : Math.random() < 0.5;
+    const solution = randomRuneSequence(pool, codeLength, allowRepeats);
     return {
       title: "Seal of the Forgotten Tongue",
       description: "An old Nattau seal answers only to the lost island glyphs spoken in the proper order.",
       difficultyLabel: difficulty,
       moveLimit: null,
-      attemptLimit: easy ? 8 : insane ? 4 : hard ? 5 : 6,
+      attemptLimit: easy ? 8 : insane ? 5 : hard ? 6 : 7,
       timeLimitSeconds: null,
       failureMessage: "The runes flare crimson and the seal becomes deathly still.",
       publicConfig: {
         runes: pool,
         code_length: codeLength,
-        allow_repeats: true,
+        allow_repeats: allowRepeats,
+        variant_id: makeVariantId("tongue", [difficulty, ...pool, allowRepeats, ...solution]),
+        generation_rule: "direct-secret-code",
       },
       secretConfig: {
-        solution: randomRuneSequence(pool, codeLength),
+        solution,
       },
     };
   }
 
   if (type === "sliding_lock") {
+    const config = buildVerifiedSlidingVariant(difficulty);
+    const allowance = easy ? 3 : insane ? 0 : hard ? 1 : 2;
     return {
       title: "The Koru Gate",
       description: "Carved Nattau wards bind an old ceremonial gate. Slide the greenstone Koru Seal through the interlocking carvings and carry it to the open edge.",
       difficultyLabel: difficulty,
-      moveLimit: easy ? 5 : insane ? 4 : hard ? 5 : 6,
+      moveLimit: config.minimumMoves + allowance,
       attemptLimit: null,
       timeLimitSeconds: null,
       failureMessage: "The carved wards slam into place and the Koru Gate falls silent.",
-      publicConfig: buildSlidingConfig(difficulty),
+      publicConfig: config.publicConfig,
       secretConfig: {},
     };
   }
@@ -302,10 +279,12 @@ export function buildPuzzlePreset(
     };
   }
 
-  const pool = DEFAULT_RUNES.slice(0, hard ? 8 : easy ? 5 : 6);
+  const poolSize = hard ? 8 : easy ? 5 : 6;
+  const pool = shuffle(NATTAU_RUNE_IDS).slice(0, poolSize);
   const baseLength = easy ? 2 : 3;
   const maxLevel = easy ? 4 : insane ? 7 : hard ? 6 : 5;
   const totalLength = baseLength + maxLevel - 1;
+  const sequence = randomRuneSequence(pool, totalLength, true);
   return {
     title: "Echoes of the First Rune",
     description: "The glyphs burn in a sequence, then vanish. Remember what the stone showed you.",
@@ -321,9 +300,11 @@ export function buildPuzzlePreset(
       flash_ms: insane ? 440 : hard ? 520 : 650,
       reveal_limit: maxLevel + (easy ? 3 : insane ? 0 : hard ? 1 : 2),
       reset_on_miss: hard,
+      variant_id: makeVariantId("echo", [difficulty, ...pool, ...sequence]),
+      generation_rule: "direct-memory-sequence",
     },
     secretConfig: {
-      sequence: randomRuneSequence(pool, totalLength),
+      sequence,
     },
   };
 }
