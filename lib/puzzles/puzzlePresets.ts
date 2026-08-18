@@ -10,8 +10,17 @@ import {
   buildVerifiedSlidingVariant,
   makeVariantId,
 } from "./puzzleVariants";
+import {
+  selectSigilMaterial,
+  selectSigilVariant,
+  type SigilMaterialMode,
+} from "./shatteredSigil";
 
 export const DEFAULT_RUNES = ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ", "ᚷ", "ᚹ"];
+
+export type PuzzlePresetOptions = {
+  sigilMaterial?: SigilMaterialMode;
+};
 
 function shuffle<T>(items: T[]) {
   const result = [...items];
@@ -36,23 +45,21 @@ function freshPublicVariantId(prefix: string, difficulty: string, publicParts: A
   ]);
 }
 
-function buildSigilConfig(difficulty: string) {
+function buildSigilConfig(
+  difficulty: string,
+  materialMode: SigilMaterialMode = "auto",
+) {
   const normalized = difficulty.toLowerCase();
   const size = normalized === "hard" || normalized === "insane" ? 4 : 3;
   const scrambleSteps =
     normalized === "easy" ? 8 : normalized === "medium" ? 14 : normalized === "hard" ? 22 : 30;
-  const symbolPool = [
-    "☉", "☽", "✦", "ᚦ", "ᛉ", "ᚱ", "ᚲ", "ᚷ",
-    "ᚹ", "ᛏ", "ᛒ", "ᛗ", "ᛟ", "ᛞ", "ᛇ", "ᚾ",
-  ];
-  const symbols = shuffle(symbolPool).slice(0, size * size);
-  const targetOrder = symbols.map((_, index) => String(index));
+  const targetOrder = Array.from({ length: size * size }, (_, index) => String(index));
   const initialOrder = [...targetOrder];
   let previousPair = "";
 
   // The board is scrambled exclusively through legal adjacent swaps starting
-  // from the solved order. Reversing those swaps is therefore always a valid
-  // solution, regardless of the random layout that was produced.
+  // from the solved image. Reversing those swaps is therefore always a valid
+  // solution, regardless of the ritual artwork or material that was selected.
   for (let step = 0; step < scrambleSteps; step += 1) {
     const from = Math.floor(Math.random() * initialOrder.length);
     const row = Math.floor(from / size);
@@ -73,17 +80,40 @@ function buildSigilConfig(difficulty: string) {
     [initialOrder[0], initialOrder[1]] = [initialOrder[1], initialOrder[0]];
   }
 
-  const variantId = makeVariantId("sigil", [size, ...symbols, ...initialOrder]);
+  const material = selectSigilMaterial(materialMode);
+  const motif = selectSigilVariant(material);
+  const artRotation = Math.floor(Math.random() * 8) * 45;
+  const artMirror = Math.random() < 0.5;
+  const variantId = makeVariantId("sigil", [
+    size,
+    material,
+    motif,
+    artRotation,
+    artMirror,
+    ...initialOrder,
+    Date.now(),
+    Math.random(),
+  ]);
+
+  const referenceMode =
+    normalized === "easy" ? "open" : normalized === "insane" ? "none" : "hold";
 
   return {
     publicConfig: {
       size,
-      symbols,
       initial_order: initialOrder,
-      target_hint: "Restore the sigil to its canonical reading order.",
+      target_hint: "Restore the fragments until they form one continuous ritual image.",
       scramble_steps: scrambleSteps,
       variant_id: variantId,
-      generation_rule: "verified-by-reversible-adjacent-scramble",
+      material,
+      material_mode: materialMode,
+      art_variant: motif,
+      art_rotation: artRotation,
+      art_mirror: artMirror,
+      tear_seed: variantId,
+      reference_mode: referenceMode,
+      assist_correct: normalized === "easy",
+      generation_rule: "verified-ritual-image-by-reversible-adjacent-scramble",
     } satisfies JsonRecord,
     secretConfig: {
       target_order: targetOrder,
@@ -208,7 +238,8 @@ function buildCircuitConfig(difficulty: string) {
 
 export function buildPuzzlePreset(
   type: PuzzleType,
-  difficulty = "Medium"
+  difficulty = "Medium",
+  options: PuzzlePresetOptions = {},
 ): PuzzlePreset {
   const normalized = difficulty.toLowerCase();
   const insane = normalized === "insane";
@@ -259,15 +290,15 @@ export function buildPuzzlePreset(
   }
 
   if (type === "shattered_sigil") {
-    const config = buildSigilConfig(difficulty);
+    const config = buildSigilConfig(difficulty, options.sigilMaterial ?? "auto");
     return {
       title: "Shattered Sigil",
-      description: "The ward has been broken into drifting fragments. Reassemble the ancient pattern.",
+      description: "A ritual image has been broken into misplaced fragments. Restore the artifact until every carved or inked line becomes whole again.",
       difficultyLabel: difficulty,
       moveLimit: config.scrambleSteps + (easy ? 6 : insane ? 4 : hard ? 6 : 8),
       attemptLimit: null,
       timeLimitSeconds: null,
-      failureMessage: "The fragments sink into the stone before the sigil can be restored.",
+      failureMessage: "The fragments settle into a false pattern and the ritual goes silent.",
       publicConfig: config.publicConfig,
       secretConfig: config.secretConfig,
     };
