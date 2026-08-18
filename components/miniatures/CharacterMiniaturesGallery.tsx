@@ -58,25 +58,33 @@ export function CharacterMiniaturesGallery({ campaignId, preferredPlayerId = nul
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    void supabase.rpc("list_campaign_miniature_roster", { p_campaign_id: campaignId })
-      .then(({ data, error: rpcError }) => {
+
+    const loadRoster = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: rpcError } = await supabase.rpc("list_campaign_miniature_roster", {
+          p_campaign_id: campaignId,
+        });
         if (rpcError) throw rpcError;
         if (cancelled) return;
+
         const rows = (data ?? []) as RosterRow[];
         setRoster(rows);
         const preferred = preferredPlayerId && rows.some((row) => row.player_id === preferredPlayerId)
           ? preferredPlayerId
           : null;
         setSelectedId(preferred ?? rows.find((row) => row.miniature_id)?.player_id ?? rows[0]?.player_id ?? null);
-      })
-      .catch((cause) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load character miniatures.");
-      })
-      .finally(() => {
+      } catch (cause) {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : "Could not load character miniatures.");
+        }
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    };
+
+    void loadRoster();
     return () => { cancelled = true; };
   }, [campaignId, preferredPlayerId, supabase]);
 
@@ -86,9 +94,18 @@ export function CharacterMiniaturesGallery({ campaignId, preferredPlayerId = nul
     setError(null);
     const row = roster.find((entry) => entry.player_id === selectedId);
     if (!row) return () => { cancelled = true; };
-    void downloadCurrent(row).catch((cause) => {
-      if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not download this miniature.");
-    });
+
+    const loadModel = async () => {
+      try {
+        await downloadCurrent(row);
+      } catch (cause) {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : "Could not download this miniature.");
+        }
+      }
+    };
+
+    void loadModel();
     return () => { cancelled = true; };
   }, [downloadCurrent, roster, selectedId]);
 
