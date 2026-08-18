@@ -77,8 +77,20 @@ export function usePuzzleVault({ campaignId }: Options) {
   useEffect(() => {
     void load();
     const supabase = createClient();
+
+    // A workshop page can mount more than one consumer of usePuzzleVault
+    // (for example the main workshop and the maintenance panel). Supabase's
+    // browser client is shared, so every subscription needs its own channel
+    // topic. A fresh suffix also keeps React Strict Mode's effect replay from
+    // trying to attach callbacks to a channel that is already subscribed while
+    // the previous cleanup is still being removed asynchronously.
+    const subscriptionId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
     const channel = supabase
-      .channel(`campaign-puzzle-vault-${campaignId}`)
+      .channel(`campaign-puzzle-vault-${campaignId}-${subscriptionId}`)
       .on(
         "postgres_changes",
         {
