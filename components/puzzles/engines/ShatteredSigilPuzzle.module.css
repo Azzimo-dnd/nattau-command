@@ -86,6 +86,11 @@
   transition: gap 450ms ease;
 }
 
+.parchmentBoard {
+  gap: 0 !important;
+  padding: 1.2%;
+}
+
 .board::before {
   content: '';
   position: absolute;
@@ -100,7 +105,7 @@
     0 0 0 1px rgba(120, 113, 108, 0.14);
 }
 
-.boardSolved {
+.boardSolved:not(.parchmentBoard) {
   gap: 1px;
 }
 
@@ -149,39 +154,16 @@
 }
 
 .fragment.parchment {
-  border: 1px solid rgba(94, 61, 35, 0.18);
-  border-radius: 4px 7px 3px 6px;
+  z-index: 1;
+  border: 1px solid rgba(94, 61, 35, 0.2);
+  border-radius: 1px;
   background:
     linear-gradient(135deg, rgba(255, 245, 218, 0.1), rgba(79, 48, 28, 0.09)),
     url('/puzzles/nattau-ritual-parchment.svg') center / cover;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 247, 221, 0.07),
-    0 5px 10px rgba(0, 0, 0, 0.34);
-  clip-path: polygon(
-    3% 1%,
-    16% 3%,
-    28% 0,
-    46% 2%,
-    63% 0,
-    78% 3%,
-    96% 1%,
-    99% 15%,
-    97% 31%,
-    100% 49%,
-    97% 66%,
-    100% 84%,
-    96% 99%,
-    78% 97%,
-    62% 100%,
-    44% 98%,
-    26% 100%,
-    11% 97%,
-    1% 99%,
-    3% 82%,
-    0 65%,
-    2% 49%,
-    0 28%
-  );
+    inset 0 0 0 1px rgba(255, 247, 221, 0.06),
+    0 3px 8px rgba(0, 0, 0, 0.28);
+  transform: scale(1.064);
 }
 
 .fragment:nth-child(3n + 2) {
@@ -192,14 +174,6 @@
 .fragment:nth-child(4n) {
   --chip-a: 7%;
   --chip-b: 94%;
-}
-
-.fragment.parchment:nth-child(3n + 2) {
-  transform: rotate(-0.28deg);
-}
-
-.fragment.parchment:nth-child(4n) {
-  transform: rotate(0.32deg);
 }
 
 .fragment:hover:not(:disabled) {
@@ -222,7 +196,12 @@
     0 0 0 2px rgba(250, 204, 21, 0.11) !important;
 }
 
+.fragment.parchment.selected {
+  transform: translateY(-4px) scale(1.085) !important;
+}
+
 .neighbor:not(.selected) {
+  z-index: 3;
   box-shadow:
     inset 0 0 0 1px rgba(250, 204, 21, 0.08),
     0 5px 10px rgba(0, 0, 0, 0.31);
@@ -297,12 +276,16 @@
 
 .fragment.parchment .edgeWear {
   box-shadow:
-    inset 0 0 9px rgba(76, 43, 23, 0.22),
-    inset 0 0 0 1px rgba(255, 244, 211, 0.05);
+    inset 0 0 10px rgba(76, 43, 23, 0.25),
+    inset 0 0 0 1px rgba(255, 244, 211, 0.06);
 }
 
 .swapPulse {
   animation: fragment-settle 420ms cubic-bezier(.2,.8,.2,1);
+}
+
+.fragment.parchment.swapPulse {
+  animation: parchment-settle 420ms cubic-bezier(.2,.8,.2,1);
 }
 
 .dust {
@@ -426,10 +409,54 @@
   background: rgba(113, 63, 18, 0.16);
 }
 
+.preview {
+  margin: 0 auto;
+  max-width: 430px;
+}
+
+.preview .shell {
+  border-radius: 24px;
+  padding: 10px;
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.preview .recess {
+  border-radius: 18px;
+  padding: 8px;
+}
+
+.previewFragment {
+  cursor: default;
+  pointer-events: none;
+}
+
+.previewFragment:hover {
+  filter: none;
+}
+
+.previewMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: rgba(148, 163, 184, 0.75);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 @keyframes fragment-settle {
   0% { transform: translateY(-4px) scale(1.025); }
   55% { transform: translateY(1px) scale(0.99); }
   100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes parchment-settle {
+  0% { transform: translateY(-4px) scale(1.085); }
+  55% { transform: translateY(1px) scale(1.045); }
+  100% { transform: translateY(0) scale(1.064); }
 }
 
 @keyframes sigil-dust {
@@ -454,11 +481,11 @@
     padding: 9px;
   }
 
-  .board {
+  .board:not(.parchmentBoard) {
     gap: 3px;
   }
 
-  .boardSolved {
+  .boardSolved:not(.parchmentBoard) {
     gap: 1px;
   }
 
