@@ -5,13 +5,23 @@
   border: 1px solid rgba(120, 113, 108, 0.42);
   border-radius: 34px;
   padding: clamp(12px, 2.5vw, 20px);
-  background:
-    linear-gradient(rgba(15, 18, 16, 0.16), rgba(6, 9, 8, 0.44)),
-    url('/puzzles/nattau-stone-slab.svg') center / cover;
   box-shadow:
     0 30px 70px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     inset 0 -20px 50px rgba(0, 0, 0, 0.28);
+}
+
+.shell.stone {
+  background:
+    linear-gradient(rgba(15, 18, 16, 0.12), rgba(6, 9, 8, 0.48)),
+    url('/puzzles/nattau-stone-slab.svg') center / cover;
+}
+
+.shell.parchment {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(173, 125, 75, 0.08), transparent 25%),
+    linear-gradient(rgba(29, 21, 15, 0.22), rgba(8, 8, 7, 0.58)),
+    url('/puzzles/nattau-stone-slab.svg') center / cover;
 }
 
 .shell::before {
@@ -34,7 +44,11 @@
   inset: 0;
   pointer-events: none;
   background: url('/puzzles/nattau-moss.svg') center / cover no-repeat;
-  opacity: 0.34;
+  opacity: 0.28;
+}
+
+.shell.parchment::after {
+  opacity: 0.16;
 }
 
 .recess {
@@ -42,10 +56,10 @@
   border-radius: 28px;
   padding: clamp(10px, 2vw, 15px);
   background:
-    radial-gradient(circle at 50% 44%, rgba(100, 116, 96, 0.14), transparent 48%),
-    linear-gradient(145deg, rgba(13, 17, 15, 0.94), rgba(29, 30, 26, 0.96));
+    radial-gradient(circle at 50% 44%, rgba(100, 116, 96, 0.11), transparent 48%),
+    linear-gradient(145deg, rgba(13, 17, 15, 0.96), rgba(29, 30, 26, 0.97));
   box-shadow:
-    inset 0 12px 26px rgba(0, 0, 0, 0.52),
+    inset 0 12px 26px rgba(0, 0, 0, 0.58),
     inset 0 -1px 0 rgba(255, 255, 255, 0.035),
     0 1px 0 rgba(255, 255, 255, 0.045);
 }
@@ -68,6 +82,8 @@
   gap: clamp(3px, 0.7vw, 6px);
   touch-action: none;
   overscroll-behavior: contain;
+  user-select: none;
+  transition: gap 450ms ease;
 }
 
 .board::before {
@@ -84,19 +100,38 @@
     0 0 0 1px rgba(120, 113, 108, 0.14);
 }
 
+.boardSolved {
+  gap: 1px;
+}
+
 .fragment {
   --chip-a: 4%;
   --chip-b: 97%;
   position: relative;
   min-width: 0;
   overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  transform-origin: center;
+  transition:
+    transform 150ms ease,
+    filter 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease;
+}
+
+.fragment:active:not(:disabled) {
+  cursor: grabbing;
+}
+
+.fragment.stone {
   border: 1px solid rgba(214, 211, 209, 0.11);
   border-radius: 9px 13px 8px 12px;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.17)),
     url('/puzzles/nattau-ward-stone.svg') center / cover;
   color: #d6d3d1;
-  cursor: pointer;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.055),
     inset 0 -8px 14px rgba(0, 0, 0, 0.17),
@@ -111,49 +146,92 @@
     0 91%,
     2% 8%
   );
-  transition:
-    transform 150ms ease,
-    filter 150ms ease,
-    border-color 150ms ease,
-    box-shadow 150ms ease;
+}
+
+.fragment.parchment {
+  border: 1px solid rgba(94, 61, 35, 0.18);
+  border-radius: 4px 7px 3px 6px;
+  background:
+    linear-gradient(135deg, rgba(255, 245, 218, 0.1), rgba(79, 48, 28, 0.09)),
+    url('/puzzles/nattau-ritual-parchment.svg') center / cover;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 247, 221, 0.07),
+    0 5px 10px rgba(0, 0, 0, 0.34);
+  clip-path: polygon(
+    3% 1%,
+    16% 3%,
+    28% 0,
+    46% 2%,
+    63% 0,
+    78% 3%,
+    96% 1%,
+    99% 15%,
+    97% 31%,
+    100% 49%,
+    97% 66%,
+    100% 84%,
+    96% 99%,
+    78% 97%,
+    62% 100%,
+    44% 98%,
+    26% 100%,
+    11% 97%,
+    1% 99%,
+    3% 82%,
+    0 65%,
+    2% 49%,
+    0 28%
+  );
 }
 
 .fragment:nth-child(3n + 2) {
   --chip-a: 1%;
   --chip-b: 99%;
-  border-radius: 12px 7px 13px 8px;
 }
 
 .fragment:nth-child(4n) {
   --chip-a: 7%;
   --chip-b: 94%;
-  border-radius: 7px 12px 10px 6px;
+}
+
+.fragment.parchment:nth-child(3n + 2) {
+  transform: rotate(-0.28deg);
+}
+
+.fragment.parchment:nth-child(4n) {
+  transform: rotate(0.32deg);
 }
 
 .fragment:hover:not(:disabled) {
-  filter: brightness(1.08);
+  filter: brightness(1.07);
 }
 
 .fragment:focus-visible {
-  outline: 2px solid rgba(250, 204, 21, 0.8);
+  outline: 2px solid rgba(250, 204, 21, 0.82);
   outline-offset: 2px;
 }
 
 .selected {
-  z-index: 6;
-  transform: translateY(-3px) scale(1.025);
-  border-color: rgba(250, 204, 21, 0.42);
+  z-index: 7;
+  transform: translateY(-4px) scale(1.025) rotate(0deg) !important;
+  border-color: rgba(250, 204, 21, 0.42) !important;
   filter: brightness(1.12);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 12px 22px rgba(0, 0, 0, 0.52),
-    0 0 0 2px rgba(250, 204, 21, 0.11);
+    0 14px 24px rgba(0, 0, 0, 0.54),
+    0 0 0 2px rgba(250, 204, 21, 0.11) !important;
+}
+
+.neighbor:not(.selected) {
+  box-shadow:
+    inset 0 0 0 1px rgba(250, 204, 21, 0.08),
+    0 5px 10px rgba(0, 0, 0, 0.31);
 }
 
 .correct {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.055),
-    inset 0 0 16px rgba(110, 231, 183, 0.055),
+    inset 0 0 18px rgba(110, 231, 183, 0.07),
     0 5px 10px rgba(0, 0, 0, 0.32);
 }
 
@@ -161,7 +239,7 @@
   content: '';
   position: absolute;
   inset: 3px;
-  border: 1px solid rgba(167, 243, 208, 0.12);
+  border: 1px solid rgba(167, 243, 208, 0.13);
   border-radius: 8px;
   pointer-events: none;
 }
@@ -169,26 +247,58 @@
 .art {
   position: absolute;
   inset: 0;
-  z-index: 1;
   width: 100%;
   height: 100%;
+  opacity: 0.96;
+}
+
+.fragment.stone .art {
   filter:
     drop-shadow(0 1px 0 rgba(220, 252, 231, 0.08))
     drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.58));
-  opacity: 0.94;
+}
+
+.fragment.parchment .art {
+  filter:
+    drop-shadow(0 0.5px 0 rgba(255, 245, 220, 0.15))
+    contrast(1.06);
+}
+
+.surfaceNoise,
+.edgeWear {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .surfaceNoise {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
   background:
     radial-gradient(circle at 16% 21%, rgba(255, 255, 255, 0.04) 0 1px, transparent 2px),
     radial-gradient(circle at 73% 69%, rgba(0, 0, 0, 0.18) 0 1px, transparent 2px),
     linear-gradient(120deg, transparent 42%, rgba(255, 255, 255, 0.025) 48%, transparent 54%);
   background-size: 31px 29px, 37px 41px, auto;
   mix-blend-mode: overlay;
+}
+
+.fragment.parchment .surfaceNoise {
+  background:
+    radial-gradient(circle at 14% 17%, rgba(86, 49, 28, 0.11) 0 1px, transparent 2px),
+    radial-gradient(circle at 78% 71%, rgba(114, 72, 36, 0.1) 0 2px, transparent 3px),
+    linear-gradient(85deg, transparent 43%, rgba(70, 44, 27, 0.04) 49%, transparent 55%);
+  background-size: 26px 31px, 47px 43px, auto;
+  mix-blend-mode: multiply;
+}
+
+.edgeWear {
+  box-shadow:
+    inset 0 0 8px rgba(0, 0, 0, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.fragment.parchment .edgeWear {
+  box-shadow:
+    inset 0 0 9px rgba(76, 43, 23, 0.22),
+    inset 0 0 0 1px rgba(255, 244, 211, 0.05);
 }
 
 .swapPulse {
@@ -200,7 +310,6 @@
   left: 8%;
   right: 8%;
   bottom: -5px;
-  z-index: 5;
   height: 18px;
   pointer-events: none;
   opacity: 0;
@@ -210,6 +319,13 @@
     radial-gradient(circle at 70% 66%, rgba(203, 184, 151, 0.34), transparent 20%),
     radial-gradient(circle at 88% 54%, rgba(157, 143, 119, 0.28), transparent 18%);
   filter: blur(1.8px);
+}
+
+.fragment.parchment .dust {
+  background:
+    radial-gradient(circle at 18% 70%, rgba(202, 175, 123, 0.28), transparent 20%),
+    radial-gradient(circle at 51% 62%, rgba(126, 92, 56, 0.22), transparent 24%),
+    radial-gradient(circle at 83% 56%, rgba(214, 188, 138, 0.22), transparent 20%);
 }
 
 .swapPulse .dust {
@@ -222,42 +338,74 @@
   z-index: 15;
   pointer-events: none;
   border-radius: 16px;
-  background: radial-gradient(circle at center, rgba(167, 243, 208, 0.08), transparent 58%);
-  box-shadow: inset 0 0 45px rgba(110, 231, 183, 0.1);
+  background:
+    radial-gradient(circle at center, rgba(167, 243, 208, 0.11), transparent 56%),
+    linear-gradient(135deg, transparent, rgba(250, 204, 21, 0.025), transparent);
+  box-shadow:
+    inset 0 0 48px rgba(110, 231, 183, 0.13),
+    0 0 28px rgba(110, 231, 183, 0.08);
   animation: solved-breathe 2.4s ease-in-out infinite;
 }
 
 .referenceCard {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(120, 113, 108, 0.28);
   border-radius: 22px;
-  background: rgba(12, 16, 14, 0.72);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.referenceCard.stone {
+  border: 1px solid rgba(120, 113, 108, 0.28);
+  background:
+    linear-gradient(rgba(12, 16, 14, 0.72), rgba(8, 11, 10, 0.82)),
+    url('/puzzles/nattau-stone-slab.svg') center / cover;
+}
+
+.referenceCard.parchment {
+  border: 1px solid rgba(128, 88, 51, 0.3);
+  background:
+    linear-gradient(rgba(23, 18, 14, 0.74), rgba(12, 11, 9, 0.86)),
+    url('/puzzles/nattau-stone-slab.svg') center / cover;
 }
 
 .referenceMedallion {
   position: relative;
-  width: min(180px, 42vw);
+  width: min(184px, 44vw);
   aspect-ratio: 1;
   overflow: hidden;
-  border: 7px solid rgba(68, 64, 60, 0.78);
-  border-radius: 999px;
-  background:
-    radial-gradient(circle, rgba(65, 76, 67, 0.68), rgba(21, 27, 23, 0.94) 72%);
   box-shadow:
     inset 0 0 22px rgba(0, 0, 0, 0.72),
     0 7px 18px rgba(0, 0, 0, 0.28);
 }
 
+.referenceMedallion.stone {
+  border: 7px solid rgba(68, 64, 60, 0.78);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(65, 76, 67, 0.68), rgba(21, 27, 23, 0.94) 72%);
+}
+
+.referenceMedallion.parchment {
+  border: 6px solid rgba(76, 53, 34, 0.72);
+  border-radius: 8px 14px 6px 12px;
+  background:
+    url('/puzzles/nattau-ritual-parchment.svg') center / cover;
+  clip-path: polygon(
+    2% 3%, 18% 1%, 34% 3%, 52% 0, 70% 3%, 98% 1%,
+    97% 22%, 100% 39%, 98% 58%, 100% 79%, 97% 98%,
+    76% 97%, 58% 100%, 39% 97%, 18% 100%, 2% 97%,
+    4% 77%, 1% 58%, 3% 38%, 0 19%
+  );
+}
+
 .referenceHidden {
-  filter: blur(10px) brightness(0.55);
-  opacity: 0.28;
+  filter: blur(11px) brightness(0.48);
+  opacity: 0.22;
 }
 
 .referenceVisible {
   filter: none;
-  opacity: 0.9;
+  opacity: 0.94;
   transition: opacity 150ms ease, filter 150ms ease;
 }
 
@@ -279,14 +427,14 @@
 }
 
 @keyframes fragment-settle {
-  0% { transform: translateY(-3px) scale(1.025); }
+  0% { transform: translateY(-4px) scale(1.025); }
   55% { transform: translateY(1px) scale(0.99); }
   100% { transform: translateY(0) scale(1); }
 }
 
 @keyframes sigil-dust {
   0% { opacity: 0; transform: translateY(1px) scale(.82); }
-  28% { opacity: .8; }
+  28% { opacity: .78; }
   100% { opacity: 0; transform: translateY(-12px) scale(1.38); }
 }
 
@@ -310,14 +458,19 @@
     gap: 3px;
   }
 
-  .fragment {
+  .boardSolved {
+    gap: 1px;
+  }
+
+  .fragment.stone {
     border-radius: 6px 9px 6px 8px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .fragment,
-  .referenceVisible {
+  .referenceVisible,
+  .board {
     transition: none;
   }
 
