@@ -261,7 +261,7 @@ export function CharacterMiniaturesGallery({ campaignId, currentUserId, isDm, pr
           {selected.miniature_id ? (
             <section className="rounded-[26px] border border-slate-800 bg-slate-900/55 p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Skins</p><p className="mt-1 text-xs text-slate-500">Everyone can preview skins. Players may contribute one skin to someone else&apos;s miniature; only the owner or GM chooses the default.</p></div>
+                <div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Skins</p><p className="mt-1 text-xs text-slate-500">Everyone can preview skins. Players may contribute one replaceable skin to someone else&apos;s miniature; only the owner or GM chooses the default.</p></div>
                 <span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-bold text-slate-500">{skins.length} saved</span>
               </div>
               <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
