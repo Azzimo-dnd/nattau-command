@@ -228,7 +228,15 @@ export function MiniaturePainterPrototypeV1({ sourceFile }: Props) {
     setUndo((items) => [...items.slice(-29), { indices: list, before }]); repaint(list);
   }, [materialId, paintIds, repaint]);
   const undoLast = () => { if (!paintIds || !undo.length) return; const entry = undo[undo.length - 1]; for (let i = 0; i < entry.indices.length; i += 1) paintIds[entry.indices[i]] = entry.before[i]; repaint(entry.indices); setUndo((items) => items.slice(0, -1)); };
-  const resetPaint = () => { if (!paintIds) return; paintIds.fill(0); repaint({ length: paintIds.length, ...paintIds } as unknown as ArrayLike<number>); setUndo([]); };
+  const resetPaint = () => {
+    if (!paintIds || !model) return;
+    paintIds.fill(0);
+    const attr = model.geometry.getAttribute("color") as THREE.BufferAttribute;
+    const primer = new THREE.Color(PALETTE[0][1]);
+    for (let i = 0; i < attr.count; i += 1) attr.setXYZ(i, primer.r, primer.g, primer.b);
+    attr.needsUpdate = true;
+    setUndo([]);
+  };
 
   if (!sourceFile) return <div className="rounded-[28px] border border-dashed border-slate-700 bg-slate-900/40 p-10 text-center text-slate-500">Choose a saved miniature above to start the painter experiment.</div>;
 
