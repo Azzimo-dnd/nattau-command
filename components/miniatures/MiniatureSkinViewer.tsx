@@ -4,18 +4,19 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import {
   applyMiniaturePaintDocumentToGeometry,
   clearMiniaturePaintGeometry,
   type MiniaturePaintDocument,
 } from "./miniaturePaintData";
+import { loadMiniatureGeometry } from "./miniatureModelFiles";
 
 type Model = {
   geometry: THREE.BufferGeometry;
   height: number;
   triangles: number;
   name: string;
+  format: "stl" | "glb";
 };
 
 type Props = {
@@ -37,6 +38,8 @@ function CameraRig({ height, resetKey, autoRotate }: { height: number; resetKey:
     next.zoomToCursor = true;
     next.minPolarAngle = 0.08;
     next.maxPolarAngle = Math.PI * 0.98;
+    next.touches.ONE = THREE.TOUCH.ROTATE;
+    next.touches.TWO = THREE.TOUCH.DOLLY_PAN;
     controls.current = next;
     let frame = 0;
     const tick = () => {
@@ -77,6 +80,15 @@ export function MiniatureSkinViewer({ sourceFile, paintDocument, skinName = null
   const [autoRotate, setAutoRotate] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const [paintApplied, setPaintApplied] = useState(false);
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const sync = () => setCompact(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,24 +101,17 @@ export function MiniatureSkinViewer({ sourceFile, paintDocument, skinName = null
       setError(null);
       if (!sourceFile) return;
       try {
-        const geometry = new STLLoader().parse(await sourceFile.arrayBuffer());
-        geometry.computeVertexNormals();
-        geometry.computeBoundingBox();
-        const box = geometry.boundingBox;
-        if (!box) throw new Error("Could not determine model bounds.");
-        const height = box.max.z - box.min.z;
-        geometry.translate(-(box.min.x + box.max.x) / 2, -(box.min.y + box.max.y) / 2, -box.min.z);
-        const triangles = Math.floor((geometry.getAttribute("position")?.count ?? 0) / 3);
+        const loaded = await loadMiniatureGeometry(sourceFile);
         if (cancelled) {
-          geometry.dispose();
+          loaded.geometry.dispose();
           return;
         }
-        const next = { geometry, height, triangles, name: sourceFile.name };
+        const next = { ...loaded };
         modelRef.current = next;
         setModel(next);
         setResetKey((value) => value + 1);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Could not load this STL file.");
+        setError(cause instanceof Error ? cause.message : "Could not load this miniature file.");
       }
     };
     void load();
@@ -134,7 +139,7 @@ export function MiniatureSkinViewer({ sourceFile, paintDocument, skinName = null
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-300">Miniature viewport</p>
           <p className="mt-1 text-sm font-bold text-slate-200">{model?.name ?? "No miniature loaded"}</p>
-          <p className="mt-1 text-[11px] text-slate-600">Skin: {skinName ?? "Original / unpainted"}</p>
+          <p className="mt-1 text-[11px] text-slate-600">Skin: {skinName ?? "Original / unpainted"}{model?.format === "glb" ? " · Web GLB" : " · Source STL"}</p>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => setAutoRotate((value) => !value)} disabled={!model} className={`rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-30 ${autoRotate ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-200" : "border-slate-700 text-slate-400"}`}>{autoRotate ? "Stop turntable" : "Turntable"}</button>
@@ -142,24 +147,24 @@ export function MiniatureSkinViewer({ sourceFile, paintDocument, skinName = null
         </div>
       </div>
 
-      <div className="relative h-[62vh] min-h-[520px] max-h-[820px]">
+      <div className="relative h-[58dvh] min-h-[390px] max-h-[820px] sm:min-h-[520px]" style={{ touchAction: "none" }}>
         {model ? (
-          <Canvas shadows dpr={[1, 1.7]} camera={{ fov: 32, position: [55, 34, 62] }} gl={{ antialias: true, alpha: false }}>
+          <Canvas shadows={!compact} dpr={compact ? 1 : [1, 1.7]} camera={{ fov: 32, position: [55, 34, 62] }} gl={{ antialias: true, alpha: false }}>
             <color attach="background" args={["#0a0f16"]} />
-            <fog attach="fog" args={["#0a0f16", 95, 220]} />
+            {!compact ? <fog attach="fog" args={["#0a0f16", 95, 220]} /> : null}
             <ambientLight intensity={1.15} />
             <hemisphereLight args={["#d8e7ff", "#281d16", 1.35]} />
-            <directionalLight castShadow position={[40, 70, 35]} intensity={3.1} />
-            <directionalLight position={[-35, 30, -25]} intensity={1.35} />
-            <mesh castShadow receiveShadow geometry={model.geometry} rotation={[-Math.PI / 2, 0, 0]}>
+            <directionalLight castShadow={!compact} position={[40, 70, 35]} intensity={3.1} />
+            {!compact ? <directionalLight position={[-35, 30, -25]} intensity={1.35} /> : null}
+            <mesh castShadow={!compact} receiveShadow={!compact} geometry={model.geometry} rotation={[-Math.PI / 2, 0, 0]}>
               <meshStandardMaterial vertexColors={paintApplied} color={paintApplied ? "#ffffff" : "#8f949b"} roughness={0.68} metalness={0.08} />
             </mesh>
-            <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.18, 0]}><circleGeometry args={[46, 96]} /><meshStandardMaterial color="#151b22" roughness={0.96} /></mesh>
+            <mesh receiveShadow={!compact} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.18, 0]}><circleGeometry args={[46, compact ? 48 : 96]} /><meshStandardMaterial color="#151b22" roughness={0.96} /></mesh>
             <gridHelper args={[140, 28, "#344253", "#17202a"]} position={[0, -0.1, 0]} />
             <CameraRig height={model.height} resetKey={resetKey} autoRotate={autoRotate} />
           </Canvas>
         ) : <div className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-500">No miniature loaded.</div>}
-        {model ? <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-slate-700/80 bg-slate-950/75 px-4 py-2 text-center text-[11px] font-semibold text-slate-400 backdrop-blur">Drag to orbit · wheel / pinch to zoom · right-drag / two fingers to pan</div> : null}
+        {model ? <div className="pointer-events-none absolute bottom-4 left-1/2 max-w-[92%] -translate-x-1/2 rounded-full border border-slate-700/80 bg-slate-950/75 px-4 py-2 text-center text-[11px] font-semibold text-slate-400 backdrop-blur">Touch: one finger orbit · pinch zoom · two fingers pan · Desktop: drag orbit / right-drag pan</div> : null}
       </div>
       {error ? <p className="border-t border-rose-500/20 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">{error}</p> : null}
     </div>
