@@ -88,11 +88,12 @@ function buildTopology(geometry: THREE.BufferGeometry): Topology {
     }
   }
 
-  const edgeMap = new Map<bigint, number>();
+  const edgeBase = nextVertexId + 1;
+  const edgeMap = new Map<number, number>();
   const edgeKey = (left: number, right: number) => {
     const low = Math.min(left, right);
     const high = Math.max(left, right);
-    return (BigInt(low) << 32n) | BigInt(high);
+    return low * edgeBase + high;
   };
 
   for (let triangle = 0; triangle < triangleCount; triangle += 1) {
