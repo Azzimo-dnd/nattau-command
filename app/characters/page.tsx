@@ -17,7 +17,7 @@ export default async function CharactersPage() {
               <p className="text-xs font-black uppercase tracking-[0.32em] text-yellow-500">Expedition roster</p>
               <h1 className="mt-3 text-4xl font-black sm:text-5xl">Characters</h1>
               <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-                Browse the expedition&apos;s current miniatures and their saved paint skins. Everyone can preview available skins; the Game Master or the character owner decides which one is the campaign default.
+                Browse current miniatures and their paint skins. Players may contribute one skin to another character while keeping unlimited skins for their own; only the Game Master or the character owner decides the default.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -27,7 +27,7 @@ export default async function CharactersPage() {
                 </Link>
               ) : (
                 <Link href="/characters/paint" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/10 px-5 font-black text-fuchsia-100">
-                  Paint My Miniature
+                  Paint Miniatures
                 </Link>
               )}
             </div>
