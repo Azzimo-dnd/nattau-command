@@ -29,13 +29,15 @@ type PaintJobRow = {
   created_at: string;
   can_set_default: boolean;
   is_mine: boolean;
+  is_guest_contribution: boolean;
+  can_replace: boolean;
 };
 
 type Props = {
   campaignId: string;
+  currentUserId: string;
+  isDm?: boolean;
   initialPlayerId?: string | null;
-  lockToPlayer?: boolean;
-  canManage?: boolean;
 };
 
 const MINIATURE_BUCKET = "character-miniatures";
@@ -52,7 +54,7 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockToPlayer = false, canManage = true }: Props) {
+export function MiniaturePainterLab({ campaignId, currentUserId, isDm = false, initialPlayerId = null }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(initialPlayerId);
@@ -75,6 +77,14 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
     [roster, selectedPlayerId],
   );
 
+  const isOwner = Boolean(selected && selected.player_id === currentUserId);
+  const canSetDefault = Boolean(selected && (isDm || isOwner));
+  const guestMode = Boolean(selected && !isDm && !isOwner);
+  const myGuestSkin = guestMode
+    ? skins.find((skin) => skin.is_mine && skin.is_guest_contribution) ?? null
+    : null;
+  const guestSkinLocked = Boolean(myGuestSkin?.is_default);
+
   const refreshSkins = useCallback(async (miniatureId: string) => {
     const { data, error: rpcError } = await supabase.rpc("list_character_miniature_paint_jobs", {
       p_miniature_id: miniatureId,
@@ -88,8 +98,7 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
   const downloadSkinDocument = useCallback(async (skin: PaintJobRow) => {
     const { data, error: downloadError } = await supabase.storage.from(PAINT_BUCKET).download(skin.storage_path);
     if (downloadError) throw downloadError;
-    const raw = JSON.parse(await data.text()) as unknown;
-    return parseMiniaturePaintDocument(raw);
+    return parseMiniaturePaintDocument(JSON.parse(await data.text()) as unknown);
   }, [supabase]);
 
   const loadSkin = useCallback(async (skin: PaintJobRow | null) => {
@@ -130,16 +139,16 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
         });
         if (rpcError) throw rpcError;
         if (cancelled) return;
-        const rows = ((data ?? []) as RosterRow[]).filter((row) => row.miniature_id && row.storage_path && row.original_name);
-        const visibleRows = lockToPlayer && initialPlayerId
-          ? rows.filter((row) => row.player_id === initialPlayerId)
-          : rows;
-        setRoster(visibleRows);
+
+        const rows = ((data ?? []) as RosterRow[]).filter(
+          (row) => row.miniature_id && row.storage_path && row.original_name,
+        );
+        setRoster(rows);
         setSelectedPlayerId((current) => {
-          if (current && visibleRows.some((row) => row.player_id === current)) return current;
-          if (initialPlayerId && visibleRows.some((row) => row.player_id === initialPlayerId)) return initialPlayerId;
-          const pippo = visibleRows.find((row) => row.display_name.trim().toLowerCase() === "pippo");
-          return pippo?.player_id ?? visibleRows[0]?.player_id ?? null;
+          if (current && rows.some((row) => row.player_id === current)) return current;
+          if (initialPlayerId && rows.some((row) => row.player_id === initialPlayerId)) return initialPlayerId;
+          const pippo = rows.find((row) => row.display_name.trim().toLowerCase() === "pippo");
+          return pippo?.player_id ?? rows[0]?.player_id ?? null;
         });
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load miniature roster.");
@@ -149,7 +158,7 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
     };
     void loadRoster();
     return () => { cancelled = true; };
-  }, [campaignId, initialPlayerId, lockToPlayer, supabase]);
+  }, [campaignId, initialPlayerId, supabase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -172,17 +181,22 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
         ]);
         if (modelResult.error) throw modelResult.error;
         if (cancelled) return;
+
         setSourceFile(new File([modelResult.data], selected.original_name, {
           type: modelResult.data.type || "application/octet-stream",
         }));
 
-        const defaultSkin = skinRows.find((skin) => skin.is_default) ?? null;
-        if (defaultSkin) {
-          const document = await downloadSkinDocument(defaultSkin);
+        const guestContribution = !isDm && selected.player_id !== currentUserId
+          ? skinRows.find((skin) => skin.is_mine && skin.is_guest_contribution) ?? null
+          : null;
+        const startingSkin = guestContribution ?? skinRows.find((skin) => skin.is_default) ?? null;
+
+        if (startingSkin) {
+          const document = await downloadSkinDocument(startingSkin);
           if (cancelled) return;
           setLoadedPaintDocument(document);
-          setLoadedSkinId(defaultSkin.id);
-          setLoadedSkinName(defaultSkin.name);
+          setLoadedSkinId(startingSkin.id);
+          setLoadedSkinName(startingSkin.name);
           setPaintLoadKey((value) => value + 1);
         } else {
           setLoadedSkinName("Original / unpainted");
@@ -195,10 +209,19 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
     };
     void loadModelAndSkins();
     return () => { cancelled = true; };
-  }, [downloadSkinDocument, refreshSkins, selected, supabase]);
+  }, [currentUserId, downloadSkinDocument, isDm, refreshSkins, selected, supabase]);
 
   const savePaintJob = async (document: MiniaturePaintDocument, name: string, makeDefault: boolean) => {
     if (!selected?.miniature_id || !selectedPlayerId || saving) return;
+    if (makeDefault && !canSetDefault) {
+      setError("Only the Game Master or this character's owner can choose the default skin.");
+      return;
+    }
+    if (guestMode && myGuestSkin?.is_default) {
+      setError("Your community skin is currently the default. Ask the character owner or Game Master to switch the default before replacing it.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -211,7 +234,7 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
       return;
     }
 
-    const storagePath = `${campaignId}/${selectedPlayerId}/${selected.miniature_id}/${crypto.randomUUID()}.json`;
+    const storagePath = `${campaignId}/${selectedPlayerId}/${selected.miniature_id}/${currentUserId}/${crypto.randomUUID()}.json`;
     const { error: uploadError } = await supabase.storage.from(PAINT_BUCKET).upload(storagePath, blob, {
       contentType: "application/json",
       cacheControl: "3600",
@@ -223,23 +246,51 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
       return;
     }
 
-    const { data: registeredId, error: registerError } = await supabase.rpc("register_character_miniature_paint_job", {
-      p_miniature_id: selected.miniature_id,
-      p_storage_path: storagePath,
-      p_name: name,
-      p_file_size_bytes: blob.size,
-      p_schema_version: 1,
-    });
-    if (registerError) {
-      await supabase.storage.from(PAINT_BUCKET).remove([storagePath]);
-      setSaving(false);
-      setError(registerError.message);
-      return;
+    let savedId: string | null = null;
+    let replaced = false;
+
+    if (guestMode && myGuestSkin) {
+      const { data: oldStoragePath, error: replaceError } = await supabase.rpc(
+        "replace_character_miniature_guest_paint_job",
+        {
+          p_paint_job_id: myGuestSkin.id,
+          p_storage_path: storagePath,
+          p_name: name,
+          p_file_size_bytes: blob.size,
+          p_schema_version: 1,
+        },
+      );
+      if (replaceError) {
+        await supabase.storage.from(PAINT_BUCKET).remove([storagePath]);
+        setSaving(false);
+        setError(replaceError.message);
+        return;
+      }
+      savedId = myGuestSkin.id;
+      replaced = true;
+      if (typeof oldStoragePath === "string" && oldStoragePath && oldStoragePath !== storagePath) {
+        await supabase.storage.from(PAINT_BUCKET).remove([oldStoragePath]);
+      }
+    } else {
+      const { data: registeredId, error: registerError } = await supabase.rpc("register_character_miniature_paint_job", {
+        p_miniature_id: selected.miniature_id,
+        p_storage_path: storagePath,
+        p_name: name,
+        p_file_size_bytes: blob.size,
+        p_schema_version: 1,
+      });
+      if (registerError) {
+        await supabase.storage.from(PAINT_BUCKET).remove([storagePath]);
+        setSaving(false);
+        setError(registerError.message);
+        return;
+      }
+      savedId = typeof registeredId === "string" ? registeredId : null;
     }
 
-    if (makeDefault && registeredId) {
+    if (makeDefault && savedId) {
       const { error: defaultError } = await supabase.rpc("set_character_miniature_paint_default", {
-        p_paint_job_id: registeredId,
+        p_paint_job_id: savedId,
       });
       if (defaultError) {
         setSaving(false);
@@ -252,10 +303,16 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
     try {
       await refreshSkins(selected.miniature_id);
       setLoadedPaintDocument(document);
-      setLoadedSkinId(typeof registeredId === "string" ? registeredId : null);
+      setLoadedSkinId(savedId);
       setLoadedSkinName(name);
       setPaintLoadKey((value) => value + 1);
-      setMessage(makeDefault ? `“${name}” was saved and is now the default skin.` : `“${name}” was saved as a new skin.`);
+      if (replaced) {
+        setMessage(`“${name}” replaced your one community skin for ${selected.display_name}.`);
+      } else if (makeDefault) {
+        setMessage(`“${name}” was saved and is now the default skin.`);
+      } else {
+        setMessage(`“${name}” was saved as a new skin.`);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Skin was saved, but the list could not be refreshed.");
     } finally {
@@ -264,7 +321,7 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
   };
 
   const setDefaultSkin = async (skin: PaintJobRow | null) => {
-    if (!selected?.miniature_id || busySkinId) return;
+    if (!selected?.miniature_id || busySkinId || !canSetDefault) return;
     setError(null);
     setMessage(null);
     setBusySkinId(skin?.id ?? "original");
@@ -289,6 +346,15 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
   if (loading) return <div className="h-[680px] animate-pulse rounded-[30px] border border-slate-800 bg-slate-900/50" />;
 
   const hasDefault = skins.some((skin) => skin.is_default);
+  const canSave = Boolean(selected?.miniature_id) && !guestSkinLocked;
+  const saveActionLabel = guestMode
+    ? myGuestSkin ? "Replace my community skin" : `Save my ${selected?.display_name ?? "character"} skin`
+    : "Save as new skin";
+  const saveHelperText = guestMode
+    ? myGuestSkin
+      ? `You get one skin slot on ${selected?.display_name}. Saving replaces your existing contribution; it cannot change the default.`
+      : `You may contribute one skin to ${selected?.display_name}. Only the owner or Game Master can make it the default.`
+    : "Saved skins never alter the STL. Loading an existing skin and saving again creates a new version.";
 
   return (
     <div className="space-y-5">
@@ -297,26 +363,82 @@ export function MiniaturePainterLab({ campaignId, initialPlayerId = null, lockTo
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-fuchsia-300">Miniature skin studio</p>
             <h2 className="mt-2 text-2xl font-black text-slate-100">Paint, save and switch skins</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">Every saved paint job is a lightweight skin attached to this exact STL version. Loading a skin never changes the source miniature.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+              Owners can keep as many skins as they like. Other players get one replaceable community skin slot per character. The Game Master can paint without limits.
+            </p>
           </div>
-          {!lockToPlayer ? (
-            <label className="min-w-[250px] text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Character<select value={selectedPlayerId ?? ""} disabled={roster.length === 0 || loadingModel} onChange={(event) => setSelectedPlayerId(event.target.value || null)} className="mt-2 min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm font-bold normal-case tracking-normal text-slate-200 outline-none focus:border-fuchsia-400/60">{roster.length === 0 ? <option value="">No saved miniatures</option> : null}{roster.map((row) => <option key={row.player_id} value={row.player_id}>{row.display_name}</option>)}</select></label>
-          ) : selected ? <div className="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-400/5 px-4 py-3"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-300">Your character</p><p className="mt-1 font-black text-slate-100">{selected.display_name}</p></div> : null}
+          <label className="min-w-[250px] text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+            Character
+            <select
+              value={selectedPlayerId ?? ""}
+              disabled={roster.length === 0 || loadingModel}
+              onChange={(event) => setSelectedPlayerId(event.target.value || null)}
+              className="mt-2 min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm font-bold normal-case tracking-normal text-slate-200 outline-none focus:border-fuchsia-400/60"
+            >
+              {roster.length === 0 ? <option value="">No saved miniatures</option> : null}
+              {roster.map((row) => <option key={row.player_id} value={row.player_id}>{row.display_name}</option>)}
+            </select>
+          </label>
         </div>
+        {selected ? (
+          <div className={`mt-4 rounded-2xl border px-4 py-3 text-xs ${guestMode ? "border-cyan-400/20 bg-cyan-400/5 text-cyan-100" : "border-emerald-400/20 bg-emerald-400/5 text-emerald-100"}`}>
+            {guestMode
+              ? myGuestSkin
+                ? `Community slot: you already have “${myGuestSkin.name}” for ${selected.display_name}. Save again to replace that one slot.`
+                : `Community slot: you can create one skin for ${selected.display_name}. You cannot choose its default status.`
+              : isDm
+                ? `GM mode: unlimited skins for ${selected.display_name}, with default control.`
+                : `Owner mode: ${selected.display_name} is your character, so you can create unlimited skins and choose the default.`}
+          </div>
+        ) : null}
         {loadingModel ? <p className="mt-3 text-xs font-semibold text-cyan-300">Downloading private STL and skins…</p> : null}
       </section>
 
       {selected?.miniature_id ? (
         <section className="rounded-[28px] border border-slate-800 bg-slate-900/65 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Available skins</p><h3 className="mt-2 text-xl font-black text-slate-100">{selected.display_name}</h3></div><span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-bold text-slate-500">{skins.length} saved</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Available skins</p><h3 className="mt-2 text-xl font-black text-slate-100">{selected.display_name}</h3></div>
+            <span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-bold text-slate-500">{skins.length} saved</span>
+          </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            <div className={`rounded-2xl border p-3 ${loadedSkinId === null ? "border-cyan-400/40 bg-cyan-400/5" : "border-slate-800 bg-black/10"}`}><div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-200">Original / unpainted</p><p className="mt-1 text-[11px] text-slate-600">Source STL with primer material</p></div>{!hasDefault ? <span className="rounded-full bg-yellow-400/10 px-2 py-1 text-[9px] font-black uppercase text-yellow-300">Default</span> : null}</div><div className="mt-3 flex gap-2"><button type="button" disabled={loadingSkin} onClick={() => void loadSkin(null)} className="rounded-lg border border-cyan-400/25 px-3 py-1.5 text-[11px] font-bold text-cyan-200">Load</button>{canManage && hasDefault ? <button type="button" disabled={busySkinId !== null} onClick={() => void setDefaultSkin(null)} className="rounded-lg border border-yellow-400/25 px-3 py-1.5 text-[11px] font-bold text-yellow-200">Set default</button> : null}</div></div>
-            {skins.map((skin) => <div key={skin.id} className={`rounded-2xl border p-3 ${loadedSkinId === skin.id ? "border-fuchsia-400/40 bg-fuchsia-400/5" : "border-slate-800 bg-black/10"}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate font-black text-slate-200">{skin.name}</p><p className="mt-1 text-[11px] text-slate-600">by {skin.creator_display_name} · {formatDate(skin.created_at)}</p></div>{skin.is_default ? <span className="rounded-full bg-yellow-400/10 px-2 py-1 text-[9px] font-black uppercase text-yellow-300">Default</span> : null}</div><div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={loadingSkin} onClick={() => void loadSkin(skin)} className="rounded-lg border border-fuchsia-400/25 px-3 py-1.5 text-[11px] font-bold text-fuchsia-200">{busySkinId === skin.id && loadingSkin ? "Loading…" : "Load / edit copy"}</button>{canManage && !skin.is_default ? <button type="button" disabled={busySkinId !== null} onClick={() => void setDefaultSkin(skin)} className="rounded-lg border border-yellow-400/25 px-3 py-1.5 text-[11px] font-bold text-yellow-200">Set default</button> : null}</div></div>)}
+            <div className={`rounded-2xl border p-3 ${loadedSkinId === null ? "border-cyan-400/40 bg-cyan-400/5" : "border-slate-800 bg-black/10"}`}>
+              <div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-200">Original / unpainted</p><p className="mt-1 text-[11px] text-slate-600">Source STL with primer material</p></div>{!hasDefault ? <span className="rounded-full bg-yellow-400/10 px-2 py-1 text-[9px] font-black uppercase text-yellow-300">Default</span> : null}</div>
+              <div className="mt-3 flex gap-2"><button type="button" disabled={loadingSkin} onClick={() => void loadSkin(null)} className="rounded-lg border border-cyan-400/25 px-3 py-1.5 text-[11px] font-bold text-cyan-200">Load</button>{canSetDefault && hasDefault ? <button type="button" disabled={busySkinId !== null} onClick={() => void setDefaultSkin(null)} className="rounded-lg border border-yellow-400/25 px-3 py-1.5 text-[11px] font-bold text-yellow-200">Set default</button> : null}</div>
+            </div>
+            {skins.map((skin) => (
+              <div key={skin.id} className={`rounded-2xl border p-3 ${loadedSkinId === skin.id ? "border-fuchsia-400/40 bg-fuchsia-400/5" : "border-slate-800 bg-black/10"}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0"><p className="truncate font-black text-slate-200">{skin.name}</p><p className="mt-1 text-[11px] text-slate-600">by {skin.creator_display_name} · {formatDate(skin.created_at)}</p>{skin.is_mine && skin.is_guest_contribution ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-300">Your community slot</p> : null}</div>
+                  {skin.is_default ? <span className="rounded-full bg-yellow-400/10 px-2 py-1 text-[9px] font-black uppercase text-yellow-300">Default</span> : null}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" disabled={loadingSkin} onClick={() => void loadSkin(skin)} className="rounded-lg border border-fuchsia-400/25 px-3 py-1.5 text-[11px] font-bold text-fuchsia-200">{busySkinId === skin.id && loadingSkin ? "Loading…" : "Load / edit copy"}</button>
+                  {canSetDefault && !skin.is_default ? <button type="button" disabled={busySkinId !== null} onClick={() => void setDefaultSkin(skin)} className="rounded-lg border border-yellow-400/25 px-3 py-1.5 text-[11px] font-bold text-yellow-200">Set default</button> : null}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       ) : null}
 
-      <MiniaturePainter sourceFile={sourceFile} loadedPaintDocument={loadedPaintDocument} paintLoadKey={paintLoadKey} loadedSkinName={loadedSkinName} canSave={canManage && Boolean(selected?.miniature_id)} saving={saving} onSavePaintJob={savePaintJob} />
+      {guestSkinLocked ? (
+        <p className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-xs leading-5 text-yellow-100">
+          Your community skin is currently the default for {selected?.display_name}. It is locked against replacement so you cannot change the campaign default indirectly. The owner or GM can switch the default first.
+        </p>
+      ) : null}
+
+      <MiniaturePainter
+        sourceFile={sourceFile}
+        loadedPaintDocument={loadedPaintDocument}
+        paintLoadKey={paintLoadKey}
+        loadedSkinName={loadedSkinName}
+        canSave={canSave}
+        canMakeDefault={canSetDefault}
+        saveActionLabel={saveActionLabel}
+        saveHelperText={saveHelperText}
+        saving={saving}
+        onSavePaintJob={savePaintJob}
+      />
 
       {message ? <p className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100">{message}</p> : null}
       {error ? <p className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">{error}</p> : null}
