@@ -32,6 +32,8 @@ type PaintJobRow = {
   created_at: string;
   can_set_default: boolean;
   is_mine: boolean;
+  is_guest_contribution: boolean;
+  can_replace: boolean;
 };
 
 type Props = {
@@ -95,6 +97,7 @@ export function CharacterMiniaturesGallery({ campaignId, currentUserId, isDm, pr
       setSkinName("Original / unpainted");
       return;
     }
+
     setLoadingSkin(true);
     setBusySkinId(skin.id);
     try {
@@ -121,6 +124,7 @@ export function CharacterMiniaturesGallery({ campaignId, currentUserId, isDm, pr
         });
         if (rpcError) throw rpcError;
         if (cancelled) return;
+
         const rows = (data ?? []) as RosterRow[];
         setRoster(rows);
         const preferred = preferredPlayerId && rows.some((row) => row.player_id === preferredPlayerId)
@@ -148,6 +152,7 @@ export function CharacterMiniaturesGallery({ campaignId, currentUserId, isDm, pr
       setError(null);
       setMessage(null);
       if (!selected?.storage_path || !selected.original_name || !selected.miniature_id) return;
+
       setLoadingModel(true);
       try {
         const [modelResult, skinRows] = await Promise.all([
@@ -156,6 +161,7 @@ export function CharacterMiniaturesGallery({ campaignId, currentUserId, isDm, pr
         ]);
         if (modelResult.error) throw modelResult.error;
         if (cancelled) return;
+
         setSourceFile(new File([modelResult.data], selected.original_name, {
           type: modelResult.data.type || "application/octet-stream",
         }));
@@ -190,6 +196,7 @@ export function CharacterMiniaturesGallery({ campaignId, currentUserId, isDm, pr
       setError(result.error.message);
       return;
     }
+
     try {
       await refreshSkins(selected.miniature_id);
       setMessage(skin ? `“${skin.name}” is now the default skin.` : "Original / unpainted is now the default skin.");
@@ -205,14 +212,29 @@ export function CharacterMiniaturesGallery({ campaignId, currentUserId, isDm, pr
 
   const hasDefault = skins.some((skin) => skin.is_default);
   const canSetDefault = Boolean(selected && (isDm || selected.player_id === currentUserId));
-  const canPaintSelected = Boolean(selected && (isDm || selected.player_id === currentUserId) && selected.miniature_id);
+  const canPaintSelected = Boolean(selected?.miniature_id);
+  const paintHref = selected
+    ? isDm ? "/gm/miniatures/paint" : `/characters/paint?character=${encodeURIComponent(selected.player_id)}`
+    : isDm ? "/gm/miniatures/paint" : "/characters/paint";
 
   return (
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {roster.map((row) => {
           const active = row.player_id === selectedId;
-          return <button key={row.player_id} type="button" onClick={() => setSelectedId(row.player_id)} className={`rounded-2xl border p-4 text-left transition ${active ? "border-yellow-500/50 bg-yellow-500/10" : "border-slate-800 bg-slate-900/65 hover:border-slate-700"}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className={`truncate text-base font-black ${active ? "text-yellow-100" : "text-slate-200"}`}>{row.display_name}</p><p className="mt-1 truncate text-[11px] text-slate-600">{row.original_name ?? "No miniature yet"}</p></div><span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${row.miniature_id ? "bg-emerald-400" : "bg-slate-700"}`} /></div></button>;
+          return (
+            <button
+              key={row.player_id}
+              type="button"
+              onClick={() => setSelectedId(row.player_id)}
+              className={`rounded-2xl border p-4 text-left transition ${active ? "border-yellow-500/50 bg-yellow-500/10" : "border-slate-800 bg-slate-900/65 hover:border-slate-700"}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0"><p className={`truncate text-base font-black ${active ? "text-yellow-100" : "text-slate-200"}`}>{row.display_name}</p><p className="mt-1 truncate text-[11px] text-slate-600">{row.original_name ?? "No miniature yet"}</p></div>
+                <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${row.miniature_id ? "bg-emerald-400" : "bg-slate-700"}`} />
+              </div>
+            </button>
+          );
         })}
       </section>
 
@@ -220,17 +242,39 @@ export function CharacterMiniaturesGallery({ campaignId, currentUserId, isDm, pr
         <>
           <section className="rounded-[26px] border border-slate-800 bg-slate-900/55 p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div><p className="text-[10px] font-black uppercase tracking-[0.24em] text-yellow-500">Current miniature</p><h2 className="mt-2 text-2xl font-black text-slate-100">{selected.display_name}</h2><p className="mt-2 text-sm text-slate-500">{selected.miniature_id ? `${selected.original_name} · ${formatBytes(selected.file_size_bytes)} · ${selected.triangle_count?.toLocaleString() ?? "?"} triangles` : "The Game Master has not assigned a miniature to this character yet."}</p></div>
-              <div className="flex flex-wrap gap-2">{loadingModel || loadingSkin ? <span className="self-center text-xs font-semibold text-cyan-300">Loading private model…</span> : null}{canPaintSelected ? <Link href={isDm ? "/gm/miniatures/paint" : "/characters/paint"} className="inline-flex min-h-10 items-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/10 px-4 text-xs font-black text-fuchsia-100">Paint {isDm ? "miniature" : "my miniature"}</Link> : null}</div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-yellow-500">Current miniature</p>
+                <h2 className="mt-2 text-2xl font-black text-slate-100">{selected.display_name}</h2>
+                <p className="mt-2 text-sm text-slate-500">{selected.miniature_id ? `${selected.original_name} · ${formatBytes(selected.file_size_bytes)} · ${selected.triangle_count?.toLocaleString() ?? "?"} triangles` : "The Game Master has not assigned a miniature to this character yet."}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {loadingModel || loadingSkin ? <span className="self-center text-xs font-semibold text-cyan-300">Loading private model…</span> : null}
+                {canPaintSelected ? (
+                  <Link href={paintHref} className="inline-flex min-h-10 items-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/10 px-4 text-xs font-black text-fuchsia-100">
+                    {isDm ? "Paint miniature" : selected.player_id === currentUserId ? "Paint my miniature" : `Paint ${selected.display_name}`}
+                  </Link>
+                ) : null}
+              </div>
             </div>
           </section>
 
           {selected.miniature_id ? (
             <section className="rounded-[26px] border border-slate-800 bg-slate-900/55 p-4 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Skins</p><p className="mt-1 text-xs text-slate-500">Anyone in the campaign can preview saved skins. GM or the character owner chooses the default.</p></div><span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-bold text-slate-500">{skins.length} saved</span></div>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Skins</p><p className="mt-1 text-xs text-slate-500">Everyone can preview skins. Players may contribute one skin to someone else&apos;s miniature; only the owner or GM chooses the default.</p></div>
+                <span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-bold text-slate-500">{skins.length} saved</span>
+              </div>
               <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-                <div className={`min-w-[210px] rounded-2xl border p-3 ${selectedSkinId === null ? "border-cyan-400/40 bg-cyan-400/5" : "border-slate-800 bg-black/10"}`}><div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-200">Original / unpainted</p><p className="mt-1 text-[11px] text-slate-600">Base STL</p></div>{!hasDefault ? <span className="rounded-full bg-yellow-400/10 px-2 py-1 text-[9px] font-black uppercase text-yellow-300">Default</span> : null}</div><div className="mt-3 flex gap-2"><button type="button" disabled={loadingSkin} onClick={() => void chooseSkin(null)} className="rounded-lg border border-cyan-400/25 px-3 py-1.5 text-[11px] font-bold text-cyan-200">Preview</button>{canSetDefault && hasDefault ? <button type="button" disabled={busySkinId !== null} onClick={() => void setDefault(null)} className="rounded-lg border border-yellow-400/25 px-3 py-1.5 text-[11px] font-bold text-yellow-200">Set default</button> : null}</div></div>
-                {skins.map((skin) => <div key={skin.id} className={`min-w-[230px] rounded-2xl border p-3 ${selectedSkinId === skin.id ? "border-fuchsia-400/40 bg-fuchsia-400/5" : "border-slate-800 bg-black/10"}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate font-black text-slate-200">{skin.name}</p><p className="mt-1 truncate text-[11px] text-slate-600">by {skin.creator_display_name}</p></div>{skin.is_default ? <span className="rounded-full bg-yellow-400/10 px-2 py-1 text-[9px] font-black uppercase text-yellow-300">Default</span> : null}</div><div className="mt-3 flex gap-2"><button type="button" disabled={loadingSkin} onClick={() => void chooseSkin(skin)} className="rounded-lg border border-fuchsia-400/25 px-3 py-1.5 text-[11px] font-bold text-fuchsia-200">{busySkinId === skin.id && loadingSkin ? "Loading…" : "Preview"}</button>{canSetDefault && !skin.is_default ? <button type="button" disabled={busySkinId !== null} onClick={() => void setDefault(skin)} className="rounded-lg border border-yellow-400/25 px-3 py-1.5 text-[11px] font-bold text-yellow-200">Set default</button> : null}</div></div>)}
+                <div className={`min-w-[210px] rounded-2xl border p-3 ${selectedSkinId === null ? "border-cyan-400/40 bg-cyan-400/5" : "border-slate-800 bg-black/10"}`}>
+                  <div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-200">Original / unpainted</p><p className="mt-1 text-[11px] text-slate-600">Base STL</p></div>{!hasDefault ? <span className="rounded-full bg-yellow-400/10 px-2 py-1 text-[9px] font-black uppercase text-yellow-300">Default</span> : null}</div>
+                  <div className="mt-3 flex gap-2"><button type="button" disabled={loadingSkin} onClick={() => void chooseSkin(null)} className="rounded-lg border border-cyan-400/25 px-3 py-1.5 text-[11px] font-bold text-cyan-200">Preview</button>{canSetDefault && hasDefault ? <button type="button" disabled={busySkinId !== null} onClick={() => void setDefault(null)} className="rounded-lg border border-yellow-400/25 px-3 py-1.5 text-[11px] font-bold text-yellow-200">Set default</button> : null}</div>
+                </div>
+                {skins.map((skin) => (
+                  <div key={skin.id} className={`min-w-[230px] rounded-2xl border p-3 ${selectedSkinId === skin.id ? "border-fuchsia-400/40 bg-fuchsia-400/5" : "border-slate-800 bg-black/10"}`}>
+                    <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate font-black text-slate-200">{skin.name}</p><p className="mt-1 truncate text-[11px] text-slate-600">by {skin.creator_display_name}</p>{skin.is_mine && skin.is_guest_contribution ? <p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-cyan-300">Your community skin</p> : null}</div>{skin.is_default ? <span className="rounded-full bg-yellow-400/10 px-2 py-1 text-[9px] font-black uppercase text-yellow-300">Default</span> : null}</div>
+                    <div className="mt-3 flex gap-2"><button type="button" disabled={loadingSkin} onClick={() => void chooseSkin(skin)} className="rounded-lg border border-fuchsia-400/25 px-3 py-1.5 text-[11px] font-bold text-fuchsia-200">{busySkinId === skin.id && loadingSkin ? "Loading…" : "Preview"}</button>{canSetDefault && !skin.is_default ? <button type="button" disabled={busySkinId !== null} onClick={() => void setDefault(skin)} className="rounded-lg border border-yellow-400/25 px-3 py-1.5 text-[11px] font-bold text-yellow-200">Set default</button> : null}</div>
+                  </div>
+                ))}
               </div>
             </section>
           ) : null}
