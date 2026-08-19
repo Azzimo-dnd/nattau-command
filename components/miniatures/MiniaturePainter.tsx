@@ -4,7 +4,6 @@ import { Canvas, type ThreeEvent, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import {
   createMiniaturePaintDocument,
   decodeMiniaturePaintIds,
@@ -12,10 +11,11 @@ import {
   type MiniaturePaintPaletteEntry,
   type PaletteCategory,
 } from "./miniaturePaintData";
+import { loadMiniatureGeometry } from "./miniatureModelFiles";
 
 type Tool = "smart" | "brush" | "triangle" | "shell" | "picker";
 type BrushMode = "surface" | "volume";
-type Model = { geometry: THREE.BufferGeometry; name: string; triangles: number; height: number };
+type Model = { geometry: THREE.BufferGeometry; name: string; triangles: number; height: number; format: "stl" | "glb" };
 type Topology = { adjacency: Int32Array; normals: Float32Array; centroids: Float32Array };
 type UndoEntry = { indices: Uint32Array; before: Uint8Array };
 type FocusRequest = { id: number; point: [number, number, number] } | null;
@@ -104,8 +104,7 @@ function buildTopology(geometry: THREE.BufferGeometry): Topology {
     const key = `${Math.round(position.getX(index) * quantize)}|${Math.round(position.getY(index) * quantize)}|${Math.round(position.getZ(index) * quantize)}`;
     let vertexId = vertexMap.get(key);
     if (vertexId === undefined) {
-      vertexId = nextVertexId;
-      nextVertexId += 1;
+      vertexId = nextVertexId++;
       vertexMap.set(key, vertexId);
     }
     vertexIds[index] = vertexId;
@@ -124,12 +123,7 @@ function buildTopology(geometry: THREE.BufferGeometry): Topology {
     normals.set([normal.x, normal.y, normal.z], offset);
     centroids.set([(a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3, (a.z + b.z + c.z) / 3], offset);
 
-    const pairs = [
-      [vertexIds[offset], vertexIds[offset + 1]],
-      [vertexIds[offset + 1], vertexIds[offset + 2]],
-      [vertexIds[offset + 2], vertexIds[offset]],
-    ] as const;
-
+    const pairs = [[vertexIds[offset], vertexIds[offset + 1]], [vertexIds[offset + 1], vertexIds[offset + 2]], [vertexIds[offset + 2], vertexIds[offset]]] as const;
     for (let slot = 0; slot < 3; slot += 1) {
       const key = edgeKey(pairs[slot][0], pairs[slot][1]);
       const packed = offset + slot;
@@ -142,7 +136,6 @@ function buildTopology(geometry: THREE.BufferGeometry): Topology {
       }
     }
   }
-
   return { adjacency, normals, centroids };
 }
 
@@ -169,7 +162,6 @@ function CameraRig({ height, paintMode, resetKey, spaceHeld, shiftHeld, focusReq
     controls.minPolarAngle = 0.08;
     controls.maxPolarAngle = Math.PI * 0.98;
     controlsRef.current = controls;
-
     let frame = 0;
     const tick = () => {
       controls.update();
@@ -195,6 +187,9 @@ function CameraRig({ height, paintMode, resetKey, spaceHeld, shiftHeld, focusReq
       controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
       controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
     }
+    const touches = controls.touches as unknown as { ONE: number; TWO: number };
+    touches.ONE = paintMode ? -1 : THREE.TOUCH.ROTATE;
+    touches.TWO = THREE.TOUCH.DOLLY_PAN;
   }, [paintMode, shiftHeld, spaceHeld]);
 
   useEffect(() => {
@@ -244,6 +239,10 @@ function PaintMesh({ model, topology, paintIds, palette, tool, materialId, angle
   const meshRef = useRef<THREE.Mesh>(null!);
   const previewRef = useRef<number[]>([]);
   const hoverKeyRef = useRef("");
+  const touchPreviewKeyRef = useRef("");
+  const activeTouchIdsRef = useRef(new Set<number>());
+  const touchStartRef = useRef<{ id: number; x: number; y: number; at: number; brushStarted: boolean } | null>(null);
+  const lastBrushFaceRef = useRef(-1);
   const colors = useMemo(() => palette.map((entry) => new THREE.Color(entry.color)), [palette]);
 
   const restore = useCallback((clearHoverKey = true) => {
@@ -264,7 +263,6 @@ function PaintMesh({ model, topology, paintIds, palette, tool, materialId, angle
   const collect = useCallback((seed: number, point: THREE.Vector3, activeTool: Tool) => {
     if (seed < 0 || seed >= paintIds.length) return [];
     if (activeTool === "triangle" || activeTool === "picker") return [seed];
-
     const queue = new Uint32Array(paintIds.length);
     const visited = new Uint8Array(paintIds.length);
     const result: number[] = [];
@@ -287,16 +285,13 @@ function PaintMesh({ model, topology, paintIds, palette, tool, materialId, angle
         if (dx * dx + dy * dy + dz * dz > radiusSquared) continue;
       }
       result.push(triangle);
-
       for (let slot = 0; slot < 3; slot += 1) {
         const neighbor = topology.adjacency[offset + slot];
         if (neighbor < 0 || visited[neighbor]) continue;
         const neighborOffset = neighbor * 3;
         if (activeTool === "smart") {
           if (paintIds[neighbor] !== seedMaterial) continue;
-          const dot = topology.normals[offset] * topology.normals[neighborOffset]
-            + topology.normals[offset + 1] * topology.normals[neighborOffset + 1]
-            + topology.normals[offset + 2] * topology.normals[neighborOffset + 2];
+          const dot = topology.normals[offset] * topology.normals[neighborOffset] + topology.normals[offset + 1] * topology.normals[neighborOffset + 1] + topology.normals[offset + 2] * topology.normals[neighborOffset + 2];
           if (dot < smartThreshold) continue;
         }
         if (activeTool === "brush") {
@@ -305,9 +300,7 @@ function PaintMesh({ model, topology, paintIds, palette, tool, materialId, angle
           const dz = topology.centroids[neighborOffset + 2] - point.z;
           if (dx * dx + dy * dy + dz * dz > radiusSquared) continue;
           if (brushMode === "surface") {
-            const dot = topology.normals[offset] * topology.normals[neighborOffset]
-              + topology.normals[offset + 1] * topology.normals[neighborOffset + 1]
-              + topology.normals[offset + 2] * topology.normals[neighborOffset + 2];
+            const dot = topology.normals[offset] * topology.normals[neighborOffset] + topology.normals[offset + 1] * topology.normals[neighborOffset + 1] + topology.normals[offset + 2] * topology.normals[neighborOffset + 2];
             if (dot < surfaceThreshold) continue;
           }
         }
@@ -318,7 +311,7 @@ function PaintMesh({ model, topology, paintIds, palette, tool, materialId, angle
     return result;
   }, [angle, brushMode, paintIds, radius, topology]);
 
-  const regionFromEvent = useCallback((event: ThreeEvent<MouseEvent | PointerEvent>, activeTool: Tool) => {
+  const regionFromEvent = useCallback((event: ThreeEvent<PointerEvent>, activeTool: Tool) => {
     const face = event.faceIndex ?? -1;
     if (face < 0) return [];
     return collect(face, meshRef.current.worldToLocal(event.point.clone()), activeTool);
@@ -340,60 +333,124 @@ function PaintMesh({ model, topology, paintIds, palette, tool, materialId, angle
     onPreview(indices.length);
   }, [colors, materialId, model.geometry, onPreview, restore]);
 
-  return (
-    <>
-      <mesh
-        ref={meshRef}
-        geometry={model.geometry}
-        rotation={[-Math.PI / 2, 0, 0]}
-        castShadow
-        receiveShadow
-        onPointerMove={(event) => {
-          onHoverPoint([event.point.x, event.point.y, event.point.z]);
-          if (!paintMode || navigationActive || tool === "picker" || event.buttons !== 0) {
-            if (previewRef.current.length) restore();
-            return;
-          }
-          event.stopPropagation();
+  const applyTouchTap = (event: ThreeEvent<PointerEvent>) => {
+    const face = event.faceIndex ?? -1;
+    if (face < 0) return;
+    if (tool === "picker") {
+      onPick(paintIds[face] ?? 0);
+      touchPreviewKeyRef.current = "";
+      restore();
+      return;
+    }
+    const activeTool = tool;
+    const key = `${face}:${activeTool}:${materialId}:${angle}:${radius}:${brushMode}`;
+    const region = regionFromEvent(event, activeTool);
+    if (touchPreviewKeyRef.current === key && previewRef.current.length) {
+      restore();
+      touchPreviewKeyRef.current = "";
+      onPaint(region);
+    } else {
+      touchPreviewKeyRef.current = key;
+      preview(region);
+    }
+  };
+
+  return <>
+    <mesh
+      ref={meshRef}
+      geometry={model.geometry}
+      rotation={[-Math.PI / 2, 0, 0]}
+      castShadow
+      receiveShadow
+      onPointerDown={(event) => {
+        if (!paintMode || navigationActive || event.nativeEvent.pointerType !== "touch") return;
+        activeTouchIdsRef.current.add(event.nativeEvent.pointerId);
+        if (activeTouchIdsRef.current.size > 1) {
+          touchStartRef.current = null;
+          lastBrushFaceRef.current = -1;
+          if (previewRef.current.length) restore();
+          touchPreviewKeyRef.current = "";
+          return;
+        }
+        touchStartRef.current = { id: event.nativeEvent.pointerId, x: event.nativeEvent.clientX, y: event.nativeEvent.clientY, at: performance.now(), brushStarted: false };
+      }}
+      onPointerMove={(event) => {
+        onHoverPoint([event.point.x, event.point.y, event.point.z]);
+        const native = event.nativeEvent;
+        if (native.pointerType === "touch") {
+          if (!paintMode || navigationActive || activeTouchIdsRef.current.size !== 1 || tool !== "brush") return;
+          const start = touchStartRef.current;
+          if (!start || start.id !== native.pointerId) return;
+          const distance = Math.hypot(native.clientX - start.x, native.clientY - start.y);
+          if (!start.brushStarted && performance.now() - start.at < 100 && distance < 6) return;
+          start.brushStarted = true;
           const face = event.faceIndex ?? -1;
-          if (face < 0) return;
-          const hit = event.point;
-          const key = `${face}:${tool}:${brushMode}:${angle}:${radius}:${materialId}:${Math.round(hit.x * 2)}:${Math.round(hit.y * 2)}:${Math.round(hit.z * 2)}`;
-          if (key === hoverKeyRef.current) return;
-          hoverKeyRef.current = key;
-          preview(regionFromEvent(event, tool));
-        }}
-        onPointerOut={() => {
-          onHoverPoint(null);
-          if (paintMode) restore();
-        }}
-        onClick={(event) => {
-          if (!paintMode || navigationActive) return;
+          if (face < 0 || face === lastBrushFaceRef.current) return;
+          lastBrushFaceRef.current = face;
           event.stopPropagation();
-          const face = event.faceIndex ?? -1;
-          if (face < 0) return;
-          const native = event.nativeEvent;
-          if (native.altKey || tool === "picker") {
-            onPick(paintIds[face] ?? 0);
-            restore();
-            return;
-          }
-          const activeTool: Tool = native.ctrlKey || native.metaKey ? "smart" : tool;
-          const region = regionFromEvent(event, activeTool);
+          if (previewRef.current.length) restore();
+          onPaint(regionFromEvent(event, "brush"));
+          return;
+        }
+
+        if (!paintMode || navigationActive || tool === "picker" || native.buttons !== 0) {
+          if (previewRef.current.length) restore();
+          return;
+        }
+        event.stopPropagation();
+        const face = event.faceIndex ?? -1;
+        if (face < 0) return;
+        const hit = event.point;
+        const key = `${face}:${tool}:${brushMode}:${angle}:${radius}:${materialId}:${Math.round(hit.x * 2)}:${Math.round(hit.y * 2)}:${Math.round(hit.z * 2)}`;
+        if (key === hoverKeyRef.current) return;
+        hoverKeyRef.current = key;
+        preview(regionFromEvent(event, tool));
+      }}
+      onPointerUp={(event) => {
+        const native = event.nativeEvent;
+        if (native.pointerType !== "touch") return;
+        const hadMultiple = activeTouchIdsRef.current.size > 1;
+        activeTouchIdsRef.current.delete(native.pointerId);
+        const start = touchStartRef.current;
+        touchStartRef.current = null;
+        lastBrushFaceRef.current = -1;
+        if (!paintMode || navigationActive || hadMultiple) return;
+        if (tool === "brush" && start?.brushStarted) return;
+        event.stopPropagation();
+        applyTouchTap(event);
+      }}
+      onPointerCancel={(event) => {
+        activeTouchIdsRef.current.delete(event.nativeEvent.pointerId);
+        touchStartRef.current = null;
+        lastBrushFaceRef.current = -1;
+      }}
+      onPointerOut={(event) => {
+        onHoverPoint(null);
+        if (event.nativeEvent.pointerType !== "touch" && paintMode) restore();
+      }}
+      onClick={(event) => {
+        const native = event.nativeEvent as PointerEvent;
+        if (native.pointerType === "touch" || !paintMode || navigationActive) return;
+        event.stopPropagation();
+        const face = event.faceIndex ?? -1;
+        if (face < 0) return;
+        if (native.altKey || tool === "picker") {
+          onPick(paintIds[face] ?? 0);
           restore();
-          onPaint(region);
-        }}
-      >
-        <meshStandardMaterial vertexColors roughness={0.64} metalness={0.08} />
-      </mesh>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.18, 0]}>
-        <circleGeometry args={[46, 96]} />
-        <meshStandardMaterial color="#151b22" roughness={0.96} />
-      </mesh>
-      <gridHelper args={[140, 28, "#344253", "#17202a"]} position={[0, -0.1, 0]} />
-      <CameraRig height={model.height} paintMode={paintMode} resetKey={resetKey} spaceHeld={spaceHeld} shiftHeld={shiftHeld} focusRequest={focusRequest} />
-    </>
-  );
+          return;
+        }
+        const activeTool: Tool = native.ctrlKey || native.metaKey ? "smart" : tool;
+        const region = regionFromEvent(event as ThreeEvent<PointerEvent>, activeTool);
+        restore();
+        onPaint(region);
+      }}
+    >
+      <meshStandardMaterial vertexColors roughness={0.64} metalness={0.08} />
+    </mesh>
+    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.18, 0]}><circleGeometry args={[46, 64]} /><meshStandardMaterial color="#151b22" roughness={0.96} /></mesh>
+    <gridHelper args={[140, 28, "#344253", "#17202a"]} position={[0, -0.1, 0]} />
+    <CameraRig height={model.height} paintMode={paintMode} resetKey={resetKey} spaceHeld={spaceHeld} shiftHeld={shiftHeld} focusRequest={focusRequest} />
+  </>;
 }
 
 function paintAll(geometry: THREE.BufferGeometry, ids: Uint8Array, palette: MiniaturePaintPaletteEntry[]) {
@@ -409,18 +466,7 @@ function paintAll(geometry: THREE.BufferGeometry, ids: Uint8Array, palette: Mini
   colorAttribute.needsUpdate = true;
 }
 
-export function MiniaturePainter({
-  sourceFile,
-  loadedPaintDocument = null,
-  paintLoadKey = null,
-  loadedSkinName = null,
-  canSave = false,
-  canMakeDefault = false,
-  saveActionLabel = "Save as new skin",
-  saveHelperText = "Saved skins never alter the STL. Loading an existing skin and saving again creates a new version.",
-  saving = false,
-  onSavePaintJob,
-}: Props) {
+export function MiniaturePainter({ sourceFile, loadedPaintDocument = null, paintLoadKey = null, loadedSkinName = null, canSave = false, canMakeDefault = false, saveActionLabel = "Save as new skin", saveHelperText = "Saved skins never alter the source miniature. Loading an existing skin and saving again creates a new version.", saving = false, onSavePaintJob }: Props) {
   const [model, setModel] = useState<Model | null>(null);
   const modelRef = useRef<Model | null>(null);
   const [topology, setTopology] = useState<Topology | null>(null);
@@ -443,11 +489,19 @@ export function MiniaturePainter({
   const [shiftHeld, setShiftHeld] = useState(false);
   const [focusRequest, setFocusRequest] = useState<FocusRequest>(null);
   const [skinName, setSkinName] = useState("");
+  const [compact, setCompact] = useState(false);
   const hoverPointRef = useRef<[number, number, number] | null>(null);
 
   useEffect(() => {
-    const isTypingTarget = (target: EventTarget | null) => target instanceof HTMLElement
-      && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+    const media = window.matchMedia("(max-width: 767px)");
+    const sync = () => setCompact(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null) => target instanceof HTMLElement && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
     const keyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
       if (event.key === "Shift") setShiftHeld(true);
@@ -494,35 +548,29 @@ export function MiniaturePainter({
       hoverPointRef.current = null;
       if (!sourceFile) return;
 
-      setStatus("Reading STL…");
+      setStatus(`Reading ${sourceFile.name.toLowerCase().endsWith(".glb") ? "Web GLB" : "source STL"}…`);
       try {
-        const geometry = new STLLoader().parse(await sourceFile.arrayBuffer());
-        geometry.computeVertexNormals();
-        geometry.computeBoundingBox();
-        const box = geometry.boundingBox;
-        if (!box) throw new Error("Could not read model bounds.");
-        const height = box.max.z - box.min.z;
-        geometry.translate(-(box.min.x + box.max.x) / 2, -(box.min.y + box.max.y) / 2, -box.min.z);
-        const triangles = Math.floor((geometry.getAttribute("position")?.count ?? 0) / 3);
-        const colorAttribute = new THREE.BufferAttribute(new Float32Array(triangles * 9), 3);
+        const loaded = await loadMiniatureGeometry(sourceFile);
+        const geometry = loaded.geometry;
+        const colorAttribute = new THREE.BufferAttribute(new Float32Array(loaded.triangles * 9), 3);
         geometry.setAttribute("color", colorAttribute);
-        const ids = new Uint8Array(triangles);
+        const ids = new Uint8Array(loaded.triangles);
         paintAll(geometry, ids, BASE_PALETTE);
 
-        setStatus(`Analyzing ${triangles.toLocaleString()} triangles…`);
+        setStatus(`Analyzing ${loaded.triangles.toLocaleString()} triangles…`);
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
         const nextTopology = buildTopology(geometry);
         if (cancelled) {
           geometry.dispose();
           return;
         }
-        const nextModel = { geometry, name: sourceFile.name, triangles, height };
+        const nextModel: Model = { geometry, name: loaded.name, triangles: loaded.triangles, height: loaded.height, format: loaded.format };
         modelRef.current = nextModel;
         setModel(nextModel);
         setTopology(nextTopology);
         setPaintIds(ids);
         setResetKey((value) => value + 1);
-        setStatus("Ready. Camera remains available while painting.");
+        setStatus(`${loaded.format === "glb" ? "Web GLB" : "STL"} ready. Touch and desktop controls are active.`);
       } catch (error) {
         setStatus(error instanceof Error ? error.message : "Could not prepare painter.");
       }
@@ -579,9 +627,10 @@ export function MiniaturePainter({
 
   const applyPaint = useCallback((indices: number[]) => {
     if (!paintIds || !indices.length) return;
-    const before = new Uint8Array(indices.length);
-    const list = new Uint32Array(indices.length);
-    indices.forEach((triangle, index) => {
+    const unique = Array.from(new Set(indices));
+    const before = new Uint8Array(unique.length);
+    const list = new Uint32Array(unique.length);
+    unique.forEach((triangle, index) => {
       list[index] = triangle;
       before[index] = paintIds[triangle];
       paintIds[triangle] = materialId;
@@ -616,11 +665,7 @@ export function MiniaturePainter({
       return;
     }
     const nextIndex = palette.length;
-    setPalette((entries) => [...entries, {
-      name: `Custom ${entries.filter((entry) => entry.category === "Custom").length + 1}`,
-      color: customColor,
-      category: "Custom",
-    }]);
+    setPalette((entries) => [...entries, { name: `Custom ${entries.filter((entry) => entry.category === "Custom").length + 1}`, color: customColor, category: "Custom" }]);
     setMaterialId(nextIndex);
     setActiveCategory("Custom");
   };
@@ -631,74 +676,70 @@ export function MiniaturePainter({
     await onSavePaintJob(document, skinName.trim(), makeDefault);
   };
 
-  const visiblePalette = palette
-    .map((entry, index) => ({ entry, index }))
-    .filter(({ entry }) => activeCategory === "All" || entry.category === activeCategory);
-
+  const visiblePalette = palette.map((entry, index) => ({ entry, index })).filter(({ entry }) => activeCategory === "All" || entry.category === activeCategory);
   if (!sourceFile) return <div className="rounded-[28px] border border-dashed border-slate-700 bg-slate-900/40 p-10 text-center text-slate-500">Choose a saved miniature above to start painting.</div>;
 
   const navigationActive = paintMode && spaceHeld;
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
 
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+  return <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div>
       <div className="overflow-hidden rounded-[30px] border border-slate-800 bg-[#080d13]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-fuchsia-300">Miniature Painter v0.4</p>
-            <p className="mt-1 text-sm font-bold text-slate-200">{model?.name ?? "Preparing model…"}</p>
-            <p className="mt-1 text-[11px] text-slate-600">{status}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setPaintMode(false)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${!paintMode ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-200" : "border-slate-700 text-slate-400"}`}>View</button>
-            <button type="button" onClick={() => setPaintMode(true)} disabled={!model} className={`rounded-xl border px-3 py-2 text-xs font-bold ${paintMode ? "border-fuchsia-400/50 bg-fuchsia-400/10 text-fuchsia-200" : "border-slate-700 text-slate-400"}`}>Paint</button>
-            <button type="button" onClick={() => setResetKey((value) => value + 1)} className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-400">Reset view</button>
-          </div>
+          <div><p className="text-[10px] font-black uppercase tracking-[0.24em] text-fuchsia-300">Miniature Painter v0.5</p><p className="mt-1 text-sm font-bold text-slate-200">{model?.name ?? "Preparing model…"}</p><p className="mt-1 text-[11px] text-slate-600">{status}</p></div>
+          <div className="hidden flex-wrap gap-2 sm:flex"><button type="button" onClick={() => setPaintMode(false)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${!paintMode ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-200" : "border-slate-700 text-slate-400"}`}>View</button><button type="button" onClick={() => setPaintMode(true)} disabled={!model} className={`rounded-xl border px-3 py-2 text-xs font-bold ${paintMode ? "border-fuchsia-400/50 bg-fuchsia-400/10 text-fuchsia-200" : "border-slate-700 text-slate-400"}`}>Paint</button><button type="button" onClick={() => setResetKey((value) => value + 1)} className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-400">Reset view</button></div>
         </div>
 
-        <div className={`relative h-[70vh] min-h-[580px] max-h-[900px] ${navigationActive ? "cursor-grabbing" : paintMode ? "cursor-crosshair" : "cursor-grab"}`} onContextMenu={(event) => event.preventDefault()}>
-          {model && topology && paintIds ? (
-            <Canvas shadows dpr={[1, 1.5]} camera={{ fov: 32 }}>
-              <color attach="background" args={["#0a0f16"]} />
-              <ambientLight intensity={1.25} />
-              <directionalLight position={[40, 70, 35]} intensity={3} />
-              <directionalLight position={[-30, 20, -25]} intensity={1.2} />
-              <PaintMesh model={model} topology={topology} paintIds={paintIds} palette={palette} tool={tool} materialId={materialId} angle={angle} radius={radius} brushMode={brushMode} paintMode={paintMode} navigationActive={navigationActive} resetKey={resetKey} spaceHeld={spaceHeld} shiftHeld={shiftHeld} focusRequest={focusRequest} onPaint={applyPaint} onPick={setMaterialId} onPreview={setPreviewCount} onHoverPoint={(point) => { hoverPointRef.current = point; }} />
-            </Canvas>
-          ) : <div className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-400">{status}</div>}
-          {model ? <div className="pointer-events-none absolute bottom-4 left-1/2 max-w-[92%] -translate-x-1/2 rounded-2xl border border-slate-700 bg-slate-950/85 px-4 py-2 text-center text-[11px] leading-5 text-slate-400 backdrop-blur">{paintMode ? `${previewCount.toLocaleString()} triangles · LMB paint · RMB orbit · MMB pan · wheel zoom-to-cursor · Space+LMB orbit · Shift+Space+LMB pan · F focus · Alt+click pick · Ctrl+click Smart` : "LMB orbit · MMB zoom · RMB pan · wheel zoom-to-cursor · hover a detail and press F to make it the camera pivot"}</div> : null}
+        <div className={`relative h-[60dvh] min-h-[400px] max-h-[900px] sm:h-[70vh] sm:min-h-[580px] ${navigationActive ? "cursor-grabbing" : paintMode ? "cursor-crosshair" : "cursor-grab"}`} style={{ touchAction: "none" }} onContextMenu={(event) => event.preventDefault()}>
+          {model && topology && paintIds ? <Canvas shadows={!compact} dpr={compact ? 1 : [1, 1.5]} camera={{ fov: 32 }}>
+            <color attach="background" args={["#0a0f16"]} />
+            <ambientLight intensity={compact ? 1.35 : 1.25} />
+            <directionalLight castShadow={!compact} position={[40, 70, 35]} intensity={3} />
+            {!compact ? <directionalLight position={[-30, 20, -25]} intensity={1.2} /> : null}
+            <PaintMesh model={model} topology={topology} paintIds={paintIds} palette={palette} tool={tool} materialId={materialId} angle={angle} radius={radius} brushMode={brushMode} paintMode={paintMode} navigationActive={navigationActive} resetKey={resetKey} spaceHeld={spaceHeld} shiftHeld={shiftHeld} focusRequest={focusRequest} onPaint={applyPaint} onPick={setMaterialId} onPreview={setPreviewCount} onHoverPoint={(point) => { hoverPointRef.current = point; }} />
+          </Canvas> : <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm font-semibold text-slate-400">{status}</div>}
+          {model ? <div className="pointer-events-none absolute bottom-3 left-1/2 max-w-[94%] -translate-x-1/2 rounded-2xl border border-slate-700 bg-slate-950/85 px-3 py-2 text-center text-[10px] leading-4 text-slate-400 backdrop-blur sm:bottom-4 sm:px-4 sm:text-[11px] sm:leading-5">{compact ? paintMode ? `${previewCount.toLocaleString()} triangles · Smart/Fill: tap once to preview, tap again to apply · Brush: drag one finger · two fingers zoom/pan · use Navigate for one-finger orbit` : "Navigate: one finger orbit · pinch zoom · two fingers pan · switch to Paint when the view is ready" : paintMode ? `${previewCount.toLocaleString()} triangles · LMB paint · RMB orbit · MMB pan · wheel zoom-to-cursor · Space+LMB orbit · Shift+Space+LMB pan · F focus · Alt+click pick · Ctrl+click Smart` : "LMB orbit · MMB zoom · RMB pan · wheel zoom-to-cursor · hover a detail and press F to make it the camera pivot"}</div> : null}
         </div>
       </div>
 
-      <aside className="space-y-4">
-        <div className="rounded-[26px] border border-slate-800 bg-slate-900/75 p-5">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-fuchsia-300">Tools</p>
-          <div className="mt-3 grid grid-cols-2 gap-2">{([['smart', 'Smart'], ['brush', 'Brush'], ['triangle', 'Triangle'], ['shell', 'Shell'], ['picker', 'Picker']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setTool(id)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${tool === id ? "border-fuchsia-400/50 bg-fuchsia-400/10 text-fuchsia-100" : "border-slate-700 text-slate-400"}`}>{label}</button>)}</div>
-          {tool === "smart" ? <label className="mt-4 block text-xs text-slate-500">Edge threshold <b className="float-right text-slate-300">{angle}°</b><input type="range" min="3" max="80" value={angle} onChange={(event) => setAngle(Number(event.target.value))} className="mt-2 w-full" /></label> : null}
-          {tool === "brush" ? <div className="mt-4 space-y-4"><div><p className="text-xs font-semibold text-slate-500">Brush behaviour</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => setBrushMode("surface")} className={`rounded-xl border px-3 py-2 text-xs font-bold ${brushMode === "surface" ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100" : "border-slate-700 text-slate-400"}`}>Surface</button><button type="button" onClick={() => setBrushMode("volume")} className={`rounded-xl border px-3 py-2 text-xs font-bold ${brushMode === "volume" ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100" : "border-slate-700 text-slate-400"}`}>Volume</button></div></div><label className="block text-xs text-slate-500">Brush radius <b className="float-right text-slate-300">{radius.toFixed(1)} mm</b><input type="range" min="0.5" max="12" step="0.5" value={radius} onChange={(event) => setRadius(Number(event.target.value))} className="mt-2 w-full" /></label></div> : null}
+      <div className="sticky bottom-2 z-40 mt-3 rounded-2xl border border-slate-700 bg-slate-950/95 p-2 shadow-2xl shadow-black/50 backdrop-blur xl:hidden">
+        <div className="grid grid-cols-5 gap-1.5">
+          <button type="button" onClick={() => setPaintMode(false)} className={`min-h-10 rounded-xl border text-[10px] font-black ${!paintMode ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100" : "border-slate-700 text-slate-400"}`}>Navigate</button>
+          <button type="button" onClick={() => setPaintMode(true)} className={`min-h-10 rounded-xl border text-[10px] font-black ${paintMode ? "border-fuchsia-400/50 bg-fuchsia-400/10 text-fuchsia-100" : "border-slate-700 text-slate-400"}`}>Paint</button>
+          <select aria-label="Paint tool" value={tool} onChange={(event) => setTool(event.target.value as Tool)} className="min-h-10 rounded-xl border border-slate-700 bg-slate-900 px-1 text-[10px] font-black text-slate-200"><option value="smart">Smart</option><option value="brush">Brush</option><option value="triangle">Triangle</option><option value="shell">Shell</option><option value="picker">Picker</option></select>
+          <button type="button" onClick={undoLast} disabled={!undo.length} className="min-h-10 rounded-xl border border-slate-700 text-[10px] font-black text-slate-300 disabled:opacity-30">Undo</button>
+          <button type="button" onClick={() => scrollTo(canSave ? "mini-painter-save" : "mini-painter-colors")} className="min-h-10 rounded-xl border border-emerald-400/25 text-[10px] font-black text-emerald-200">{canSave ? "Save" : "Colors"}</button>
         </div>
-
-        <div className="rounded-[26px] border border-slate-800 bg-slate-900/75 p-5">
-          <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.2em] text-yellow-400">Colors</p><p className="mt-1 text-[11px] text-slate-600">{palette.length} swatches</p></div><div className="h-9 w-9 rounded-xl border-2 border-cyan-300" style={{ background: palette[materialId]?.color ?? palette[0].color }} /></div>
-          <div className="mt-3 flex flex-wrap gap-1.5">{CATEGORY_TABS.map((category) => <button key={category} type="button" onClick={() => setActiveCategory(category)} className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${activeCategory === category ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-100" : "border-slate-800 text-slate-500"}`}>{category}</button>)}</div>
-          <div className="mt-3 max-h-64 overflow-y-auto pr-1"><div className="grid grid-cols-5 gap-2">{visiblePalette.map(({ entry, index }) => <button key={`${entry.name}-${index}`} type="button" title={entry.name} aria-label={entry.name} onClick={() => setMaterialId(index)} className={`aspect-square rounded-xl border-2 ${materialId === index ? "border-cyan-300 ring-2 ring-cyan-300/20" : "border-slate-700"}`} style={{ background: entry.color }} />)}</div></div>
-          <p className="mt-3 text-xs font-bold text-slate-300">{palette[materialId]?.name ?? "Primer"}</p>
-          <div className="mt-4 rounded-2xl border border-slate-800 bg-black/15 p-3"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Custom swatch</p><div className="mt-2 flex items-center gap-3"><input type="color" value={customColor} onChange={(event) => setCustomColor(event.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border border-slate-700 bg-transparent p-1" aria-label="Custom color" /><span className="text-xs font-bold uppercase text-slate-400">{customColor}</span></div><button type="button" onClick={addCustomSwatch} className="mt-2 min-h-9 w-full rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 text-xs font-bold text-cyan-100">Add custom color</button></div>
+        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+          {palette.map((entry, index) => <button key={`mobile-${entry.name}-${index}`} type="button" title={entry.name} onClick={() => { setMaterialId(index); setPaintMode(true); }} className={`h-9 w-9 shrink-0 rounded-full border-2 ${materialId === index ? "border-cyan-300 ring-2 ring-cyan-300/20" : "border-slate-700"}`} style={{ background: entry.color }} />)}
         </div>
-
-        <div className="rounded-[26px] border border-slate-800 bg-slate-900/75 p-5"><div className="grid grid-cols-2 gap-2"><button type="button" onClick={undoLast} disabled={!undo.length} className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-30">Undo</button><button type="button" onClick={resetPaint} disabled={!paintIds} className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-30">Reset paint</button></div></div>
-
-        {canSave ? (
-          <div className="rounded-[26px] border border-emerald-500/20 bg-emerald-500/5 p-5">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300">Save skin</p>
-            <p className="mt-2 text-[11px] leading-5 text-slate-500">{saveHelperText}</p>
-            <input value={skinName} maxLength={80} onChange={(event) => setSkinName(event.target.value)} placeholder="e.g. Kainalia armour" className="mt-3 min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200 outline-none focus:border-emerald-400/60" />
-            <div className="mt-3 grid gap-2">
-              <button type="button" disabled={!model || !skinName.trim() || saving} onClick={() => void saveSkin(false)} className="min-h-11 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 text-xs font-black text-emerald-100 disabled:opacity-30">{saving ? "Saving…" : saveActionLabel}</button>
-              {canMakeDefault ? <button type="button" disabled={!model || !skinName.trim() || saving} onClick={() => void saveSkin(true)} className="min-h-11 rounded-xl bg-emerald-400 px-4 text-xs font-black text-slate-950 disabled:opacity-30">Save & make default</button> : null}
-            </div>
-          </div>
-        ) : null}
-      </aside>
+      </div>
     </div>
-  );
+
+    <aside className="space-y-4 pb-24 xl:pb-0">
+      <div id="mini-painter-tools" className="rounded-[26px] border border-slate-800 bg-slate-900/75 p-5">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-fuchsia-300">Tools</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">{([['smart', 'Smart'], ['brush', 'Brush'], ['triangle', 'Triangle'], ['shell', 'Shell'], ['picker', 'Picker']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setTool(id)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${tool === id ? "border-fuchsia-400/50 bg-fuchsia-400/10 text-fuchsia-100" : "border-slate-700 text-slate-400"}`}>{label}</button>)}</div>
+        {tool === "smart" ? <label className="mt-4 block text-xs text-slate-500">Edge threshold <b className="float-right text-slate-300">{angle}°</b><input type="range" min="3" max="80" value={angle} onChange={(event) => setAngle(Number(event.target.value))} className="mt-2 w-full" /></label> : null}
+        {tool === "brush" ? <div className="mt-4 space-y-4"><div><p className="text-xs font-semibold text-slate-500">Brush behaviour</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => setBrushMode("surface")} className={`rounded-xl border px-3 py-2 text-xs font-bold ${brushMode === "surface" ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100" : "border-slate-700 text-slate-400"}`}>Surface</button><button type="button" onClick={() => setBrushMode("volume")} className={`rounded-xl border px-3 py-2 text-xs font-bold ${brushMode === "volume" ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-100" : "border-slate-700 text-slate-400"}`}>Volume</button></div></div><label className="block text-xs text-slate-500">Brush radius <b className="float-right text-slate-300">{radius.toFixed(1)} mm</b><input type="range" min="0.5" max="12" step="0.5" value={radius} onChange={(event) => setRadius(Number(event.target.value))} className="mt-2 w-full" /></label></div> : null}
+        <p className="mt-4 text-[11px] leading-5 text-slate-600 sm:hidden">Mobile: in Paint, one finger paints and two fingers navigate. Smart/Triangle/Shell use tap-preview → tap-confirm so fat-finger mistakes are easier to avoid.</p>
+      </div>
+
+      <div id="mini-painter-colors" className="rounded-[26px] border border-slate-800 bg-slate-900/75 p-5">
+        <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.2em] text-yellow-400">Colors</p><p className="mt-1 text-[11px] text-slate-600">{palette.length} swatches</p></div><div className="h-9 w-9 rounded-xl border-2 border-cyan-300" style={{ background: palette[materialId]?.color ?? palette[0].color }} /></div>
+        <div className="mt-3 flex flex-wrap gap-1.5">{CATEGORY_TABS.map((category) => <button key={category} type="button" onClick={() => setActiveCategory(category)} className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${activeCategory === category ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-100" : "border-slate-800 text-slate-500"}`}>{category}</button>)}</div>
+        <div className="mt-3 max-h-64 overflow-y-auto pr-1"><div className="grid grid-cols-5 gap-2">{visiblePalette.map(({ entry, index }) => <button key={`${entry.name}-${index}`} type="button" title={entry.name} aria-label={entry.name} onClick={() => setMaterialId(index)} className={`aspect-square rounded-xl border-2 ${materialId === index ? "border-cyan-300 ring-2 ring-cyan-300/20" : "border-slate-700"}`} style={{ background: entry.color }} />)}</div></div>
+        <p className="mt-3 text-xs font-bold text-slate-300">{palette[materialId]?.name ?? "Primer"}</p>
+        <div className="mt-4 rounded-2xl border border-slate-800 bg-black/15 p-3"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Custom swatch</p><div className="mt-2 flex items-center gap-3"><input type="color" value={customColor} onChange={(event) => setCustomColor(event.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border border-slate-700 bg-transparent p-1" aria-label="Custom color" /><span className="text-xs font-bold uppercase text-slate-400">{customColor}</span></div><button type="button" onClick={addCustomSwatch} className="mt-2 min-h-9 w-full rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 text-xs font-bold text-cyan-100">Add custom color</button></div>
+      </div>
+
+      <div className="rounded-[26px] border border-slate-800 bg-slate-900/75 p-5"><div className="grid grid-cols-2 gap-2"><button type="button" onClick={undoLast} disabled={!undo.length} className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-30">Undo</button><button type="button" onClick={resetPaint} disabled={!paintIds} className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-30">Reset paint</button></div></div>
+
+      {canSave ? <div id="mini-painter-save" className="rounded-[26px] border border-emerald-500/20 bg-emerald-500/5 p-5">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300">Save skin</p><p className="mt-2 text-[11px] leading-5 text-slate-500">{saveHelperText}</p>
+        <input value={skinName} maxLength={80} onChange={(event) => setSkinName(event.target.value)} placeholder="e.g. Kainalia armour" className="mt-3 min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200 outline-none focus:border-emerald-400/60" />
+        <div className="mt-3 grid gap-2"><button type="button" disabled={!model || !skinName.trim() || saving} onClick={() => void saveSkin(false)} className="min-h-11 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 text-xs font-black text-emerald-100 disabled:opacity-30">{saving ? "Saving…" : saveActionLabel}</button>{canMakeDefault ? <button type="button" disabled={!model || !skinName.trim() || saving} onClick={() => void saveSkin(true)} className="min-h-11 rounded-xl bg-emerald-400 px-4 text-xs font-black text-slate-950 disabled:opacity-30">Save & make default</button> : null}</div>
+      </div> : null}
+    </aside>
+  </div>;
 }
