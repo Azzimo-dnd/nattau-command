@@ -34,50 +34,61 @@ export function MiniaturePainterLab({ campaignId }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
-    void supabase.rpc("list_campaign_miniature_roster", { p_campaign_id: campaignId })
-      .then(({ data, error: rpcError }) => {
+    const loadRoster = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: rpcError } = await supabase.rpc("list_campaign_miniature_roster", {
+          p_campaign_id: campaignId,
+        });
         if (rpcError) throw rpcError;
         if (cancelled) return;
-        const rows = ((data ?? []) as RosterRow[]).filter((row) => row.miniature_id && row.storage_path && row.original_name);
+        const rows = ((data ?? []) as RosterRow[]).filter(
+          (row) => row.miniature_id && row.storage_path && row.original_name,
+        );
         setRoster(rows);
         const pippo = rows.find((row) => row.display_name.trim().toLowerCase() === "pippo");
         setSelectedPlayerId(pippo?.player_id ?? rows[0]?.player_id ?? null);
-      })
-      .catch((cause) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load miniature roster.");
-      })
-      .finally(() => {
+      } catch (cause) {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : "Could not load miniature roster.");
+        }
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    };
 
+    void loadRoster();
     return () => { cancelled = true; };
   }, [campaignId, supabase]);
 
   useEffect(() => {
     let cancelled = false;
-    setSourceFile(null);
-    setError(null);
-    if (!selected?.storage_path || !selected.original_name) return () => { cancelled = true; };
 
-    setLoadingModel(true);
-    void supabase.storage.from(BUCKET).download(selected.storage_path)
-      .then(({ data, error: downloadError }) => {
+    const loadModel = async () => {
+      setSourceFile(null);
+      setError(null);
+      if (!selected?.storage_path || !selected.original_name) return;
+
+      setLoadingModel(true);
+      try {
+        const { data, error: downloadError } = await supabase.storage.from(BUCKET).download(selected.storage_path);
         if (downloadError) throw downloadError;
         if (cancelled) return;
         setSourceFile(new File([data], selected.original_name ?? "miniature.stl", {
           type: data.type || "application/octet-stream",
         }));
-      })
-      .catch((cause) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load current miniature.");
-      })
-      .finally(() => {
+      } catch (cause) {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : "Could not load current miniature.");
+        }
+      } finally {
         if (!cancelled) setLoadingModel(false);
-      });
+      }
+    };
 
+    void loadModel();
     return () => { cancelled = true; };
   }, [selected, supabase]);
 
