@@ -17,7 +17,7 @@ export default async function MiniaturePainterPage() {
             <p className="text-xs font-black uppercase tracking-[0.3em] text-fuchsia-300">GM miniature studio</p>
             <h1 className="mt-2 text-3xl font-black sm:text-4xl">Miniature Painter</h1>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-400">
-              Experimental paint workflow inspired by miniature editors and slicer Smart Fill tools. This version is deliberately non-destructive: it paints the downloaded STL only in browser memory so we can judge region selection on real campaign miniatures before persisting anything.
+              Paint any current campaign miniature, save multiple lightweight skins, load an existing skin as a starting point, and choose the default version shown to the expedition.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -30,7 +30,7 @@ export default async function MiniaturePainterPage() {
           </div>
         </div>
 
-        <MiniaturePainterLab campaignId={access.membership.campaignId} />
+        <MiniaturePainterLab campaignId={access.membership.campaignId} canManage />
       </div>
     </main>
   );
