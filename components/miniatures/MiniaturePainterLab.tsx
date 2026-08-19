@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { MiniaturePainterPrototype } from "./MiniaturePainterPrototype";
+import { MiniaturePainterPrototypeV1 } from "./MiniaturePainterPrototypeV1";
 
 type RosterRow = {
   player_id: string;
@@ -125,7 +125,7 @@ export function MiniaturePainterLab({ campaignId }: Props) {
         {loadingModel ? <p className="mt-3 text-xs font-semibold text-cyan-300">Downloading private STL…</p> : null}
       </section>
 
-      <MiniaturePainterPrototype sourceFile={sourceFile} />
+      <MiniaturePainterPrototypeV1 sourceFile={sourceFile} />
 
       {error ? <p className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">{error}</p> : null}
     </div>
