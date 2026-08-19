@@ -64,6 +64,12 @@ export function getNavigationSections(
       items: [
         { label: "Map", href: "/map", icon: "map" },
         {
+          label: "Characters",
+          href: "/characters",
+          icon: "account",
+          description: "Inspect the expedition's current 3D character miniatures.",
+        },
+        {
           label: "Settlement",
           href: "/settlement",
           icon: "settlement",
@@ -115,6 +121,12 @@ export function getNavigationSections(
           href: "/gm/puzzles",
           icon: "spark",
           description: "Build, hide, reveal and supervise interactive puzzles.",
+        },
+        {
+          label: "Miniature Studio",
+          href: "/gm/miniatures",
+          icon: "account",
+          description: "Upload, preview and select current character miniatures.",
         },
         {
           label: "Fate Management",
