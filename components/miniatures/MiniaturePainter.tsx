@@ -26,6 +26,9 @@ type Props = {
   paintLoadKey?: string | number | null;
   loadedSkinName?: string | null;
   canSave?: boolean;
+  canMakeDefault?: boolean;
+  saveActionLabel?: string;
+  saveHelperText?: string;
   saving?: boolean;
   onSavePaintJob?: (document: MiniaturePaintDocument, name: string, makeDefault: boolean) => void | Promise<void>;
 };
@@ -406,7 +409,18 @@ function paintAll(geometry: THREE.BufferGeometry, ids: Uint8Array, palette: Mini
   colorAttribute.needsUpdate = true;
 }
 
-export function MiniaturePainter({ sourceFile, loadedPaintDocument = null, paintLoadKey = null, loadedSkinName = null, canSave = false, saving = false, onSavePaintJob }: Props) {
+export function MiniaturePainter({
+  sourceFile,
+  loadedPaintDocument = null,
+  paintLoadKey = null,
+  loadedSkinName = null,
+  canSave = false,
+  canMakeDefault = false,
+  saveActionLabel = "Save as new skin",
+  saveHelperText = "Saved skins never alter the STL. Loading an existing skin and saving again creates a new version.",
+  saving = false,
+  onSavePaintJob,
+}: Props) {
   const [model, setModel] = useState<Model | null>(null);
   const modelRef = useRef<Model | null>(null);
   const [topology, setTopology] = useState<Topology | null>(null);
@@ -476,6 +490,7 @@ export function MiniaturePainter({ sourceFile, loadedPaintDocument = null, paint
       setPalette([...BASE_PALETTE]);
       setUndo([]);
       setPreviewCount(0);
+      setSkinName("");
       hoverPointRef.current = null;
       if (!sourceFile) return;
 
@@ -526,6 +541,7 @@ export function MiniaturePainter({ sourceFile, loadedPaintDocument = null, paint
       paintAll(model.geometry, paintIds, BASE_PALETTE);
       setUndo([]);
       setMaterialId(12);
+      setSkinName("");
       setStatus("Original unpainted miniature loaded.");
       return;
     }
@@ -540,7 +556,8 @@ export function MiniaturePainter({ sourceFile, loadedPaintDocument = null, paint
       paintAll(model.geometry, paintIds, loadedPaintDocument.palette);
       setUndo([]);
       setMaterialId(0);
-      setStatus(`${loadedSkinName ?? "Saved skin"} loaded. Changes can be saved as a new skin.`);
+      setSkinName(loadedSkinName && loadedSkinName !== "Original / unpainted" ? loadedSkinName : "");
+      setStatus(`${loadedSkinName ?? "Saved skin"} loaded. Changes can be saved from here.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not apply saved skin.");
     }
@@ -627,7 +644,7 @@ export function MiniaturePainter({ sourceFile, loadedPaintDocument = null, paint
       <div className="overflow-hidden rounded-[30px] border border-slate-800 bg-[#080d13]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-fuchsia-300">Miniature Painter v0.3</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-fuchsia-300">Miniature Painter v0.4</p>
             <p className="mt-1 text-sm font-bold text-slate-200">{model?.name ?? "Preparing model…"}</p>
             <p className="mt-1 text-[11px] text-slate-600">{status}</p>
           </div>
@@ -673,11 +690,11 @@ export function MiniaturePainter({ sourceFile, loadedPaintDocument = null, paint
         {canSave ? (
           <div className="rounded-[26px] border border-emerald-500/20 bg-emerald-500/5 p-5">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300">Save skin</p>
-            <p className="mt-2 text-[11px] leading-5 text-slate-500">Saved skins never alter the STL. Loading an existing skin and saving again creates a new version.</p>
+            <p className="mt-2 text-[11px] leading-5 text-slate-500">{saveHelperText}</p>
             <input value={skinName} maxLength={80} onChange={(event) => setSkinName(event.target.value)} placeholder="e.g. Kainalia armour" className="mt-3 min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200 outline-none focus:border-emerald-400/60" />
             <div className="mt-3 grid gap-2">
-              <button type="button" disabled={!model || !skinName.trim() || saving} onClick={() => void saveSkin(false)} className="min-h-11 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 text-xs font-black text-emerald-100 disabled:opacity-30">{saving ? "Saving…" : "Save as new skin"}</button>
-              <button type="button" disabled={!model || !skinName.trim() || saving} onClick={() => void saveSkin(true)} className="min-h-11 rounded-xl bg-emerald-400 px-4 text-xs font-black text-slate-950 disabled:opacity-30">Save & make default</button>
+              <button type="button" disabled={!model || !skinName.trim() || saving} onClick={() => void saveSkin(false)} className="min-h-11 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 text-xs font-black text-emerald-100 disabled:opacity-30">{saving ? "Saving…" : saveActionLabel}</button>
+              {canMakeDefault ? <button type="button" disabled={!model || !skinName.trim() || saving} onClick={() => void saveSkin(true)} className="min-h-11 rounded-xl bg-emerald-400 px-4 text-xs font-black text-slate-950 disabled:opacity-30">Save & make default</button> : null}
             </div>
           </div>
         ) : null}
