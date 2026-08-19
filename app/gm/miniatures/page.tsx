@@ -21,6 +21,9 @@ export default async function MiniatureStudioPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link href="/gm/miniatures/paint" className="inline-flex min-h-11 items-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/10 px-4 text-sm font-semibold text-fuchsia-100">
+              Paint Miniatures
+            </Link>
             <Link href="/characters" className="inline-flex min-h-11 items-center rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 text-sm font-semibold text-yellow-200">
               View Characters
             </Link>
