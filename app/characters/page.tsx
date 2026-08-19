@@ -17,7 +17,7 @@ export default async function CharactersPage() {
               <p className="text-xs font-black uppercase tracking-[0.32em] text-yellow-500">Expedition roster</p>
               <h1 className="mt-3 text-4xl font-black sm:text-5xl">Characters</h1>
               <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-                Browse current miniatures and their paint skins. Players may contribute one skin to another character while keeping unlimited skins for their own; only the Game Master or the character owner decides the default.
+                Browse current miniatures and their paint skins. Players may contribute one replaceable skin to another character while keeping unlimited skins for their own; only the Game Master or the character owner decides the default.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
