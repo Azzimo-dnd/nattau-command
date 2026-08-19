@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CharactersPage() {
   const access = await requireCampaignMembership("nattau");
+  const isDm = access.membership.role === "dm";
 
   return (
     <main className="min-h-screen bg-[#090e15] px-4 py-7 text-slate-100 sm:px-6 lg:py-9">
@@ -16,19 +17,27 @@ export default async function CharactersPage() {
               <p className="text-xs font-black uppercase tracking-[0.32em] text-yellow-500">Expedition roster</p>
               <h1 className="mt-3 text-4xl font-black sm:text-5xl">Characters</h1>
               <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-                The expedition&apos;s current player miniatures. Pick a character to inspect the model from every angle; only the miniature selected as current by the Game Master is exposed to campaign members.
+                Browse the expedition&apos;s current miniatures and their saved paint skins. Everyone can preview available skins; the Game Master or the character owner decides which one is the campaign default.
               </p>
             </div>
-            {access.membership.role === "dm" ? (
-              <Link href="/gm/miniatures" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-yellow-500 px-5 font-black text-slate-950">
-                Manage Miniatures
-              </Link>
-            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {isDm ? (
+                <Link href="/gm/miniatures" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-yellow-500 px-5 font-black text-slate-950">
+                  Manage Miniatures
+                </Link>
+              ) : (
+                <Link href="/characters/paint" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/10 px-5 font-black text-fuchsia-100">
+                  Paint My Miniature
+                </Link>
+              )}
+            </div>
           </div>
         </header>
 
         <CharacterMiniaturesGallery
           campaignId={access.membership.campaignId}
+          currentUserId={access.userId}
+          isDm={isDm}
           preferredPlayerId={access.membership.role === "player" ? access.userId : null}
         />
       </div>
