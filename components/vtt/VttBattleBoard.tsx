@@ -27,6 +27,8 @@ type MeasureMode = "navigate" | "ruler" | "radius";
 type MeasurePoint = [number, number];
 
 const assetCache = new Map<string, Promise<LoadedTokenAsset>>();
+const MAX_MAP_BYTES = 20 * 1024 * 1024;
+const SCENE_FIELDS = "id,campaign_id,name,grid_width,grid_height,feet_per_square,is_active,map_storage_path,map_original_name,map_opacity,grid_opacity,show_grid";
 
 function clampAndSnap(value: number, halfExtent: number) {
   const limit = Math.max(0.5, halfExtent - 0.5);
@@ -42,6 +44,11 @@ function isEditableTarget(target: EventTarget | null) {
 function normalizeRotation(value: number) {
   const full = Math.PI * 2;
   return ((value % full) + full) % full;
+}
+
+function mapExtension(file: File) {
+  const match = file.name.toLowerCase().match(/\.(webp|png|jpe?g)$/);
+  return match?.[1] === "jpeg" ? "jpg" : match?.[1] ?? null;
 }
 
 async function loadTokenAsset(
@@ -150,7 +157,7 @@ function VttOrbitControls({ disabled }: { disabled: boolean }) {
   return null;
 }
 
-function BattleGrid({ width, height }: { width: number; height: number }) {
+function BattleGrid({ width, height, opacity }: { width: number; height: number; opacity: number }) {
   const geometry = useMemo(() => {
     const points: number[] = [];
     const halfW = width / 2;
@@ -172,8 +179,83 @@ function BattleGrid({ width, height }: { width: number; height: number }) {
 
   return (
     <lineSegments geometry={geometry}>
-      <lineBasicMaterial color="#34455c" transparent opacity={0.78} />
+      <lineBasicMaterial color="#5b7ca8" transparent opacity={opacity} depthWrite={false} />
     </lineSegments>
+  );
+}
+
+function SceneSurface({
+  scene,
+  supabase,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+}: {
+  scene: VttScene;
+  supabase: ReturnType<typeof createClient>;
+  onPointerDown: (event: ThreeEvent<PointerEvent>) => void;
+  onPointerMove: (event: ThreeEvent<PointerEvent>) => void;
+  onPointerUp: (event: ThreeEvent<PointerEvent>) => void;
+}) {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    let objectUrl: string | null = null;
+    let loadedTexture: THREE.Texture | null = null;
+    setTexture(null);
+
+    if (!scene.map_storage_path) return () => undefined;
+
+    void supabase.storage.from("vtt-maps").download(scene.map_storage_path).then(({ data, error }) => {
+      if (!alive || error || !data) return;
+      objectUrl = URL.createObjectURL(data);
+      new THREE.TextureLoader().load(
+        objectUrl,
+        (next) => {
+          if (!alive) {
+            next.dispose();
+            return;
+          }
+          next.colorSpace = THREE.SRGBColorSpace;
+          next.wrapS = THREE.ClampToEdgeWrapping;
+          next.wrapT = THREE.ClampToEdgeWrapping;
+          next.needsUpdate = true;
+          loadedTexture = next;
+          setTexture(next);
+          if (objectUrl) {
+            URL.revokeObjectURL(objectUrl);
+            objectUrl = null;
+          }
+        },
+      );
+    });
+
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      loadedTexture?.dispose();
+    };
+  }, [scene.map_storage_path, supabase]);
+
+  return (
+    <mesh
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, -0.012, 0]}
+      receiveShadow
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    >
+      <planeGeometry args={[scene.grid_width, scene.grid_height]} />
+      <meshBasicMaterial
+        color={texture ? "#ffffff" : "#121a26"}
+        map={texture ?? undefined}
+        opacity={texture ? scene.map_opacity : 1}
+        transparent={Boolean(texture) && scene.map_opacity < 0.999}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
   );
 }
 
@@ -289,7 +371,8 @@ function TokenMesh({
             <ringGeometry args={[0.42 * token.size_squares, 0.52 * token.size_squares, 48]} />
             <meshBasicMaterial color={ringColor} transparent opacity={0.9} side={THREE.DoubleSide} />
           </mesh>
-          <mesh position={[0, 0.045, 0.62 * token.size_squares]} rotation={[Math.PI / 2, 0, 0]}>
+          {/* Canonical miniature +Y becomes scene -Z after the Z-up -> Y-up model rotation below. */}
+          <mesh position={[0, 0.045, -0.62 * token.size_squares]} rotation={[-Math.PI / 2, 0, 0]}>
             <coneGeometry args={[0.11 * token.size_squares, 0.28 * token.size_squares, 3]} />
             <meshBasicMaterial color={ringColor} depthTest={false} />
           </mesh>
@@ -405,18 +488,8 @@ function VttCanvas({
       <ambientLight intensity={1.25} />
       <directionalLight position={[12, 22, 10]} intensity={2.5} castShadow />
       <directionalLight position={[-12, 10, -8]} intensity={0.8} />
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -0.012, 0]}
-        receiveShadow
-        onPointerDown={planeDown}
-        onPointerMove={planeMove}
-        onPointerUp={planeUp}
-      >
-        <planeGeometry args={[scene.grid_width, scene.grid_height]} />
-        <meshStandardMaterial color="#121a26" roughness={0.94} metalness={0.02} />
-      </mesh>
-      <BattleGrid width={scene.grid_width} height={scene.grid_height} />
+      <SceneSurface scene={scene} supabase={supabase} onPointerDown={planeDown} onPointerMove={planeMove} onPointerUp={planeUp} />
+      {scene.show_grid ? <BattleGrid width={scene.grid_width} height={scene.grid_height} opacity={scene.grid_opacity} /> : null}
       <MeasurementOverlay mode={measureMode} start={measureStart} end={measureEnd} />
       {tokens.map((token) => (
         <TokenMesh
@@ -439,6 +512,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
+  const mapInputRef = useRef<HTMLInputElement | null>(null);
   const [scene, setScene] = useState<VttScene | null>(null);
   const [tokens, setTokens] = useState<VttToken[]>([]);
   const [enemyModels, setEnemyModels] = useState<VttEnemyModel[]>([]);
@@ -449,8 +523,27 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
   const [measureMode, setMeasureMode] = useState<MeasureMode>("navigate");
   const [measureStart, setMeasureStart] = useState<MeasurePoint | null>(null);
   const [measureEnd, setMeasureEnd] = useState<MeasurePoint | null>(null);
+  const [mapFile, setMapFile] = useState<File | null>(null);
+  const [draftWidth, setDraftWidth] = useState(24);
+  const [draftHeight, setDraftHeight] = useState(18);
+  const [draftMapOpacity, setDraftMapOpacity] = useState(100);
+  const [draftGridOpacity, setDraftGridOpacity] = useState(78);
+  const [draftShowGrid, setDraftShowGrid] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const refreshScene = useCallback(async () => {
+    const { data, error: sceneError } = await supabase
+      .from("vtt_scenes")
+      .select(SCENE_FIELDS)
+      .eq("campaign_id", campaignId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (sceneError) throw sceneError;
+    const next = data as VttScene | null;
+    setScene(next);
+    return next;
+  }, [campaignId, supabase]);
 
   const refreshTokens = useCallback(async (sceneId: string) => {
     const { data, error: rpcError } = await supabase.rpc("list_vtt_scene_tokens", { p_scene_id: sceneId });
@@ -485,18 +578,11 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
           if (rpcError) throw rpcError;
           const raw = Array.isArray(data) ? data[0] : data;
           nextScene = (raw ?? null) as VttScene | null;
+          if (!cancelled) setScene(nextScene);
         } else {
-          const { data, error: sceneError } = await supabase
-            .from("vtt_scenes")
-            .select("id,campaign_id,name,grid_width,grid_height,feet_per_square,is_active")
-            .eq("campaign_id", campaignId)
-            .eq("is_active", true)
-            .maybeSingle();
-          if (sceneError) throw sceneError;
-          nextScene = data as VttScene | null;
+          nextScene = await refreshScene();
         }
         if (cancelled) return;
-        setScene(nextScene);
         if (nextScene) await refreshTokens(nextScene.id);
         if (isDm) await refreshEnemies();
       } catch (cause) {
@@ -507,14 +593,23 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
     };
     void boot();
     return () => { cancelled = true; };
-  }, [campaignId, isDm, refreshEnemies, refreshTokens, supabase]);
+  }, [campaignId, isDm, refreshEnemies, refreshScene, refreshTokens, supabase]);
+
+  useEffect(() => {
+    if (!scene) return;
+    setDraftWidth(scene.grid_width);
+    setDraftHeight(scene.grid_height);
+    setDraftMapOpacity(Math.round(scene.map_opacity * 100));
+    setDraftGridOpacity(Math.round(scene.grid_opacity * 100));
+    setDraftShowGrid(scene.show_grid);
+  }, [scene]);
 
   useEffect(() => {
     if (!scene) return;
     let channel = supabase
       .channel(`vtt-alpha-${scene.id}`)
       .on("broadcast", { event: "refresh" }, () => {
-        void refreshTokens(scene.id).catch(() => undefined);
+        void Promise.all([refreshTokens(scene.id), refreshScene()]).catch(() => undefined);
       });
 
     if (isDm) {
@@ -529,7 +624,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
       channelRef.current = null;
       void supabase.removeChannel(channel);
     };
-  }, [isDm, refreshTokens, scene, supabase]);
+  }, [isDm, refreshScene, refreshTokens, scene, supabase]);
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(document.fullscreenElement === boardRef.current);
@@ -541,16 +636,102 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
 
   const toggleFullscreen = async () => {
     try {
-      if (document.fullscreenElement === boardRef.current) {
-        await document.exitFullscreen();
-      } else if (boardRef.current?.requestFullscreen) {
-        await boardRef.current.requestFullscreen();
-      } else {
-        setError("Fullscreen mode is not supported by this browser.");
-      }
+      if (document.fullscreenElement === boardRef.current) await document.exitFullscreen();
+      else if (boardRef.current?.requestFullscreen) await boardRef.current.requestFullscreen();
+      else setError("Fullscreen mode is not supported by this browser.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not switch fullscreen mode.");
     }
+  };
+
+  const sceneDraft = () => {
+    const gridWidth = Math.max(4, Math.min(100, Math.round(draftWidth)));
+    const gridHeight = Math.max(4, Math.min(100, Math.round(draftHeight)));
+    return {
+      grid_width: gridWidth,
+      grid_height: gridHeight,
+      map_opacity: Math.max(0, Math.min(1, draftMapOpacity / 100)),
+      grid_opacity: Math.max(0, Math.min(1, draftGridOpacity / 100)),
+      show_grid: draftShowGrid,
+      updated_at: new Date().toISOString(),
+    };
+  };
+
+  const saveScenePresentation = async () => {
+    if (!scene || !isDm || busy) return;
+    setBusy(true); setError(null); setMessage(null);
+    const { error: updateError } = await supabase.from("vtt_scenes").update(sceneDraft()).eq("id", scene.id);
+    if (updateError) setError(updateError.message);
+    else {
+      await refreshScene();
+      broadcastRefresh();
+      setMessage("Scene size and presentation settings saved.");
+    }
+    setBusy(false);
+  };
+
+  const uploadSceneMap = async () => {
+    if (!scene || !isDm || !mapFile || busy) return;
+    const extension = mapExtension(mapFile);
+    if (!extension) {
+      setError("Battle maps must be WebP, PNG, JPG or JPEG files.");
+      return;
+    }
+    if (mapFile.size <= 0 || mapFile.size > MAX_MAP_BYTES) {
+      setError("Battle map must be larger than 0 bytes and no more than 20 MB.");
+      return;
+    }
+
+    setBusy(true); setError(null); setMessage(null);
+    const path = `${campaignId}/${scene.id}/${crypto.randomUUID()}.${extension}`;
+    const oldPath = scene.map_storage_path;
+    const { error: uploadError } = await supabase.storage.from("vtt-maps").upload(path, mapFile, {
+      cacheControl: "3600",
+      contentType: mapFile.type || (extension === "webp" ? "image/webp" : extension === "png" ? "image/png" : "image/jpeg"),
+      upsert: false,
+    });
+
+    if (uploadError) {
+      setError(uploadError.message);
+      setBusy(false);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from("vtt_scenes")
+      .update({ ...sceneDraft(), map_storage_path: path, map_original_name: mapFile.name })
+      .eq("id", scene.id);
+
+    if (updateError) {
+      await supabase.storage.from("vtt-maps").remove([path]);
+      setError(updateError.message);
+    } else {
+      if (oldPath && oldPath !== path) await supabase.storage.from("vtt-maps").remove([oldPath]);
+      setMapFile(null);
+      if (mapInputRef.current) mapInputRef.current.value = "";
+      await refreshScene();
+      broadcastRefresh();
+      setMessage(`Battle map ${mapFile.name} is now active.`);
+    }
+    setBusy(false);
+  };
+
+  const removeSceneMap = async () => {
+    if (!scene || !isDm || !scene.map_storage_path || busy) return;
+    setBusy(true); setError(null); setMessage(null);
+    const oldPath = scene.map_storage_path;
+    const { error: updateError } = await supabase
+      .from("vtt_scenes")
+      .update({ map_storage_path: null, map_original_name: null, updated_at: new Date().toISOString() })
+      .eq("id", scene.id);
+    if (updateError) setError(updateError.message);
+    else {
+      await supabase.storage.from("vtt-maps").remove([oldPath]);
+      await refreshScene();
+      broadcastRefresh();
+      setMessage("Battle map removed. The plain grid remains active.");
+    }
+    setBusy(false);
   };
 
   const placeParty = async () => {
@@ -599,9 +780,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
     if (updateError) {
       setError(updateError.message);
       if (scene) await refreshTokens(scene.id).catch(() => undefined);
-    } else {
-      broadcastRefresh();
-    }
+    } else broadcastRefresh();
   };
 
   const rotateSelected = useCallback(async (delta: number, absolute = false) => {
@@ -617,9 +796,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
     if (updateError) {
       setError(updateError.message);
       if (scene) await refreshTokens(scene.id).catch(() => undefined);
-    } else {
-      broadcastRefresh();
-    }
+    } else broadcastRefresh();
   }, [broadcastRefresh, busy, isDm, refreshTokens, scene, selected, supabase]);
 
   useEffect(() => {
@@ -677,10 +854,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
     const dx = measureEnd[0] - measureStart[0];
     const dz = measureEnd[1] - measureStart[1];
     const squares = Math.sqrt(dx * dx + dz * dz);
-    return {
-      squares,
-      feet: squares * scene.feet_per_square,
-    };
+    return { squares, feet: squares * scene.feet_per_square };
   }, [measureEnd, measureMode, measureStart, scene]);
 
   if (loading) return <div className="h-[72vh] min-h-[620px] animate-pulse rounded-[30px] border border-slate-800 bg-slate-900/50" />;
@@ -708,14 +882,10 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300">Live scene</p>
           <h2 className={`${isFullscreen ? "text-lg" : "mt-1 text-xl"} font-black text-slate-100`}>{scene.name}</h2>
-          <p className="mt-1 text-xs text-slate-500">{scene.grid_width} × {scene.grid_height} squares · {scene.feet_per_square} ft per square · D&amp;D grid distance</p>
+          <p className="mt-1 text-xs text-slate-500">{scene.grid_width} × {scene.grid_height} squares · {scene.feet_per_square} ft per square · {scene.map_original_name ?? "plain grid"}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void toggleFullscreen()}
-            className="min-h-9 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100 hover:border-cyan-300/60"
-          >
+          <button type="button" onClick={() => void toggleFullscreen()} className="min-h-9 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100 hover:border-cyan-300/60">
             {isFullscreen ? "Exit fullscreen" : "Fullscreen table"}
           </button>
           <span className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] ${isDm ? "border-yellow-400/30 bg-yellow-400/10 text-yellow-200" : "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"}`}>
@@ -728,12 +898,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
         <div className={`relative overflow-hidden border border-slate-800 bg-[#070b11] ${isFullscreen ? "min-h-0 rounded-2xl" : "rounded-[30px]"}`}>
           <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5 rounded-2xl border border-slate-700/80 bg-slate-950/88 p-1.5 shadow-2xl backdrop-blur">
             {(["navigate", "ruler", "radius"] as MeasureMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => selectMeasureMode(mode)}
-                className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] ${measureMode === mode ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}
-              >
+              <button key={mode} type="button" onClick={() => selectMeasureMode(mode)} className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] ${measureMode === mode ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>
                 {mode === "navigate" ? "Navigate" : mode === "ruler" ? "Ruler" : "Spell radius"}
               </button>
             ))}
@@ -749,6 +914,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
 
           <div className={isFullscreen ? "h-full min-h-0" : "h-[72dvh] min-h-[560px] max-h-[920px]"}>
             <VttCanvas
+              key={`${scene.id}:${scene.grid_width}:${scene.grid_height}`}
               scene={scene}
               tokens={tokens}
               isDm={isDm}
@@ -768,8 +934,8 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
           {!isFullscreen ? (
             <div className="border-t border-slate-800 px-4 py-3 text-[11px] text-slate-500">
               {isDm
-                ? "GM: drag a miniature to move it. Arrow keys / WASD pan the camera; Shift moves faster. Q / E rotate the selected token by 45°. Ruler and Spell radius are local measuring tools."
-                : "Spectator: orbit, pan and zoom freely. Arrow keys / WASD pan the camera. Ruler and Spell radius are local tools and do not change the scene."
+                ? "GM: drag a miniature to move it. Arrow keys / WASD pan the camera; Shift moves faster. Q / E rotate the selected token by 45°."
+                : "Spectator: orbit, pan and zoom freely. Arrow keys / WASD pan the camera. Ruler and Spell radius are local tools."
               }
             </div>
           ) : null}
@@ -780,7 +946,42 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
             <section className="rounded-[26px] border border-slate-800 bg-slate-900/70 p-4">
               <p className="text-xs font-black uppercase tracking-[0.2em] text-yellow-400">GM setup</p>
               <button type="button" disabled={busy} onClick={() => void placeParty()} className="mt-3 min-h-11 w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 text-xs font-black text-cyan-100 disabled:opacity-40">Place / refresh party</button>
-              <p className="mt-2 text-[10px] leading-4 text-slate-600">Uses each player&apos;s current character miniature. Existing party tokens are not duplicated.</p>
+              <p className="mt-2 text-[10px] leading-4 text-slate-600">Uses each player&apos;s current miniature. Existing party tokens are not duplicated.</p>
+            </section>
+
+            <section className="rounded-[26px] border border-slate-800 bg-slate-900/70 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300">Scene map</p>
+              <p className="mt-2 text-[10px] leading-4 text-slate-500">Private active-scene map. Players can download only the map currently shown on the table.</p>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <label className="text-[10px] font-bold text-slate-400">Width (squares)
+                  <input type="number" min={4} max={100} value={draftWidth} onChange={(event) => setDraftWidth(Number(event.target.value))} className="mt-1 h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-xs text-slate-100 outline-none focus:border-cyan-400/60" />
+                </label>
+                <label className="text-[10px] font-bold text-slate-400">Height (squares)
+                  <input type="number" min={4} max={100} value={draftHeight} onChange={(event) => setDraftHeight(Number(event.target.value))} className="mt-1 h-10 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-xs text-slate-100 outline-none focus:border-cyan-400/60" />
+                </label>
+              </div>
+
+              <label className="mt-3 block text-[10px] font-bold text-slate-400">Map opacity · {draftMapOpacity}%
+                <input type="range" min={0} max={100} value={draftMapOpacity} onChange={(event) => setDraftMapOpacity(Number(event.target.value))} className="mt-1 w-full accent-emerald-400" />
+              </label>
+              <label className="mt-2 block text-[10px] font-bold text-slate-400">Grid opacity · {draftGridOpacity}%
+                <input type="range" min={0} max={100} value={draftGridOpacity} onChange={(event) => setDraftGridOpacity(Number(event.target.value))} className="mt-1 w-full accent-cyan-400" />
+              </label>
+              <label className="mt-2 flex items-center gap-2 text-[10px] font-bold text-slate-300">
+                <input type="checkbox" checked={draftShowGrid} onChange={(event) => setDraftShowGrid(event.target.checked)} className="h-4 w-4 accent-cyan-400" /> Show VTT grid
+              </label>
+
+              <input ref={mapInputRef} type="file" accept=".webp,.png,.jpg,.jpeg,image/webp,image/png,image/jpeg" onChange={(event) => setMapFile(event.target.files?.[0] ?? null)} className="mt-3 block w-full text-[10px] text-slate-400 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-[10px] file:font-bold file:text-slate-200" />
+              {mapFile ? <p className="mt-1 truncate text-[9px] text-emerald-300">Ready: {mapFile.name} · {(mapFile.size / 1024 / 1024).toFixed(1)} MB</p> : null}
+              {scene.map_original_name ? <p className="mt-1 truncate text-[9px] text-slate-500">Current: {scene.map_original_name}</p> : <p className="mt-1 text-[9px] text-slate-600">Current: plain grid</p>}
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" disabled={busy} onClick={() => void saveScenePresentation()} className="min-h-10 rounded-xl border border-cyan-400/25 px-3 text-[10px] font-black text-cyan-100 disabled:opacity-40">Save settings</button>
+                <button type="button" disabled={busy || !mapFile} onClick={() => void uploadSceneMap()} className="min-h-10 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 text-[10px] font-black text-emerald-100 disabled:opacity-40">Upload & apply</button>
+              </div>
+              {scene.map_storage_path ? <button type="button" disabled={busy} onClick={() => void removeSceneMap()} className="mt-2 min-h-9 w-full rounded-xl border border-rose-400/20 px-3 text-[9px] font-bold text-rose-200 disabled:opacity-40">Remove current map</button> : null}
+              <p className="mt-2 text-[9px] leading-4 text-slate-600">WebP/PNG/JPG · max 20 MB · scene size remains measured in 5 ft D&amp;D squares.</p>
             </section>
 
             <section className="rounded-[26px] border border-slate-800 bg-slate-900/70 p-4">
@@ -802,7 +1003,6 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
                 <>
                   <h3 className="mt-3 text-lg font-black text-slate-100">{selected.name}</h3>
                   <p className="mt-1 text-[11px] text-slate-500">{selected.source_kind} · ({selected.x.toFixed(0)}, {selected.z.toFixed(0)}) · {selected.size_squares} square · facing {rotationDegrees}°</p>
-
                   <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/45 p-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-cyan-300">Facing</p>
                     <div className="mt-2 grid grid-cols-3 gap-2">
@@ -810,9 +1010,8 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
                       <button type="button" disabled={busy} onClick={() => void rotateSelected(0, true)} className="min-h-10 rounded-xl border border-slate-700 text-[10px] font-black text-slate-300">Reset</button>
                       <button type="button" disabled={busy} onClick={() => void rotateSelected(Math.PI / 4)} className="min-h-10 rounded-xl border border-cyan-400/25 text-xs font-black text-cyan-100">45° ↻</button>
                     </div>
-                    <p className="mt-2 text-[9px] leading-4 text-slate-600">Keyboard: Q / E rotates the selected miniature. The small marker on its base shows current facing.</p>
+                    <p className="mt-2 text-[9px] leading-4 text-slate-600">Q / E rotates by 45°. The base arrow now points along the miniature&apos;s canonical forward direction.</p>
                   </div>
-
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <button type="button" disabled={busy} onClick={() => void toggleVisibility()} className={`min-h-10 rounded-xl border px-3 text-[10px] font-black ${selected.visible_to_players ? "border-emerald-400/30 text-emerald-200" : "border-fuchsia-400/30 text-fuchsia-200"}`}>{selected.visible_to_players ? "Hide from players" : "Reveal to players"}</button>
                     <button type="button" disabled={busy} onClick={() => void removeSelected()} className="min-h-10 rounded-xl border border-rose-400/30 px-3 text-[10px] font-black text-rose-200">Remove</button>
