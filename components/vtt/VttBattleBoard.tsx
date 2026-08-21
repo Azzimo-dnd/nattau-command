@@ -290,6 +290,7 @@ function VttCanvas({
 
 export function VttBattleBoard({ campaignId, isDm }: Props) {
   const supabase = useMemo(() => createClient(), []);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [scene, setScene] = useState<VttScene | null>(null);
   const [tokens, setTokens] = useState<VttToken[]>([]);
   const [enemyModels, setEnemyModels] = useState<VttEnemyModel[]>([]);
@@ -304,6 +305,10 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
     if (rpcError) throw rpcError;
     setTokens((data ?? []) as VttToken[]);
   }, [supabase]);
+
+  const broadcastRefresh = useCallback(() => {
+    void channelRef.current?.send({ type: "broadcast", event: "refresh", payload: {} });
+  }, []);
 
   const refreshEnemies = useCallback(async () => {
     if (!isDm) return;
@@ -354,14 +359,25 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
 
   useEffect(() => {
     if (!scene) return;
-    const channel = supabase
+    let channel = supabase
       .channel(`vtt-alpha-${scene.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "vtt_tokens" }, () => {
+      .on("broadcast", { event: "refresh" }, () => {
         void refreshTokens(scene.id).catch(() => undefined);
-      })
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [refreshTokens, scene, supabase]);
+      });
+
+    if (isDm) {
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table: "vtt_tokens" }, () => {
+        void refreshTokens(scene.id).catch(() => undefined);
+      });
+    }
+
+    channel.subscribe();
+    channelRef.current = channel;
+    return () => {
+      channelRef.current = null;
+      void supabase.removeChannel(channel);
+    };
+  }, [isDm, refreshTokens, scene, supabase]);
 
   const selected = tokens.find((token) => token.id === selectedId) ?? null;
 
@@ -373,6 +389,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
     else {
       setMessage(`Party ready: ${Number(data ?? 0)} new character token${Number(data ?? 0) === 1 ? "" : "s"} placed.`);
       await refreshTokens(scene.id).catch(() => undefined);
+      broadcastRefresh();
     }
     setBusy(false);
   };
@@ -390,6 +407,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
     else {
       setMessage(`${enemy.name} spawned hidden at the center of the grid.`);
       await refreshTokens(scene.id).catch(() => undefined);
+      broadcastRefresh();
     }
     setBusy(false);
   };
@@ -409,6 +427,8 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
     if (updateError) {
       setError(updateError.message);
       if (scene) await refreshTokens(scene.id).catch(() => undefined);
+    } else {
+      broadcastRefresh();
     }
   };
 
@@ -420,7 +440,10 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
       .update({ visible_to_players: !selected.visible_to_players, revision: selected.revision + 1, updated_at: new Date().toISOString() })
       .eq("id", selected.id);
     if (updateError) setError(updateError.message);
-    else if (scene) await refreshTokens(scene.id).catch(() => undefined);
+    else {
+      if (scene) await refreshTokens(scene.id).catch(() => undefined);
+      broadcastRefresh();
+    }
     setBusy(false);
   };
 
@@ -432,6 +455,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
     else {
       setSelectedId(null);
       if (scene) await refreshTokens(scene.id).catch(() => undefined);
+      broadcastRefresh();
     }
     setBusy(false);
   };
@@ -453,7 +477,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300">Live scene</p>
           <h2 className="mt-1 text-xl font-black text-slate-100">{scene.name}</h2>
-          <p className="mt-1 text-xs text-slate-500">{scene.grid_width} × {scene.grid_height} squares · {scene.feet_per_square} ft per square · D&D grid distance</p>
+          <p className="mt-1 text-xs text-slate-500">{scene.grid_width} × {scene.grid_height} squares · {scene.feet_per_square} ft per square · D&amp;D grid distance</p>
         </div>
         <span className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] ${isDm ? "border-yellow-400/30 bg-yellow-400/10 text-yellow-200" : "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"}`}>
           {isDm ? "GM control" : "Player spectator"}
