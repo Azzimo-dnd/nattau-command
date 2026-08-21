@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { VttDiceMode } from "./useVttDice";
+
+type HistoryDiceMode = "normal" | "advantage" | "disadvantage";
 
 export type VttDiceHistoryRow = {
   id: string;
@@ -11,7 +12,7 @@ export type VttDiceHistoryRow = {
   roller_id: string | null;
   roller_name: string;
   expression: string;
-  mode: VttDiceMode;
+  mode: HistoryDiceMode;
   modifier: number;
   total: number;
   details: Record<string, unknown>;
@@ -22,7 +23,7 @@ type SaveVttDiceRoll = {
   rollKey: string;
   sceneId: string;
   expression: string;
-  mode: VttDiceMode;
+  mode: HistoryDiceMode;
   modifier: number;
   total: number;
   details: Record<string, unknown>;
