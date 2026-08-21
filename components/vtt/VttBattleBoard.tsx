@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { VttCanvas, type VttToolMode } from "./VttGridAlignedCanvas";
 import { VttDiceBar } from "./VttDiceBar";
+import { VttDiceHistoryPanel } from "./VttDiceHistoryPanel";
 import { VttSceneManager } from "./VttSceneManager";
 import { VttSceneSettings } from "./VttSceneSettings";
 import { VttSelectionPanel } from "./VttSelectionPanel";
@@ -32,12 +33,17 @@ export function VttBattleBoard({ campaignId, isDm, currentUserId, currentUserNam
   });
   const boardRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(document.fullscreenElement === boardRef.current);
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
+
+  useEffect(() => {
+    setHistoryOpen(false);
+  }, [board.scene?.id]);
 
   useEffect(() => {
     if (!isDm || board.selectedTokens.length !== 1 || board.playerPreview || dice.activeRoll) return;
@@ -160,6 +166,19 @@ export function VttBattleBoard({ campaignId, isDm, currentUserId, currentUserNam
             />
           </div>
 
+          <VttDiceHistoryPanel
+            open={historyOpen}
+            isFullscreen={isFullscreen}
+            sceneName={scene.name}
+            isDm={isDm}
+            rolls={dice.historyRolls}
+            loading={dice.historyLoading}
+            clearing={dice.historyClearing}
+            error={dice.historyError}
+            onClose={() => setHistoryOpen(false)}
+            onClear={() => { void dice.clearHistory(); }}
+          />
+
           <VttDiceBar
             isFullscreen={isFullscreen}
             counts={dice.counts}
@@ -175,11 +194,14 @@ export function VttBattleBoard({ campaignId, isDm, currentUserId, currentUserNam
             error={dice.error}
             appearanceName={dice.appearanceName}
             appearanceSwatch={dice.appearanceSwatch}
+            historyCount={dice.historyRolls.length}
+            historyOpen={historyOpen}
             onAddDie={dice.addDie}
             onRemoveDie={dice.removeDie}
             onModifier={dice.setModifier}
             onMode={dice.setMode}
             onClear={dice.clearDice}
+            onHistory={() => setHistoryOpen((current) => !current)}
             onRoll={() => { void dice.roll(); }}
           />
 
