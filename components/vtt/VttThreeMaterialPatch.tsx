@@ -40,28 +40,14 @@ function installMapMaterialPatch() {
       const previous = this[MAP_VALUE] ?? null;
       this[MAP_VALUE] = next;
 
-      // WebGLRenderer.render is installed as an instance method by Three.js, so
-      // patching WebGLRenderer.prototype.render does not reliably intercept R3F.
-      // Intercept the map assignment itself instead. When R3F changes a material
-      // from no map to a loaded battle-map texture, Three.js must compile a new
-      // shader with USE_MAP enabled.
       if (previous !== next && typeof this.version === "number") {
         this.needsUpdate = true;
-        if (next) {
-          next.needsUpdate = true;
-          console.info("[VTT map] Texture attached to MeshBasicMaterial", {
-            texture: next.uuid,
-            imageWidth: (next.image as { width?: number } | undefined)?.width ?? null,
-            imageHeight: (next.image as { height?: number } | undefined)?.height ?? null,
-            materialVersion: this.version,
-          });
-        }
+        if (next) next.needsUpdate = true;
       }
     },
   });
 
   prototype[MAP_PATCH_FLAG] = true;
-  console.info("[VTT map] Installed MeshBasicMaterial.map setter patch.");
 }
 
 function installFacingMarkerPatch() {
@@ -79,12 +65,13 @@ function installFacingMarkerPatch() {
         && this.position.z < 0;
 
       if (isVttFacingMarker) {
-        // The real STL/GLB miniature front used by our current assets is opposite
-        // to the +Y assumption made in the first facing-marker correction.
-        // Keep token.rotation authoritative and only mirror the visual marker so
-        // it sits and points along the same forward direction as the miniature.
-        this.position.z = -this.position.z;
-        if (this.rotation.x < 0) this.rotation.x = -this.rotation.x;
+        const distance = Math.abs(this.position.z);
+
+        // The tested Nattau miniature assets face local +X on the VTT board.
+        // Keep token.rotation as the only authoritative rotation value and only
+        // move/rotate the visual facing marker into that same local direction.
+        this.position.set(distance, 0.045, 0);
+        this.rotation.set(0, 0, -Math.PI / 2);
       }
     }
 
@@ -92,7 +79,6 @@ function installFacingMarkerPatch() {
   };
 
   prototype[FACING_PATCH_FLAG] = true;
-  console.info("[VTT facing] Installed miniature facing-marker axis patch.");
 }
 
 function installPatches() {
