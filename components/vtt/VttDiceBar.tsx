@@ -26,11 +26,14 @@ export function VttDiceBar({
   error,
   appearanceName,
   appearanceSwatch,
+  historyCount,
+  historyOpen,
   onAddDie,
   onRemoveDie,
   onModifier,
   onMode,
   onClear,
+  onHistory,
   onRoll,
 }: {
   isFullscreen: boolean;
@@ -47,11 +50,14 @@ export function VttDiceBar({
   error: string | null;
   appearanceName: string;
   appearanceSwatch: string;
+  historyCount: number;
+  historyOpen: boolean;
   onAddDie: (sides: SupportedDie) => void;
   onRemoveDie: (sides: SupportedDie) => void;
   onModifier: (value: number) => void;
   onMode: (mode: VttDiceMode) => void;
   onClear: () => void;
+  onHistory: () => void;
   onRoll: () => void;
 }) {
   const busy = Boolean(activeRoll);
@@ -147,6 +153,14 @@ export function VttDiceBar({
 
             <button type="button" disabled={busy} onClick={onClear} className="min-h-9 rounded-xl border border-slate-800 bg-slate-900/80 px-3 text-[10px] font-black uppercase tracking-[0.08em] text-slate-500 hover:text-slate-200 disabled:opacity-40">
               Clear
+            </button>
+
+            <button
+              type="button"
+              onClick={onHistory}
+              className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.08em] ${historyOpen ? "border-cyan-300/55 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/80 text-slate-400 hover:text-slate-100"}`}
+            >
+              History{historyCount > 0 ? ` · ${historyCount}` : ""}
             </button>
 
             <button
