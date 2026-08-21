@@ -2,53 +2,61 @@
 
 import * as THREE from "three";
 
-const PATCH_FLAG = Symbol.for("nattau.vtt.dynamic-map-material-patch");
-const lastMapByMaterial = new WeakMap<THREE.Material, THREE.Texture | null>();
+const PATCH_FLAG = Symbol.for("nattau.vtt.mesh-basic-map-setter-patch");
+const MAP_VALUE = Symbol.for("nattau.vtt.mesh-basic-map-value");
 
-type PatchedRendererPrototype = typeof THREE.WebGLRenderer.prototype & {
+type PatchedPrototype = typeof THREE.MeshBasicMaterial.prototype & {
   [PATCH_FLAG]?: boolean;
 };
 
-function refreshDynamicTextureMaterials(root: THREE.Object3D) {
-  root.traverse((object) => {
-    const mesh = object as THREE.Mesh;
-    if (!mesh.isMesh || !mesh.material) return;
-
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const material of materials) {
-      if (!("map" in material)) continue;
-
-      const currentMap = ((material as THREE.MeshBasicMaterial).map ?? null) as THREE.Texture | null;
-      const previousMap = lastMapByMaterial.get(material);
-
-      // MeshBasicMaterial is first compiled while the asynchronous battle-map texture
-      // is still null. Three.js uses a different shader program when USE_MAP is present.
-      // Force a compile on the first observation as well as on every later map change;
-      // otherwise a patch installed after the first frame can remember nothing and leave
-      // Chrome rendering the material's white base color forever.
-      if (previousMap !== currentMap) {
-        material.needsUpdate = true;
-      }
-      lastMapByMaterial.set(material, currentMap);
-    }
-  });
-}
+type PatchedMaterial = THREE.MeshBasicMaterial & {
+  [MAP_VALUE]?: THREE.Texture | null;
+};
 
 function installPatch() {
-  const prototype = THREE.WebGLRenderer.prototype as PatchedRendererPrototype;
+  const prototype = THREE.MeshBasicMaterial.prototype as PatchedPrototype;
   if (prototype[PATCH_FLAG]) return;
 
-  const originalRender = prototype.render;
-  prototype.render = function patchedRender(
-    this: THREE.WebGLRenderer,
-    scene: THREE.Object3D,
-    camera: THREE.Camera,
-  ) {
-    refreshDynamicTextureMaterials(scene);
-    return originalRender.call(this, scene, camera);
-  };
+  const existing = Object.getOwnPropertyDescriptor(prototype, "map");
+  if (existing && !existing.configurable) {
+    console.warn("[VTT map] Could not install MeshBasicMaterial.map patch: property is not configurable.");
+    prototype[PATCH_FLAG] = true;
+    return;
+  }
+
+  Object.defineProperty(prototype, "map", {
+    configurable: true,
+    enumerable: true,
+    get(this: PatchedMaterial) {
+      return this[MAP_VALUE] ?? null;
+    },
+    set(this: PatchedMaterial, value: THREE.Texture | null | undefined) {
+      const next = value ?? null;
+      const previous = this[MAP_VALUE] ?? null;
+      this[MAP_VALUE] = next;
+
+      // WebGLRenderer.render is installed as an instance method by Three.js, so
+      // patching WebGLRenderer.prototype.render does not reliably intercept R3F.
+      // Intercept the map assignment itself instead. When R3F changes a material
+      // from no map to a loaded battle-map texture, Three.js must compile a new
+      // shader with USE_MAP enabled.
+      if (previous !== next && typeof this.version === "number") {
+        this.needsUpdate = true;
+        if (next) {
+          next.needsUpdate = true;
+          console.info("[VTT map] Texture attached to MeshBasicMaterial", {
+            texture: next.uuid,
+            imageWidth: (next.image as { width?: number } | undefined)?.width ?? null,
+            imageHeight: (next.image as { height?: number } | undefined)?.height ?? null,
+            materialVersion: this.version,
+          });
+        }
+      }
+    },
+  });
 
   prototype[PATCH_FLAG] = true;
+  console.info("[VTT map] Installed MeshBasicMaterial.map setter patch.");
 }
 
 installPatch();
