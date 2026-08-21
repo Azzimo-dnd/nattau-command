@@ -1,35 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
-import { createClient } from "@/lib/supabase/client";
-import {
-  VttCanvas as RawVttCanvas,
-  type VttMeasurePoint,
-  type VttPing,
-  type VttToolMode,
-} from "./VttCanvas";
-import type { VttScene, VttToken } from "./vttTypes";
+import { useMemo, type ComponentProps } from "react";
+import { VttCanvas as RawVttCanvas } from "./VttCanvas";
 
 export type { VttToolMode } from "./VttCanvas";
 
-type Props = {
-  scene: VttScene;
-  tokens: VttToken[];
-  isDm: boolean;
-  selectedIds: string[];
-  supabase: ReturnType<typeof createClient>;
-  toolMode: VttToolMode;
-  measureStart: VttMeasurePoint | null;
-  measureEnd: VttMeasurePoint | null;
-  ping: VttPing | null;
-  onSelect: (id: string | null, additive: boolean) => void;
-  onLocalMove: (id: string, x: number, z: number) => void;
-  onCommitMove: (id: string, x: number, z: number) => void;
-  onMeasureStart: (point: VttMeasurePoint) => void;
-  onMeasureMove: (point: VttMeasurePoint) => void;
-  onMeasureEnd: (point: VttMeasurePoint) => void;
-  onPing: (point: VttMeasurePoint) => void;
-};
+type Props = ComponentProps<typeof RawVttCanvas>;
 
 function tokenFootprint(sizeSquares: number) {
   // Tiny creatures still occupy one selectable D&D grid space. Larger creatures

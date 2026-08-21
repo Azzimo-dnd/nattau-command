@@ -21,7 +21,7 @@ export default async function VttPage() {
               <p className="text-xs font-black uppercase tracking-[0.32em] text-cyan-300">Nattau VTT Alpha</p>
               <h1 className="mt-3 text-4xl font-black sm:text-5xl">Virtual Tabletop</h1>
               <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-                A clean 5 ft D&amp;D grid with the expedition&apos;s real 3D miniatures. Players are spectators in Alpha; the Game Master alone controls placement, movement and enemy reveals.
+                A clean 5 ft D&amp;D grid with the expedition&apos;s real 3D miniatures, shared physical dice and lightweight GM tools. World state remains Game Master controlled.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -37,7 +37,12 @@ export default async function VttPage() {
           </div>
         </header>
 
-        <VttBattleBoard campaignId={access.membership.campaignId} isDm={isDm} />
+        <VttBattleBoard
+          campaignId={access.membership.campaignId}
+          isDm={isDm}
+          currentUserId={access.userId}
+          currentUserName={access.displayName}
+        />
       </div>
     </main>
   );
