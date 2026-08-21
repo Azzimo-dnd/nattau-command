@@ -1,5 +1,5 @@
 -- Nattau VTT Dice v0.4.2 — scene-scoped roll history
--- Branch-only migration. Do not apply to production until the VTT dice beta is approved.
+-- Additive schema for VTT dice history. Safe for the existing app because no existing table is altered.
 -- Each roll belongs to exactly one VTT scene and is removed automatically when that scene is deleted.
 
 begin;
@@ -116,13 +116,13 @@ with check (
 );
 
 drop policy if exists "VTT dice owner or GM delete" on public.vtt_dice_rolls;
-create policy "VTT dice owner or GM delete"
+drop policy if exists "VTT dice GM delete" on public.vtt_dice_rolls;
+create policy "VTT dice GM delete"
 on public.vtt_dice_rolls
 for delete
 to authenticated
 using (
-  roller_id = auth.uid()
-  or exists (
+  exists (
     select 1
     from public.vtt_scenes s
     where s.id = scene_id
