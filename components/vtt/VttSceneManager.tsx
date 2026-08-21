@@ -16,9 +16,22 @@ type Props = {
   onDelete: (scene: VttScene) => void;
 };
 
+type PartyRosterRow = {
+  user_id: string;
+  display_name: string;
+  has_miniature: boolean;
+  included: boolean;
+};
+
 export function VttSceneManager({ scenes, workspaceSceneId, busy, onCreate, onOpen, onActivate, onVisibility, onDuplicate, onDelete }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [thumbnailById, setThumbnailById] = useState<Record<string, string>>({});
+  const [partyRoster, setPartyRoster] = useState<PartyRosterRow[]>([]);
+  const [partyDraft, setPartyDraft] = useState<Set<string>>(new Set());
+  const [partyLoading, setPartyLoading] = useState(false);
+  const [partySaving, setPartySaving] = useState(false);
+  const [partyError, setPartyError] = useState<string | null>(null);
+  const [partyMessage, setPartyMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +47,77 @@ export function VttSceneManager({ scenes, workspaceSceneId, busy, onCreate, onOp
     void load();
     return () => { cancelled = true; };
   }, [scenes, supabase]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadRoster = async () => {
+      if (!workspaceSceneId) {
+        setPartyRoster([]);
+        setPartyDraft(new Set());
+        return;
+      }
+      setPartyLoading(true);
+      setPartyError(null);
+      setPartyMessage(null);
+      const { data, error } = await supabase.rpc("list_vtt_party_roster", { p_scene_id: workspaceSceneId });
+      if (cancelled) return;
+      if (error) {
+        setPartyError(error.message);
+        setPartyRoster([]);
+        setPartyDraft(new Set());
+      } else {
+        const rows = (data ?? []) as PartyRosterRow[];
+        setPartyRoster(rows);
+        setPartyDraft(new Set(rows.filter((row) => row.included && row.has_miniature).map((row) => row.user_id)));
+      }
+      setPartyLoading(false);
+    };
+    void loadRoster();
+    return () => { cancelled = true; };
+  }, [supabase, workspaceSceneId]);
+
+  const selectedCount = partyRoster.filter((row) => row.has_miniature && partyDraft.has(row.user_id)).length;
+  const readyCount = partyRoster.filter((row) => row.has_miniature).length;
+
+  const togglePartyMember = (userId: string) => {
+    setPartyMessage(null);
+    setPartyDraft((current) => {
+      const next = new Set(current);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const selectAllParty = () => {
+    setPartyMessage(null);
+    setPartyDraft(new Set(partyRoster.filter((row) => row.has_miniature).map((row) => row.user_id)));
+  };
+
+  const selectNoParty = () => {
+    setPartyMessage(null);
+    setPartyDraft(new Set());
+  };
+
+  const savePartyRoster = async () => {
+    if (!workspaceSceneId || partySaving || busy) return;
+    setPartySaving(true);
+    setPartyError(null);
+    setPartyMessage(null);
+    const selectedIds = partyRoster
+      .filter((row) => row.has_miniature && partyDraft.has(row.user_id))
+      .map((row) => row.user_id);
+    const { error } = await supabase.rpc("set_vtt_party_roster", {
+      p_scene_id: workspaceSceneId,
+      p_user_ids: selectedIds,
+    });
+    if (error) setPartyError(error.message);
+    else {
+      setPartyRoster((current) => current.map((row) => ({ ...row, included: row.has_miniature && partyDraft.has(row.user_id) })));
+      setPartyMessage(`Roster saved: ${selectedIds.length} character${selectedIds.length === 1 ? "" : "s"}. Use Place / refresh party below to sync the tabletop.`);
+    }
+    setPartySaving(false);
+  };
 
   return (
     <section className="rounded-[26px] border border-slate-800 bg-slate-900/70 p-4">
@@ -83,6 +167,50 @@ export function VttSceneManager({ scenes, workspaceSceneId, busy, onCreate, onOp
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200">Party roster</p>
+            <p className="mt-1 text-[9px] leading-4 text-slate-500">Choose which player characters belong to the selected scene.</p>
+          </div>
+          <span className="rounded-full border border-cyan-400/20 px-2 py-1 text-[9px] font-black text-cyan-100">{selectedCount}/{readyCount}</span>
+        </div>
+
+        {partyLoading ? (
+          <p className="mt-3 text-[10px] text-slate-500">Loading party…</p>
+        ) : partyRoster.length === 0 ? (
+          <p className="mt-3 text-[10px] leading-4 text-slate-500">No active player accounts are available for this scene.</p>
+        ) : (
+          <div className="mt-3 space-y-1.5">
+            {partyRoster.map((member) => (
+              <label key={member.user_id} className={`flex min-h-9 items-center justify-between gap-3 rounded-lg border px-2.5 py-2 ${member.has_miniature ? "cursor-pointer border-slate-800 bg-slate-950/50" : "border-slate-900 bg-slate-950/25 opacity-55"}`}>
+                <span className="flex min-w-0 items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={member.has_miniature && partyDraft.has(member.user_id)}
+                    disabled={!member.has_miniature || partySaving || busy}
+                    onChange={() => togglePartyMember(member.user_id)}
+                    className="h-4 w-4 shrink-0 accent-cyan-400"
+                  />
+                  <span className="truncate text-[10px] font-bold text-slate-200">{member.display_name}</span>
+                </span>
+                <span className={`shrink-0 text-[8px] font-black uppercase ${member.has_miniature ? "text-emerald-300" : "text-slate-600"}`}>{member.has_miniature ? "Ready" : "No miniature"}</span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" disabled={partyLoading || partySaving || busy} onClick={selectAllParty} className="min-h-8 rounded-lg border border-slate-700 text-[9px] font-bold text-slate-300 disabled:opacity-40">Select all</button>
+          <button type="button" disabled={partyLoading || partySaving || busy} onClick={selectNoParty} className="min-h-8 rounded-lg border border-slate-700 text-[9px] font-bold text-slate-300 disabled:opacity-40">Select none</button>
+        </div>
+        <button type="button" disabled={partyLoading || partySaving || busy} onClick={() => void savePartyRoster()} className="mt-2 min-h-9 w-full rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-[9px] font-black uppercase tracking-[0.08em] text-cyan-100 disabled:opacity-40">
+          {partySaving ? "Saving…" : "Save roster"}
+        </button>
+        {partyMessage ? <p className="mt-2 text-[9px] leading-4 text-emerald-300">{partyMessage}</p> : null}
+        {partyError ? <p className="mt-2 text-[9px] leading-4 text-rose-300">{partyError}</p> : null}
       </div>
     </section>
   );
