@@ -64,6 +64,12 @@ export function getNavigationSections(
       items: [
         { label: "Map", href: "/map", icon: "map" },
         {
+          label: "VTT Alpha",
+          href: "/vtt",
+          icon: "war-room",
+          description: "Open the live 5 ft virtual tabletop. Players spectate while the GM controls the scene.",
+        },
+        {
           label: "Characters",
           href: "/characters",
           icon: "account",
@@ -127,6 +133,12 @@ export function getNavigationSections(
           href: "/gm/miniatures",
           icon: "account",
           description: "Upload, preview and select current character miniatures.",
+        },
+        {
+          label: "VTT Enemy Studio",
+          href: "/gm/vtt/enemies",
+          icon: "war-room",
+          description: "Privately upload, convert and paint monster miniatures for the VTT.",
         },
         {
           label: "Fate Management",
