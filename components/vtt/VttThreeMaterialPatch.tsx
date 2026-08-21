@@ -21,10 +21,12 @@ function refreshDynamicTextureMaterials(root: THREE.Object3D) {
       const currentMap = ((material as THREE.MeshBasicMaterial).map ?? null) as THREE.Texture | null;
       const previousMap = lastMapByMaterial.get(material);
 
-      // Three.js compiles a different shader when a material changes between
-      // "no texture" and "has texture". R3F updates the property for us, but
-      // Three still needs an explicit material recompile for this transition.
-      if (previousMap !== undefined && previousMap !== currentMap) {
+      // MeshBasicMaterial is first compiled while the asynchronous battle-map texture
+      // is still null. Three.js uses a different shader program when USE_MAP is present.
+      // Force a compile on the first observation as well as on every later map change;
+      // otherwise a patch installed after the first frame can remember nothing and leave
+      // Chrome rendering the material's white base color forever.
+      if (previousMap !== currentMap) {
         material.needsUpdate = true;
       }
       lastMapByMaterial.set(material, currentMap);
