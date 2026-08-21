@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { VttCanvas, type VttToolMode } from "./VttCanvas";
+import { VttCanvas, type VttToolMode } from "./VttGridAlignedCanvas";
 import { VttSceneManager } from "./VttSceneManager";
 import { VttSceneSettings } from "./VttSceneSettings";
 import { VttSelectionPanel } from "./VttSelectionPanel";
