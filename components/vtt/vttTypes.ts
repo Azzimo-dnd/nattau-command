@@ -11,6 +11,9 @@ export type VttScene = {
   map_opacity: number;
   grid_opacity: number;
   show_grid: boolean;
+  map_scale: number;
+  map_offset_x: number;
+  map_offset_z: number;
 };
 
 export type VttToken = {
