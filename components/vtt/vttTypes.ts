@@ -6,6 +6,11 @@ export type VttScene = {
   grid_height: number;
   feet_per_square: number;
   is_active: boolean;
+  map_storage_path: string | null;
+  map_original_name: string | null;
+  map_opacity: number;
+  grid_opacity: number;
+  show_grid: boolean;
 };
 
 export type VttToken = {
