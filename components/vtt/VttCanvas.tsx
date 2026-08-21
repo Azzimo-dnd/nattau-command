@@ -10,6 +10,8 @@ import {
   parseMiniaturePaintDocument,
 } from "@/components/miniatures/miniaturePaintData";
 import { loadMiniatureGeometry } from "@/components/miniatures/miniatureModelFiles";
+import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-physics/dicePhysicsTypes";
+import { VttDiceLayer } from "./VttDiceLayer";
 import type { VttScene, VttToken } from "./vttTypes";
 
 export type VttToolMode = "navigate" | "ruler" | "radius" | "ping";
@@ -32,6 +34,7 @@ type Props = {
   measureStart: VttMeasurePoint | null;
   measureEnd: VttMeasurePoint | null;
   ping: VttPing | null;
+  diceRequest: PhysicsRollRequest | null;
   onSelect: (id: string | null, additive: boolean) => void;
   onLocalMove: (id: string, x: number, z: number) => void;
   onCommitMove: (id: string, x: number, z: number) => void;
@@ -39,6 +42,8 @@ type Props = {
   onMeasureMove: (point: VttMeasurePoint) => void;
   onMeasureEnd: (point: VttMeasurePoint) => void;
   onPing: (point: VttMeasurePoint) => void;
+  onDiceComplete: (result: PhysicsRollResult) => void;
+  onDiceImpact: (force: number) => void;
 };
 
 const assetCache = new Map<string, Promise<LoadedTokenAsset>>();
@@ -461,6 +466,7 @@ export function VttCanvas({
   measureStart,
   measureEnd,
   ping,
+  diceRequest,
   onSelect,
   onLocalMove,
   onCommitMove,
@@ -468,6 +474,8 @@ export function VttCanvas({
   onMeasureMove,
   onMeasureEnd,
   onPing,
+  onDiceComplete,
+  onDiceImpact,
 }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [measuring, setMeasuring] = useState(false);
@@ -475,7 +483,7 @@ export function VttCanvas({
   const halfH = scene.grid_height / 2;
 
   const planeDown = (event: ThreeEvent<PointerEvent>) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || diceRequest) return;
     if (toolMode === "ping") {
       event.stopPropagation();
       onPing([event.point.x, event.point.z]);
@@ -488,21 +496,21 @@ export function VttCanvas({
   };
 
   const planeMove = (event: ThreeEvent<PointerEvent>) => {
-    if (draggingId && isDm) {
+    if (draggingId && isDm && !diceRequest) {
       event.stopPropagation();
       const x = clampAndSnap(event.point.x, halfW);
       const z = clampAndSnap(event.point.z, halfH);
       onLocalMove(draggingId, x, z);
       return;
     }
-    if (measuring && (toolMode === "ruler" || toolMode === "radius")) {
+    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) {
       event.stopPropagation();
       onMeasureMove([event.point.x, event.point.z]);
     }
   };
 
   const planeUp = (event: ThreeEvent<PointerEvent>) => {
-    if (draggingId && isDm) {
+    if (draggingId && isDm && !diceRequest) {
       event.stopPropagation();
       const x = clampAndSnap(event.point.x, halfW);
       const z = clampAndSnap(event.point.z, halfH);
@@ -511,7 +519,7 @@ export function VttCanvas({
       onCommitMove(id, x, z);
       return;
     }
-    if (measuring && (toolMode === "ruler" || toolMode === "radius")) {
+    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) {
       event.stopPropagation();
       setMeasuring(false);
       onMeasureEnd([event.point.x, event.point.z]);
@@ -528,7 +536,7 @@ export function VttCanvas({
         near: 0.1,
         far: 300,
       }}
-      onPointerMissed={() => { if (toolMode === "navigate") onSelect(null, false); }}
+      onPointerMissed={() => { if (toolMode === "navigate" && !diceRequest) onSelect(null, false); }}
     >
       <color attach="background" args={["#070b11"]} />
       <ambientLight intensity={1.25} />
@@ -546,12 +554,22 @@ export function VttCanvas({
           token={token}
           selected={selectedIds.includes(token.id)}
           isDm={isDm}
-          canDrag={toolMode === "navigate"}
+          canDrag={toolMode === "navigate" && !diceRequest}
           supabase={supabase}
           onSelect={onSelect}
           onDragStart={(id) => setDraggingId(id)}
         />
       ))}
+      {diceRequest ? (
+        <VttDiceLayer
+          key={diceRequest.rollId}
+          request={diceRequest}
+          sceneWidth={scene.grid_width}
+          sceneHeight={scene.grid_height}
+          onComplete={onDiceComplete}
+          onImpact={onDiceImpact}
+        />
+      ) : null}
       <VttOrbitControls disabled={Boolean(draggingId) || measuring} />
     </Canvas>
   );

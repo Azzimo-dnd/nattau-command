@@ -2,14 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { VttCanvas, type VttToolMode } from "./VttGridAlignedCanvas";
+import { VttDiceBar } from "./VttDiceBar";
 import { VttSceneManager } from "./VttSceneManager";
 import { VttSceneSettings } from "./VttSceneSettings";
 import { VttSelectionPanel } from "./VttSelectionPanel";
 import { useVttBoard } from "./useVttBoard";
+import { useVttDice } from "./useVttDice";
 
 type Props = {
   campaignId: string;
   isDm: boolean;
+  currentUserId: string;
+  currentUserName: string;
 };
 
 function isEditableTarget(target: EventTarget | null) {
@@ -18,8 +22,14 @@ function isEditableTarget(target: EventTarget | null) {
   return element.tagName === "INPUT" || element.tagName === "TEXTAREA" || element.tagName === "SELECT" || element.isContentEditable;
 }
 
-export function VttBattleBoard({ campaignId, isDm }: Props) {
+export function VttBattleBoard({ campaignId, isDm, currentUserId, currentUserName }: Props) {
   const board = useVttBoard(campaignId, isDm);
+  const dice = useVttDice({
+    campaignId,
+    currentUserId,
+    currentUserName,
+    sceneId: board.scene?.id ?? null,
+  });
   const boardRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -30,7 +40,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!isDm || board.selectedTokens.length !== 1 || board.playerPreview) return;
+    if (!isDm || board.selectedTokens.length !== 1 || board.playerPreview || dice.activeRoll) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target)) return;
       const key = event.key.toLowerCase();
@@ -44,7 +54,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [board.playerPreview, board.rotateSelected, board.selectedTokens.length, isDm]);
+  }, [board.playerPreview, board.rotateSelected, board.selectedTokens.length, dice.activeRoll, isDm]);
 
   const toggleFullscreen = async () => {
     if (document.fullscreenElement === boardRef.current) await document.exitFullscreen();
@@ -109,7 +119,8 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
                 key={mode}
                 type="button"
                 onClick={() => board.selectToolMode(mode)}
-                className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] ${board.toolMode === mode ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}
+                disabled={Boolean(dice.activeRoll)}
+                className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${board.toolMode === mode ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}
               >
                 {mode === "navigate" ? "Navigate" : mode === "ruler" ? "Ruler" : mode === "radius" ? "Spell radius" : "Ping"}
               </button>
@@ -136,6 +147,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
               measureStart={board.measureStart}
               measureEnd={board.measureEnd}
               ping={board.ping}
+              diceRequest={dice.activeRoll?.request ?? null}
               onSelect={board.selectToken}
               onLocalMove={board.localMove}
               onCommitMove={(id, x, z) => { void board.commitMove(id, x, z); }}
@@ -143,8 +155,33 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
               onMeasureMove={board.setMeasureEnd}
               onMeasureEnd={board.setMeasureEnd}
               onPing={board.sendPing}
+              onDiceComplete={(result) => { void dice.handlePhysicsComplete(result); }}
+              onDiceImpact={dice.handleImpact}
             />
           </div>
+
+          <VttDiceBar
+            isFullscreen={isFullscreen}
+            counts={dice.counts}
+            modifier={dice.modifier}
+            mode={dice.mode}
+            expression={dice.expression}
+            physicalCount={dice.physicalCount}
+            maxPhysicalDice={dice.maxPhysicalDice}
+            canUseD20Mode={dice.canUseD20Mode}
+            canRoll={dice.canRoll}
+            activeRoll={dice.activeRoll}
+            latestResult={dice.latestResult}
+            error={dice.error}
+            appearanceName={dice.appearanceName}
+            appearanceSwatch={dice.appearanceSwatch}
+            onAddDie={dice.addDie}
+            onRemoveDie={dice.removeDie}
+            onModifier={dice.setModifier}
+            onMode={dice.setMode}
+            onClear={dice.clearDice}
+            onRoll={() => { void dice.roll(); }}
+          />
 
           {!isFullscreen ? (
             <div className="border-t border-slate-800 px-4 py-3 text-[11px] text-slate-500">
@@ -152,7 +189,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
                 ? "Player Preview hides GM-only tokens and disables GM manipulation. Real players remain protected by server RLS."
                 : isDm
                   ? "GM: click to select; Shift/Ctrl-click adds to selection. Drag one token to move it. Q/E rotate a single selection."
-                  : "Spectator: orbit, pan, zoom, measure and ping. World state remains GM-controlled."
+                  : "Spectator: orbit, pan, zoom, measure, ping and use the shared VTT dice bar."
               }
             </div>
           ) : null}
@@ -241,7 +278,7 @@ export function VttBattleBoard({ campaignId, isDm }: Props) {
       {!isFullscreen && board.message ? <p className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100">{board.message}</p> : null}
       {!isFullscreen && board.error ? <p className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">{board.error}</p> : null}
       {isFullscreen && (board.message || board.error) ? (
-        <div className={`pointer-events-none absolute bottom-3 left-1/2 z-30 -translate-x-1/2 rounded-xl border px-4 py-2 text-xs shadow-2xl ${board.error ? "border-rose-500/30 bg-rose-950/90 text-rose-100" : "border-emerald-500/25 bg-emerald-950/90 text-emerald-100"}`}>
+        <div className={`pointer-events-none absolute bottom-32 left-1/2 z-30 -translate-x-1/2 rounded-xl border px-4 py-2 text-xs shadow-2xl ${board.error ? "border-rose-500/30 bg-rose-950/90 text-rose-100" : "border-emerald-500/25 bg-emerald-950/90 text-emerald-100"}`}>
           {board.error ?? board.message}
         </div>
       ) : null}
