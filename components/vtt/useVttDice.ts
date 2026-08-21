@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCampaignDiceConfiguration } from "@/components/dice-physics/useCampaignDiceConfiguration";
-import { useCampaignDiceLog } from "@/components/dice/useCampaignDiceLog";
 import {
   buildPhysicsDiceFromGroups,
   countPhysicalDice,
@@ -15,6 +14,7 @@ import { getSharedDiceSoundEngine } from "@/components/dice-physics/diceSound";
 import { getDiceCosmetic } from "@/components/dice-physics/diceCosmetics";
 import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-physics/dicePhysicsTypes";
 import type { DiceGroup, RolledGroup, SupportedDie } from "@/components/dice/diceUtils";
+import { useVttDiceHistory } from "./useVttDiceHistory";
 
 export type VttDiceMode = "normal" | "advantage" | "disadvantage";
 
@@ -77,12 +77,6 @@ function expressionFromGroups(groups: DiceGroup[], modifier: number) {
   return `${dice} ${modifier > 0 ? "+" : "-"} ${Math.abs(modifier)}`;
 }
 
-function modeLabel(mode: VttDiceMode) {
-  if (mode === "advantage") return "Advantage";
-  if (mode === "disadvantage") return "Disadvantage";
-  return "Normal";
-}
-
 function isEnvelope(value: unknown): value is VttDiceEnvelope {
   if (!value || typeof value !== "object") return false;
   const record = value as Partial<VttDiceEnvelope>;
@@ -123,7 +117,15 @@ export function useVttDice({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const configuration = useCampaignDiceConfiguration({ campaignId, currentUserId });
-  const diceLog = useCampaignDiceLog({ campaignId, currentUserId });
+  const {
+    rolls: historyRolls,
+    loading: historyLoading,
+    saving: historySaving,
+    clearing: historyClearing,
+    error: historyError,
+    saveRoll: saveHistoryRoll,
+    clearScene: clearHistory,
+  } = useVttDiceHistory(sceneId);
   const soundEngine = useMemo(() => getSharedDiceSoundEngine(), []);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const sceneIdRef = useRef<string | null>(sceneId);
@@ -240,7 +242,7 @@ export function useVttDice({
   }, []);
 
   const roll = useCallback(async () => {
-    if (!sceneId || activeRef.current || configuration.loading || diceLog.saving) return;
+    if (!sceneId || activeRef.current || configuration.loading || historySaving) return;
     if (groups.length === 0) {
       setLocalError("Add at least one die before rolling.");
       return;
@@ -276,7 +278,6 @@ export function useVttDice({
       };
 
       setLocalError(null);
-      diceLog.setError(null);
       setLatestResult(null);
       pendingLocalRef.current = { envelope };
       activeRef.current = envelope;
@@ -290,7 +291,7 @@ export function useVttDice({
       setActiveRoll(null);
       setLocalError(cause instanceof Error ? cause.message : "Could not prepare the VTT dice roll.");
     }
-  }, [configuration.appearance, configuration.loading, configuration.physics, currentUserId, currentUserName, diceLog, effectiveMode, expression, groups, modifier, physicalCount, physicalGroups, sceneId, soundEngine]);
+  }, [configuration.appearance, configuration.loading, configuration.physics, currentUserId, currentUserName, effectiveMode, expression, groups, historySaving, modifier, physicalCount, physicalGroups, sceneId, soundEngine]);
 
   const handlePhysicsComplete = useCallback(async (physicsResult: PhysicsRollResult) => {
     const envelope = activeRef.current;
@@ -339,20 +340,17 @@ export function useVttDice({
       keptDie,
     };
 
-    await diceLog.saveRoll({
-      roll_kind: "generic",
-      title: `${envelope.expression} · ${modeLabel(envelope.mode)} · VTT`,
+    await saveHistoryRoll({
+      rollKey: envelope.rollId,
+      sceneId: envelope.sceneId,
       expression: envelope.expression,
+      mode: envelope.mode,
+      modifier: envelope.modifier,
       total,
-      outcome: `Rolled by ${envelope.rollerName} on the VTT`,
-      visibility: "campaign",
       details: {
-        mode: envelope.mode,
         groups: rolledGroups,
         kept_die: keptDie,
         kept_index: keptIndex,
-        vtt: true,
-        vtt_scene_id: envelope.sceneId,
         physics: {
           engine: "rapier",
           roll_id: physicsResult.rollId,
@@ -376,7 +374,7 @@ export function useVttDice({
     setLatestResult(toast);
     void channelRef.current?.send({ type: "broadcast", event: "roll-result", payload: toast });
     clearActiveAfter(envelope.rollId);
-  }, [clearActiveAfter, currentUserId, diceLog]);
+  }, [clearActiveAfter, currentUserId, saveHistoryRoll]);
 
   const handleImpact = useCallback((force: number) => {
     const envelope = activeRef.current;
@@ -384,13 +382,13 @@ export function useVttDice({
     soundEngine.impact(force);
   }, [soundEngine]);
 
-  const error = localError ?? configuration.error ?? diceLog.error;
+  const error = localError ?? configuration.error;
   const canRoll = Boolean(sceneId)
     && groups.length > 0
     && physicalCount <= MAX_VTT_PHYSICAL_DICE
     && !activeRoll
     && !configuration.loading
-    && !diceLog.saving;
+    && !historySaving;
 
   return {
     counts,
@@ -408,6 +406,11 @@ export function useVttDice({
     appearanceName: cosmetic.name,
     appearanceSwatch: cosmetic.swatch,
     configurationLoading: configuration.loading,
+    historyRolls,
+    historyLoading,
+    historyClearing,
+    historyError,
+    clearHistory,
     addDie,
     removeDie,
     clearDice,
