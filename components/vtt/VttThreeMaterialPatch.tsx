@@ -4,7 +4,7 @@ import * as THREE from "three";
 
 const MAP_PATCH_FLAG = Symbol.for("nattau.vtt.mesh-basic-map-setter-patch");
 const MAP_VALUE = Symbol.for("nattau.vtt.mesh-basic-map-value");
-const FACING_PATCH_FLAG = Symbol.for("nattau.vtt.facing-marker-axis-patch");
+const FACING_PATCH_FLAG = Symbol.for("nattau.vtt.facing-marker-axis-patch-v2");
 
 type PatchedMaterialPrototype = typeof THREE.MeshBasicMaterial.prototype & {
   [MAP_PATCH_FLAG]?: boolean;
@@ -40,14 +40,28 @@ function installMapMaterialPatch() {
       const previous = this[MAP_VALUE] ?? null;
       this[MAP_VALUE] = next;
 
+      // WebGLRenderer.render is installed as an instance method by Three.js, so
+      // patching WebGLRenderer.prototype.render does not reliably intercept R3F.
+      // Intercept the map assignment itself instead. When R3F changes a material
+      // from no map to a loaded battle-map texture, Three.js must compile a new
+      // shader with USE_MAP enabled.
       if (previous !== next && typeof this.version === "number") {
         this.needsUpdate = true;
-        if (next) next.needsUpdate = true;
+        if (next) {
+          next.needsUpdate = true;
+          console.info("[VTT map] Texture attached to MeshBasicMaterial", {
+            texture: next.uuid,
+            imageWidth: (next.image as { width?: number } | undefined)?.width ?? null,
+            imageHeight: (next.image as { height?: number } | undefined)?.height ?? null,
+            materialVersion: this.version,
+          });
+        }
       }
     },
   });
 
   prototype[MAP_PATCH_FLAG] = true;
+  console.info("[VTT map] Installed MeshBasicMaterial.map setter patch.");
 }
 
 function installFacingMarkerPatch() {
@@ -65,13 +79,12 @@ function installFacingMarkerPatch() {
         && this.position.z < 0;
 
       if (isVttFacingMarker) {
+        // The screenshot-confirmed miniature front is the opposite side of the
+        // local X axis from the previous attempt. Keep token.rotation authoritative
+        // and move only the visual marker from the legacy -Z definition to local -X.
         const distance = Math.abs(this.position.z);
-
-        // The tested Nattau miniature assets face local +X on the VTT board.
-        // Keep token.rotation as the only authoritative rotation value and only
-        // move/rotate the visual facing marker into that same local direction.
-        this.position.set(distance, 0.045, 0);
-        this.rotation.set(0, 0, -Math.PI / 2);
+        this.position.set(-distance, this.position.y, 0);
+        this.rotation.set(0, 0, Math.PI / 2);
       }
     }
 
@@ -79,6 +92,7 @@ function installFacingMarkerPatch() {
   };
 
   prototype[FACING_PATCH_FLAG] = true;
+  console.info("[VTT facing] Installed miniature facing-marker -X patch.");
 }
 
 function installPatches() {
