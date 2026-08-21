@@ -2,25 +2,30 @@
 
 import * as THREE from "three";
 
-const PATCH_FLAG = Symbol.for("nattau.vtt.mesh-basic-map-setter-patch");
+const MAP_PATCH_FLAG = Symbol.for("nattau.vtt.mesh-basic-map-setter-patch");
 const MAP_VALUE = Symbol.for("nattau.vtt.mesh-basic-map-value");
+const FACING_PATCH_FLAG = Symbol.for("nattau.vtt.facing-marker-axis-patch");
 
-type PatchedPrototype = typeof THREE.MeshBasicMaterial.prototype & {
-  [PATCH_FLAG]?: boolean;
+type PatchedMaterialPrototype = typeof THREE.MeshBasicMaterial.prototype & {
+  [MAP_PATCH_FLAG]?: boolean;
+};
+
+type PatchedObjectPrototype = typeof THREE.Object3D.prototype & {
+  [FACING_PATCH_FLAG]?: boolean;
 };
 
 type PatchedMaterial = THREE.MeshBasicMaterial & {
   [MAP_VALUE]?: THREE.Texture | null;
 };
 
-function installPatch() {
-  const prototype = THREE.MeshBasicMaterial.prototype as PatchedPrototype;
-  if (prototype[PATCH_FLAG]) return;
+function installMapMaterialPatch() {
+  const prototype = THREE.MeshBasicMaterial.prototype as PatchedMaterialPrototype;
+  if (prototype[MAP_PATCH_FLAG]) return;
 
   const existing = Object.getOwnPropertyDescriptor(prototype, "map");
   if (existing && !existing.configurable) {
     console.warn("[VTT map] Could not install MeshBasicMaterial.map patch: property is not configurable.");
-    prototype[PATCH_FLAG] = true;
+    prototype[MAP_PATCH_FLAG] = true;
     return;
   }
 
@@ -55,13 +60,49 @@ function installPatch() {
     },
   });
 
-  prototype[PATCH_FLAG] = true;
+  prototype[MAP_PATCH_FLAG] = true;
   console.info("[VTT map] Installed MeshBasicMaterial.map setter patch.");
 }
 
-installPatch();
+function installFacingMarkerPatch() {
+  const prototype = THREE.Object3D.prototype as PatchedObjectPrototype;
+  if (prototype[FACING_PATCH_FLAG]) return;
+
+  const originalUpdateMatrix = prototype.updateMatrix;
+  prototype.updateMatrix = function patchedUpdateMatrix(this: THREE.Object3D) {
+    if (this instanceof THREE.Mesh && this.geometry instanceof THREE.ConeGeometry) {
+      const markerGeometry = this.geometry as THREE.ConeGeometry;
+      const isVttFacingMarker =
+        markerGeometry.parameters.radialSegments === 3
+        && Math.abs(this.position.x) < 0.0001
+        && Math.abs(this.position.y - 0.045) < 0.0001
+        && this.position.z < 0;
+
+      if (isVttFacingMarker) {
+        // The real STL/GLB miniature front used by our current assets is opposite
+        // to the +Y assumption made in the first facing-marker correction.
+        // Keep token.rotation authoritative and only mirror the visual marker so
+        // it sits and points along the same forward direction as the miniature.
+        this.position.z = -this.position.z;
+        if (this.rotation.x < 0) this.rotation.x = -this.rotation.x;
+      }
+    }
+
+    return originalUpdateMatrix.call(this);
+  };
+
+  prototype[FACING_PATCH_FLAG] = true;
+  console.info("[VTT facing] Installed miniature facing-marker axis patch.");
+}
+
+function installPatches() {
+  installMapMaterialPatch();
+  installFacingMarkerPatch();
+}
+
+installPatches();
 
 export function VttThreeMaterialPatch() {
-  installPatch();
+  installPatches();
   return null;
 }
