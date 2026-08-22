@@ -39,6 +39,21 @@ export type VttToken = {
   initiative: number | null;
 };
 
+export type VttFogPoint = [number, number];
+export type VttFogOperation = "reveal" | "cover";
+export type VttFogShape = "all" | "rectangle" | "polygon";
+export type VttFogDrawShape = Exclude<VttFogShape, "all">;
+export type VttFogBaseState = "revealed" | "covered";
+
+export type VttFogRegion = {
+  id: number;
+  scene_id: string;
+  operation: VttFogOperation;
+  shape: VttFogShape;
+  points: VttFogPoint[];
+  created_at: string;
+};
+
 export type VttEnemyModel = {
   id: string;
   campaign_id: string;
