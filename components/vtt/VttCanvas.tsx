@@ -9,13 +9,21 @@ import { applyMiniaturePaintDocumentToGeometry, parseMiniaturePaintDocument } fr
 import { loadMiniatureGeometry } from "@/components/miniatures/miniatureModelFiles";
 import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-physics/dicePhysicsTypes";
 import { VttDiceLayer } from "./VttDiceLayer";
-import type { VttScene, VttToken } from "./vttTypes";
+import { VttFogDraftOverlay, VttFogLayer } from "./VttFogLayer";
+import type {
+  VttFogBaseState,
+  VttFogDrawShape,
+  VttFogOperation,
+  VttFogPoint,
+  VttFogRegion,
+  VttScene,
+  VttToken,
+} from "./vttTypes";
 
 export type VttToolMode = "navigate" | "ruler" | "radius" | "ping";
 export type VttMeasurePoint = [number, number];
 export type VttPing = { id: string; x: number; z: number };
 export type VttCameraCommand = { id: number; type: "fit" | "reset" | "focus"; x?: number; z?: number };
-
 export type VttAssetProgress = { loaded: number; failed: number; total: number };
 
 type LoadedTokenAsset = { geometry: THREE.BufferGeometry; baseScale: number; hasColors: boolean };
@@ -33,6 +41,13 @@ type Props = {
   diceRequest: PhysicsRollRequest | null;
   cameraCommand?: VttCameraCommand | null;
   onAssetProgress?: (progress: VttAssetProgress) => void;
+  fogEnabled: boolean;
+  fogBaseState: VttFogBaseState;
+  fogRegions: VttFogRegion[];
+  fogEditing: boolean;
+  fogOperation: VttFogOperation;
+  fogShape: VttFogDrawShape;
+  fogDraftPoints: VttFogPoint[];
   onSelect: (id: string | null, additive: boolean) => void;
   onLocalMove: (id: string, x: number, z: number) => void;
   onCommitMove: (id: string, x: number, z: number) => void;
@@ -40,6 +55,9 @@ type Props = {
   onMeasureMove: (point: VttMeasurePoint) => void;
   onMeasureEnd: (point: VttMeasurePoint) => void;
   onPing: (point: VttMeasurePoint) => void;
+  onFogPointerDown: (point: VttFogPoint) => void;
+  onFogPointerMove: (point: VttFogPoint) => void;
+  onFogPointerUp: (point: VttFogPoint) => void;
   onDiceComplete: (result: PhysicsRollResult) => void;
   onDiceImpact: (force: number) => void;
 };
@@ -234,8 +252,8 @@ function TokenNameplate({ name, size }: { name: string; size: number }) {
   useEffect(() => () => texture?.dispose(), [texture]);
   if (!texture) return null;
   const aspect = texture.image.width / texture.image.height;
-  const height = Math.max(0.48, 0.5 * Math.min(2, size));
-  return <sprite position={[0, 1.05 * Math.max(1, size), 0]} scale={[height * aspect, height, 1]}><spriteMaterial map={texture} transparent depthTest={false} depthWrite={false} /></sprite>;
+  const labelHeight = Math.max(0.48, 0.5 * Math.min(2, size));
+  return <sprite position={[0, 1.05 * Math.max(1, size), 0]} scale={[labelHeight * aspect, labelHeight, 1]}><spriteMaterial map={texture} transparent depthTest={false} depthWrite={false} /></sprite>;
 }
 
 function TokenMesh({ token, selected, currentTurn, showNameplate, isDm, canDrag, supabase, onSelect, onDragStart, onAssetSettled }: { token: VttToken; selected: boolean; currentTurn: boolean; showNameplate: boolean; isDm: boolean; canDrag: boolean; supabase: ReturnType<typeof createClient>; onSelect: (id: string, additive: boolean) => void; onDragStart: (id: string) => void; onAssetSettled: (id: string, ok: boolean) => void }) {
@@ -259,7 +277,39 @@ function TokenMesh({ token, selected, currentTurn, showNameplate, isDm, canDrag,
   </group>;
 }
 
-export function VttCanvas({ scene, tokens, isDm, selectedIds, supabase, toolMode, measureStart, measureEnd, ping, diceRequest, cameraCommand, onAssetProgress, onSelect, onLocalMove, onCommitMove, onMeasureStart, onMeasureMove, onMeasureEnd, onPing, onDiceComplete, onDiceImpact }: Props) {
+export function VttCanvas({
+  scene,
+  tokens,
+  isDm,
+  selectedIds,
+  supabase,
+  toolMode,
+  measureStart,
+  measureEnd,
+  ping,
+  diceRequest,
+  cameraCommand,
+  onAssetProgress,
+  fogEnabled,
+  fogBaseState,
+  fogRegions,
+  fogEditing,
+  fogOperation,
+  fogShape,
+  fogDraftPoints,
+  onSelect,
+  onLocalMove,
+  onCommitMove,
+  onMeasureStart,
+  onMeasureMove,
+  onMeasureEnd,
+  onPing,
+  onFogPointerDown,
+  onFogPointerMove,
+  onFogPointerUp,
+  onDiceComplete,
+  onDiceImpact,
+}: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [measuring, setMeasuring] = useState(false);
   const [assetState, setAssetState] = useState<Record<string, boolean>>({});
@@ -272,16 +322,50 @@ export function VttCanvas({ scene, tokens, isDm, selectedIds, supabase, toolMode
   }, [assetState, onAssetProgress, tokens.length]);
   const assetSettled = useCallback((id: string, ok: boolean) => setAssetState((current) => current[id] === ok ? current : { ...current, [id]: ok }), []);
 
-  const planeDown = (event: ThreeEvent<PointerEvent>) => { if (event.button !== 0 || diceRequest) return; if (toolMode === "ping") { event.stopPropagation(); onPing([event.point.x, event.point.z]); return; } if (toolMode === "navigate") return; event.stopPropagation(); setMeasuring(true); onMeasureStart([event.point.x, event.point.z]); };
-  const planeMove = (event: ThreeEvent<PointerEvent>) => { if (draggingId && isDm && !diceRequest) { event.stopPropagation(); onLocalMove(draggingId, clampAndSnap(event.point.x, halfW), clampAndSnap(event.point.z, halfH)); return; } if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) { event.stopPropagation(); onMeasureMove([event.point.x, event.point.z]); } };
-  const planeUp = (event: ThreeEvent<PointerEvent>) => { if (draggingId && isDm && !diceRequest) { event.stopPropagation(); const id = draggingId; setDraggingId(null); onCommitMove(id, clampAndSnap(event.point.x, halfW), clampAndSnap(event.point.z, halfH)); return; } if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) { event.stopPropagation(); setMeasuring(false); onMeasureEnd([event.point.x, event.point.z]); } };
+  const planeDown = (event: ThreeEvent<PointerEvent>) => {
+    if (event.button !== 0 || diceRequest) return;
+    if (fogEditing) {
+      event.stopPropagation();
+      onFogPointerDown([event.point.x, event.point.z]);
+      return;
+    }
+    if (toolMode === "ping") { event.stopPropagation(); onPing([event.point.x, event.point.z]); return; }
+    if (toolMode === "navigate") return;
+    event.stopPropagation(); setMeasuring(true); onMeasureStart([event.point.x, event.point.z]);
+  };
 
-  return <Canvas shadows dpr={[1, 1.5]} camera={{ position: defaultCameraPosition(scene.grid_width, scene.grid_height).toArray() as [number, number, number], fov: 44, near: 0.1, far: 300 }} onPointerMissed={() => { if (toolMode === "navigate" && !diceRequest) onSelect(null, false); }}>
+  const planeMove = (event: ThreeEvent<PointerEvent>) => {
+    if (fogEditing && !diceRequest) {
+      event.stopPropagation();
+      onFogPointerMove([event.point.x, event.point.z]);
+      return;
+    }
+    if (draggingId && isDm && !diceRequest) { event.stopPropagation(); onLocalMove(draggingId, clampAndSnap(event.point.x, halfW), clampAndSnap(event.point.z, halfH)); return; }
+    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) { event.stopPropagation(); onMeasureMove([event.point.x, event.point.z]); }
+  };
+
+  const planeUp = (event: ThreeEvent<PointerEvent>) => {
+    if (fogEditing && !diceRequest) {
+      event.stopPropagation();
+      onFogPointerUp([event.point.x, event.point.z]);
+      return;
+    }
+    if (draggingId && isDm && !diceRequest) { event.stopPropagation(); const id = draggingId; setDraggingId(null); onCommitMove(id, clampAndSnap(event.point.x, halfW), clampAndSnap(event.point.z, halfH)); return; }
+    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) { event.stopPropagation(); setMeasuring(false); onMeasureEnd([event.point.x, event.point.z]); }
+  };
+
+  return <Canvas shadows dpr={[1, 1.5]} camera={{ position: defaultCameraPosition(scene.grid_width, scene.grid_height).toArray() as [number, number, number], fov: 44, near: 0.1, far: 300 }} onPointerMissed={() => { if (toolMode === "navigate" && !diceRequest && !fogEditing) onSelect(null, false); }}>
     <color attach="background" args={["#070b11"]} /><ambientLight intensity={1.25} /><directionalLight position={[12, 22, 10]} intensity={2.5} castShadow /><directionalLight position={[-12, 10, -8]} intensity={0.8} />
-    <BoardBase width={scene.grid_width} height={scene.grid_height} /><BattleMap scene={scene} supabase={supabase} /><InteractionSurface width={scene.grid_width} height={scene.grid_height} onPointerDown={planeDown} onPointerMove={planeMove} onPointerUp={planeUp} />
-    {scene.show_grid ? <BattleGrid width={scene.grid_width} height={scene.grid_height} opacity={scene.grid_opacity} /> : null}<MeasurementOverlay mode={toolMode} start={measureStart} end={measureEnd} /><PingOverlay ping={ping} />
-    {tokens.map((token) => <TokenMesh key={token.id} token={token} selected={selectedIds.includes(token.id)} currentTurn={scene.initiative_active && token.id === scene.initiative_current_token_id} showNameplate={scene.show_nameplates} isDm={isDm} canDrag={toolMode === "navigate" && !diceRequest} supabase={supabase} onSelect={onSelect} onDragStart={(id) => setDraggingId(id)} onAssetSettled={assetSettled} />)}
+    <BoardBase width={scene.grid_width} height={scene.grid_height} />
+    <BattleMap scene={scene} supabase={supabase} />
+    <VttFogLayer width={scene.grid_width} height={scene.grid_height} enabled={fogEnabled} baseState={fogBaseState} regions={fogRegions} isDm={isDm} />
+    <InteractionSurface width={scene.grid_width} height={scene.grid_height} onPointerDown={planeDown} onPointerMove={planeMove} onPointerUp={planeUp} />
+    {scene.show_grid ? <BattleGrid width={scene.grid_width} height={scene.grid_height} opacity={scene.grid_opacity} /> : null}
+    {fogEditing ? <VttFogDraftOverlay points={fogDraftPoints} shape={fogShape} operation={fogOperation} /> : null}
+    <MeasurementOverlay mode={toolMode} start={measureStart} end={measureEnd} />
+    <PingOverlay ping={ping} />
+    {tokens.map((token) => <TokenMesh key={token.id} token={token} selected={selectedIds.includes(token.id)} currentTurn={scene.initiative_active && token.id === scene.initiative_current_token_id} showNameplate={scene.show_nameplates} isDm={isDm} canDrag={toolMode === "navigate" && !diceRequest && !fogEditing} supabase={supabase} onSelect={onSelect} onDragStart={(id) => setDraggingId(id)} onAssetSettled={assetSettled} />)}
     {diceRequest ? <VttDiceLayer key={diceRequest.rollId} request={diceRequest} sceneWidth={scene.grid_width} sceneHeight={scene.grid_height} onComplete={onDiceComplete} onImpact={onDiceImpact} /> : null}
-    <VttOrbitControls disabled={Boolean(draggingId) || measuring} width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
+    <VttOrbitControls disabled={Boolean(draggingId) || measuring || fogEditing} width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
   </Canvas>;
 }
