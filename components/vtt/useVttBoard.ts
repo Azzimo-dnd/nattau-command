@@ -6,7 +6,7 @@ import type { VttMeasurePoint, VttPing, VttToolMode } from "./VttCanvas";
 import type { VttEnemyModel, VttScene, VttToken } from "./vttTypes";
 
 const MAX_MAP_BYTES = 20 * 1024 * 1024;
-const SCENE_FIELDS = "id,campaign_id,name,grid_width,grid_height,feet_per_square,is_active,map_storage_path,map_original_name,map_opacity,grid_opacity,show_grid";
+const SCENE_FIELDS = "id,campaign_id,name,grid_width,grid_height,feet_per_square,is_active,visible_to_players,map_storage_path,map_original_name,map_opacity,grid_opacity,show_grid,show_nameplates,initiative_active,initiative_round,initiative_current_token_id";
 const ENEMY_FIELDS = "id,campaign_id,name,storage_path,web_storage_path,original_name,file_size_bytes,web_file_size_bytes,triangle_count,width_mm,depth_mm,height_mm,created_at";
 
 type CalibrationRow = {
@@ -14,6 +14,18 @@ type CalibrationRow = {
   map_scale: number | null;
   map_offset_x: number | null;
   map_offset_z: number | null;
+};
+
+type DirectTokenRow = {
+  character_miniature_id: string | null;
+  enemy_model_id: string | null;
+  name: string;
+  x: number;
+  z: number;
+  rotation: number;
+  scale: number;
+  size_squares: number;
+  visible_to_players: boolean;
 };
 
 function normalizeRotation(value: number) {
@@ -26,19 +38,42 @@ function mapExtension(file: File) {
   return match?.[1] === "jpeg" ? "jpg" : match?.[1] ?? null;
 }
 
-function withCalibration(scene: Omit<VttScene, "map_scale" | "map_offset_x" | "map_offset_z"> | VttScene, calibration?: CalibrationRow): VttScene {
-  const maybeScene = scene as Partial<VttScene>;
+function storagePathExtension(path: string) {
+  const match = path.toLowerCase().match(/\.([a-z0-9]+)$/);
+  return match?.[1] ?? "webp";
+}
+
+function withCalibration(scene: Partial<VttScene>, calibration?: CalibrationRow): VttScene {
   return {
     ...scene,
-    map_scale: calibration?.map_scale ?? maybeScene.map_scale ?? 1,
-    map_offset_x: calibration?.map_offset_x ?? maybeScene.map_offset_x ?? 0,
-    map_offset_z: calibration?.map_offset_z ?? maybeScene.map_offset_z ?? 0,
+    visible_to_players: scene.visible_to_players ?? true,
+    show_nameplates: scene.show_nameplates ?? false,
+    initiative_active: scene.initiative_active ?? false,
+    initiative_round: scene.initiative_round ?? 1,
+    initiative_current_token_id: scene.initiative_current_token_id ?? null,
+    map_scale: calibration?.map_scale ?? scene.map_scale ?? 1,
+    map_offset_x: calibration?.map_offset_x ?? scene.map_offset_x ?? 0,
+    map_offset_z: calibration?.map_offset_z ?? scene.map_offset_z ?? 0,
   } as VttScene;
 }
 
 function clampSceneCoordinate(value: number, squares: number) {
   const limit = Math.max(0.5, squares / 2 - 0.5);
   return Math.max(-limit, Math.min(limit, value));
+}
+
+function duplicateEnemyName(name: string, allNames: string[]) {
+  const match = name.trim().match(/^(.*?)(?:\s+(\d+))?$/);
+  const base = (match?.[1] || name).trim();
+  const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped}(?:\\s+(\\d+))?$`, "i");
+  let max = 1;
+  for (const existing of allNames) {
+    const existingMatch = existing.trim().match(pattern);
+    if (!existingMatch) continue;
+    max = Math.max(max, existingMatch[1] ? Number(existingMatch[1]) : 1);
+  }
+  return `${base} ${max + 1}`;
 }
 
 export function useVttBoard(campaignId: string, isDm: boolean) {
@@ -93,7 +128,7 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
     ]);
     if (sceneError) throw sceneError;
 
-    const nextScenes = (data ?? []).map((item) => withCalibration(item as unknown as VttScene, calibration.get(item.id)));
+    const nextScenes = (data ?? []).map((item) => withCalibration(item as unknown as Partial<VttScene>, calibration.get(item.id)));
     setScenes(nextScenes);
     const wantedId = preferredId ?? workspaceSceneIdRef.current;
     const workspace = nextScenes.find((item) => item.id === wantedId)
@@ -112,7 +147,7 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
       .eq("is_active", true)
       .maybeSingle();
     if (sceneError) throw sceneError;
-    const next = data ? withCalibration(data as unknown as VttScene) : null;
+    const next = data ? withCalibration(data as unknown as Partial<VttScene>) : null;
     setScene(next);
     return next;
   }, [campaignId, supabase]);
@@ -224,6 +259,10 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
   const selectedTokens = useMemo(() => tokens.filter((token) => selectedIds.includes(token.id)), [selectedIds, tokens]);
   const selected = selectedTokens.length === 1 ? selectedTokens[0] : null;
   const visibleTokens = playerPreview ? tokens.filter((token) => token.visible_to_players) : tokens;
+  const initiativeTokens = useMemo(() => tokens
+    .filter((token) => token.initiative !== null)
+    .slice()
+    .sort((a, b) => (b.initiative ?? -999) - (a.initiative ?? -999) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)), [tokens]);
   const rotationDegrees = selected ? Math.round(normalizeRotation(selected.rotation) * 180 / Math.PI) : 0;
   const canvasScene = scene ? {
     ...scene,
@@ -273,10 +312,7 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
     const { error: calibrationError } = await supabase.from("vtt_scenes").update(calibration).eq("id", scene.id);
     await refreshScenes(scene.id);
     if (scene.is_active) broadcastRefresh();
-    setMessage(calibrationError
-      ? "Scene settings saved. Calibration preview works locally, but persistence needs the v0.4 database migration."
-      : "Scene settings and grid calibration saved."
-    );
+    setMessage(calibrationError ? "Scene settings saved, but grid calibration could not be persisted." : "Scene settings and grid calibration saved.");
     setBusy(false);
   }, [broadcastRefresh, busy, draftMapOffsetX, draftMapOffsetZ, draftMapScale, isDm, refreshScenes, scene, sceneDraft, supabase]);
 
@@ -296,9 +332,7 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
     });
     if (uploadError) { setError(uploadError.message); setBusy(false); return; }
 
-    const { error: updateError } = await supabase.from("vtt_scenes").update({
-      ...sceneDraft(), map_storage_path: path, map_original_name: mapFile.name,
-    }).eq("id", scene.id);
+    const { error: updateError } = await supabase.from("vtt_scenes").update({ ...sceneDraft(), map_storage_path: path, map_original_name: mapFile.name }).eq("id", scene.id);
     if (updateError) {
       await supabase.storage.from("vtt-maps").remove([path]);
       setError(updateError.message);
@@ -338,10 +372,12 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
       grid_height: scene?.grid_height ?? 18,
       feet_per_square: scene?.feet_per_square ?? 5,
       is_active: false,
+      visible_to_players: true,
+      show_nameplates: false,
     }).select(SCENE_FIELDS).single();
     if (insertError) setError(insertError.message);
     else {
-      const next = withCalibration(data as unknown as VttScene);
+      const next = withCalibration(data as unknown as Partial<VttScene>);
       await refreshScenes(next.id);
       setScene(next);
       setTokens([]);
@@ -350,12 +386,83 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
     setBusy(false);
   }, [busy, campaignId, isDm, refreshScenes, scene, scenes.length, supabase]);
 
+  const duplicateScene = useCallback(async (target: VttScene) => {
+    if (!isDm || busy) return;
+    setBusy(true); setError(null); setMessage(null);
+
+    const { data: created, error: createError } = await supabase.from("vtt_scenes").insert({
+      campaign_id: campaignId,
+      name: `${target.name} copy`,
+      grid_width: target.grid_width,
+      grid_height: target.grid_height,
+      feet_per_square: target.feet_per_square,
+      is_active: false,
+      visible_to_players: true,
+      map_opacity: target.map_opacity,
+      grid_opacity: target.grid_opacity,
+      show_grid: target.show_grid,
+      show_nameplates: target.show_nameplates,
+      map_scale: target.map_scale,
+      map_offset_x: target.map_offset_x,
+      map_offset_z: target.map_offset_z,
+    }).select("id").single();
+
+    if (createError || !created) {
+      setError(createError?.message ?? "Could not duplicate scene.");
+      setBusy(false);
+      return;
+    }
+
+    const newSceneId = created.id as string;
+    let copiedMapPath: string | null = null;
+
+    if (target.map_storage_path) {
+      const { data: mapBlob, error: mapDownloadError } = await supabase.storage.from("vtt-maps").download(target.map_storage_path);
+      if (!mapDownloadError && mapBlob) {
+        copiedMapPath = `${campaignId}/${newSceneId}/${crypto.randomUUID()}.${storagePathExtension(target.map_storage_path)}`;
+        const { error: mapUploadError } = await supabase.storage.from("vtt-maps").upload(copiedMapPath, mapBlob, { contentType: mapBlob.type || undefined, upsert: false });
+        if (mapUploadError) copiedMapPath = null;
+      }
+    }
+
+    if (copiedMapPath) {
+      await supabase.from("vtt_scenes").update({ map_storage_path: copiedMapPath, map_original_name: target.map_original_name }).eq("id", newSceneId);
+    }
+
+    const { data: sourceRows } = await supabase.from("vtt_tokens")
+      .select("character_miniature_id,enemy_model_id,name,x,z,rotation,scale,size_squares,visible_to_players")
+      .eq("scene_id", target.id);
+
+    if (sourceRows?.length) {
+      const inserts = (sourceRows as DirectTokenRow[]).map((row) => ({ ...row, scene_id: newSceneId, initiative: null }));
+      await supabase.from("vtt_tokens").insert(inserts);
+    }
+
+    await refreshScenes(newSceneId);
+    await refreshTokens(newSceneId);
+    setMessage(`${target.name} duplicated as a private prepared scene.`);
+    setBusy(false);
+  }, [busy, campaignId, isDm, refreshScenes, refreshTokens, supabase]);
+
   const openScene = useCallback(async (next: VttScene) => {
     if (busy || next.id === scene?.id) return;
     setScene(next); setSelectedIds([]); setError(null);
     setMessage(next.is_active ? "Editing the live scene." : `Editing prepared scene: ${next.name}.`);
     await refreshTokens(next.id).catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load scene tokens."));
   }, [busy, refreshTokens, scene?.id]);
+
+  const setScenePlayerVisibility = useCallback(async (target: VttScene, visible: boolean) => {
+    if (!isDm || busy || !target.is_active) return;
+    setBusy(true); setError(null); setMessage(null);
+    const { error: updateError } = await supabase.from("vtt_scenes").update({ visible_to_players: visible, updated_at: new Date().toISOString() }).eq("id", target.id);
+    if (updateError) setError(updateError.message);
+    else {
+      await refreshScenes(target.id);
+      broadcastRefresh();
+      setMessage(visible ? "The live tabletop is visible to players." : "The live tabletop is hidden from players.");
+    }
+    setBusy(false);
+  }, [broadcastRefresh, busy, isDm, refreshScenes, supabase]);
 
   const activateScene = useCallback(async (target: VttScene) => {
     if (!isDm || busy || target.is_active) return;
@@ -365,7 +472,7 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
       const { error: deactivateError } = await supabase.from("vtt_scenes").update({ is_active: false }).eq("id", previous.id);
       if (deactivateError) { setError(deactivateError.message); setBusy(false); return; }
     }
-    const { error: activateError } = await supabase.from("vtt_scenes").update({ is_active: true }).eq("id", target.id);
+    const { error: activateError } = await supabase.from("vtt_scenes").update({ is_active: true, visible_to_players: true }).eq("id", target.id);
     if (activateError) {
       if (previous) await supabase.from("vtt_scenes").update({ is_active: true }).eq("id", previous.id);
       setError(activateError.message);
@@ -445,6 +552,48 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
     } else if (scene?.is_active) broadcastRefresh();
   }, [broadcastRefresh, busy, isDm, refreshTokens, scene, selected, supabase]);
 
+  const renameSelectedEnemy = useCallback(async (name: string) => {
+    if (!selected || selected.source_kind !== "enemy" || !scene || !isDm || busy) return;
+    const nextName = name.trim().slice(0, 120);
+    if (!nextName) return;
+    setBusy(true); setError(null);
+    const { error: updateError } = await supabase.from("vtt_tokens").update({ name: nextName, revision: selected.revision + 1, updated_at: new Date().toISOString() }).eq("id", selected.id);
+    if (updateError) setError(updateError.message);
+    else {
+      await refreshTokens(scene.id);
+      if (scene.is_active) broadcastRefresh();
+      setMessage(`Enemy renamed to ${nextName}.`);
+    }
+    setBusy(false);
+  }, [broadcastRefresh, busy, isDm, refreshTokens, scene, selected, supabase]);
+
+  const setTokenInitiative = useCallback(async (tokenId: string, initiative: number | null) => {
+    if (!scene || !isDm || busy) return;
+    const normalized = initiative === null || Number.isNaN(initiative) ? null : Math.max(-100, Math.min(100, Math.round(initiative)));
+    setBusy(true); setError(null);
+    const { error: updateError } = await supabase.from("vtt_tokens").update({ initiative: normalized, updated_at: new Date().toISOString() }).eq("id", tokenId);
+    if (updateError) setError(updateError.message);
+    else {
+      await refreshTokens(scene.id);
+      if (scene.is_active) broadcastRefresh();
+    }
+    setBusy(false);
+  }, [broadcastRefresh, busy, isDm, refreshTokens, scene, supabase]);
+
+  const toggleNameplates = useCallback(async () => {
+    if (!scene || !isDm || busy) return;
+    setBusy(true); setError(null);
+    const next = !scene.show_nameplates;
+    const { error: updateError } = await supabase.from("vtt_scenes").update({ show_nameplates: next, updated_at: new Date().toISOString() }).eq("id", scene.id);
+    if (updateError) setError(updateError.message);
+    else {
+      await refreshScenes(scene.id);
+      if (scene.is_active) broadcastRefresh();
+      setMessage(next ? "Token nameplates enabled." : "Token nameplates hidden.");
+    }
+    setBusy(false);
+  }, [broadcastRefresh, busy, isDm, refreshScenes, scene, supabase]);
+
   const bulkUpdate = useCallback(async (patch: Record<string, unknown>, successMessage: string) => {
     if (!scene || !isDm || selectedIds.length === 0 || busy) return;
     setBusy(true); setError(null); setMessage(null);
@@ -466,11 +615,12 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
     else {
       setSelectedIds([]);
       await refreshTokens(scene.id);
+      await refreshScenes(scene.id);
       if (scene.is_active) broadcastRefresh();
       setMessage("Selected tokens removed.");
     }
     setBusy(false);
-  }, [broadcastRefresh, busy, isDm, refreshTokens, scene, selectedIds, supabase]);
+  }, [broadcastRefresh, busy, isDm, refreshScenes, refreshTokens, scene, selectedIds, supabase]);
 
   const duplicateSelected = useCallback(async () => {
     if (!scene || !isDm || selectedTokens.length === 0 || busy) return;
@@ -478,9 +628,11 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
     if (enemies.length === 0) { setMessage("Party character tokens stay unique per scene. Select enemies to duplicate."); return; }
     setBusy(true); setError(null); setMessage(null);
     let created = 0;
+    let workingNames = tokens.map((token) => token.name);
     for (const token of enemies) {
       const model = enemyModels.find((enemy) => enemy.storage_path === token.model_storage_path || enemy.web_storage_path === token.model_storage_path);
       if (!model) continue;
+      const nextName = duplicateEnemyName(token.name, workingNames);
       const { data: tokenId, error: spawnError } = await supabase.rpc("spawn_vtt_enemy", {
         p_scene_id: scene.id,
         p_enemy_model_id: model.id,
@@ -489,16 +641,65 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
       });
       if (spawnError || !tokenId) continue;
       const { error: copyError } = await supabase.from("vtt_tokens").update({
-        name: `${token.name} copy`, rotation: token.rotation, scale: token.scale,
-        size_squares: token.size_squares, visible_to_players: token.visible_to_players,
+        name: nextName,
+        rotation: token.rotation,
+        scale: token.scale,
+        size_squares: token.size_squares,
+        visible_to_players: token.visible_to_players,
+        initiative: token.initiative,
       }).eq("id", tokenId as string);
-      if (!copyError) created += 1;
+      if (!copyError) {
+        created += 1;
+        workingNames = [...workingNames, nextName];
+      }
     }
     await refreshTokens(scene.id);
     if (scene.is_active) broadcastRefresh();
-    setMessage(created > 0 ? `${created} enemy token${created === 1 ? "" : "s"} duplicated.` : "No enemy tokens could be duplicated.");
+    setMessage(created > 0 ? `${created} enemy token${created === 1 ? "" : "s"} duplicated and numbered.` : "No enemy tokens could be duplicated.");
     setBusy(false);
-  }, [broadcastRefresh, busy, enemyModels, isDm, refreshTokens, scene, selectedTokens, supabase]);
+  }, [broadcastRefresh, busy, enemyModels, isDm, refreshTokens, scene, selectedTokens, supabase, tokens]);
+
+  const startInitiative = useCallback(async () => {
+    if (!scene || !isDm || busy || initiativeTokens.length === 0) return;
+    setBusy(true); setError(null);
+    const { error: updateError } = await supabase.from("vtt_scenes").update({ initiative_active: true, initiative_round: 1, initiative_current_token_id: initiativeTokens[0].id }).eq("id", scene.id);
+    if (updateError) setError(updateError.message);
+    else {
+      await refreshScenes(scene.id);
+      if (scene.is_active) broadcastRefresh();
+    }
+    setBusy(false);
+  }, [broadcastRefresh, busy, initiativeTokens, isDm, refreshScenes, scene, supabase]);
+
+  const stopInitiative = useCallback(async (clearValues = false) => {
+    if (!scene || !isDm || busy) return;
+    setBusy(true); setError(null);
+    if (clearValues) await supabase.from("vtt_tokens").update({ initiative: null }).eq("scene_id", scene.id);
+    const { error: updateError } = await supabase.from("vtt_scenes").update({ initiative_active: false, initiative_round: 1, initiative_current_token_id: null }).eq("id", scene.id);
+    if (updateError) setError(updateError.message);
+    else {
+      await Promise.all([refreshScenes(scene.id), refreshTokens(scene.id)]);
+      if (scene.is_active) broadcastRefresh();
+    }
+    setBusy(false);
+  }, [broadcastRefresh, busy, isDm, refreshScenes, refreshTokens, scene, supabase]);
+
+  const stepInitiative = useCallback(async (direction: 1 | -1) => {
+    if (!scene || !isDm || busy || initiativeTokens.length === 0) return;
+    const currentIndex = Math.max(0, initiativeTokens.findIndex((token) => token.id === scene.initiative_current_token_id));
+    let nextIndex = currentIndex + direction;
+    let nextRound = scene.initiative_round;
+    if (nextIndex >= initiativeTokens.length) { nextIndex = 0; nextRound += 1; }
+    if (nextIndex < 0) { nextIndex = initiativeTokens.length - 1; nextRound = Math.max(1, nextRound - 1); }
+    setBusy(true); setError(null);
+    const { error: updateError } = await supabase.from("vtt_scenes").update({ initiative_active: true, initiative_round: nextRound, initiative_current_token_id: initiativeTokens[nextIndex].id }).eq("id", scene.id);
+    if (updateError) setError(updateError.message);
+    else {
+      await refreshScenes(scene.id);
+      if (scene.is_active) broadcastRefresh();
+    }
+    setBusy(false);
+  }, [broadcastRefresh, busy, initiativeTokens, isDm, refreshScenes, scene, supabase]);
 
   const selectToolMode = useCallback((mode: VttToolMode) => {
     setToolMode(mode); setMeasureStart(null); setMeasureEnd(null);
@@ -521,14 +722,15 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
 
   return {
     supabase, mapInputRef,
-    scenes, scene, canvasScene, tokens: visibleTokens, enemyModels, selectedIds, selectedTokens,
+    scenes, scene, canvasScene, tokens: visibleTokens, allTokens: tokens, enemyModels, selectedIds, selectedTokens, initiativeTokens,
     loading, busy, playerPreview, toolMode, measureStart, measureEnd, measurement, ping,
     mapFile, draftName, draftWidth, draftHeight, draftMapOpacity, draftGridOpacity, draftShowGrid,
     draftMapScale, draftMapOffsetX, draftMapOffsetZ, error, message, rotationDegrees,
     setPlayerPreview, setMapFile, setDraftName, setDraftWidth, setDraftHeight, setDraftMapOpacity,
     setDraftGridOpacity, setDraftShowGrid, setDraftMapScale, setDraftMapOffsetX, setDraftMapOffsetZ,
     selectToken, selectToolMode, setMeasureStart, setMeasureEnd, sendPing,
-    saveScenePresentation, uploadSceneMap, removeSceneMap, createScene, openScene, activateScene, deleteScene,
-    placeParty, spawnEnemy, localMove, commitMove, rotateSelected, bulkUpdate, removeSelected, duplicateSelected,
+    saveScenePresentation, uploadSceneMap, removeSceneMap, createScene, duplicateScene, openScene, activateScene, deleteScene, setScenePlayerVisibility,
+    placeParty, spawnEnemy, localMove, commitMove, rotateSelected, renameSelectedEnemy, setTokenInitiative, toggleNameplates,
+    bulkUpdate, removeSelected, duplicateSelected, startInitiative, stopInitiative, stepInitiative,
   };
 }

@@ -6,14 +6,19 @@ export type VttScene = {
   grid_height: number;
   feet_per_square: number;
   is_active: boolean;
+  visible_to_players: boolean;
   map_storage_path: string | null;
   map_original_name: string | null;
   map_opacity: number;
   grid_opacity: number;
   show_grid: boolean;
+  show_nameplates: boolean;
   map_scale: number;
   map_offset_x: number;
   map_offset_z: number;
+  initiative_active: boolean;
+  initiative_round: number;
+  initiative_current_token_id: string | null;
 };
 
 export type VttToken = {
@@ -31,6 +36,7 @@ export type VttToken = {
   model_format: "stl" | "glb";
   paint_storage_path: string | null;
   revision: number;
+  initiative: number | null;
 };
 
 export type VttEnemyModel = {
