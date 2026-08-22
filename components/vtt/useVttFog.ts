@@ -267,12 +267,7 @@ export function useVttFog({ campaignId, currentUserId, isDm, playerPreview, scen
   }, [commitRegion, draftPoints, operation, shape]);
 
   const displayTokens = useMemo(() => {
-    const merged = new Map<string, VttToken>();
-    if (!isDm && freshPlayerTokens) {
-      for (const token of freshPlayerTokens) merged.set(token.id, token);
-    }
-    for (const token of tokens) merged.set(token.id, token);
-    const values = [...merged.values()];
+    const values = !isDm && freshPlayerTokens ? freshPlayerTokens : tokens;
     if (isDm && !playerPreview) return values;
     return values.filter((token) => token.visible_to_players && isFogPointRevealed(enabled, baseState, regions, token.x, token.z));
   }, [baseState, enabled, freshPlayerTokens, isDm, playerPreview, regions, tokens]);
