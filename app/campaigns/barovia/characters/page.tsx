@@ -1,14 +1,7 @@
-import { BaroviaModulePlaceholder } from "@/components/campaigns/BaroviaModulePlaceholder";
-import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
+import { CampaignCharactersPage } from "@/components/campaigns/CampaignTabletopPages";
 
-export default async function BaroviaCharactersPage() {
-  await requireCampaignMembership("barovia");
+export const dynamic = "force-dynamic";
 
-  return (
-    <BaroviaModulePlaceholder
-      eyebrow="Those claimed by the road"
-      title="Lost Souls"
-      description="A gallery of player character cards with Daggerheart identity, relationships, story notes and campaign status."
-    />
-  );
+export default function Page() {
+  return <CampaignCharactersPage campaignSlug="barovia" />;
 }

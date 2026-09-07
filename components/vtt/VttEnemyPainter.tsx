@@ -64,7 +64,7 @@ export function VttEnemyPainter({ campaignId, initialModelId = null }: Props) {
 
   useEffect(() => {
     let alive = true;
-    refreshModels().catch((cause) => { if (alive) setError(cause instanceof Error ? cause.message : "Could not load enemy models."); }).finally(() => { if (alive) setLoading(false); });
+    void Promise.resolve().then(() => { if (alive) return refreshModels(); }).catch((cause) => { if (alive) setError(cause instanceof Error ? cause.message : "Could not load enemy models."); }).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [refreshModels]);
 

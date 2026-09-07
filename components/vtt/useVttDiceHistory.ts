@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type HistoryDiceMode = "normal" | "advantage" | "disadvantage";
@@ -31,13 +31,14 @@ type SaveVttDiceRoll = {
 
 function friendlyError(message: string) {
   if (message.includes("vtt_dice_rolls")) {
-    return "VTT dice history is not installed yet. Apply supabase/vtt-dice-v0-4-2-history.sql before testing persistent history.";
+    return "Roll history is unavailable. Please refresh the table and try again.";
   }
   return message;
 }
 
 export function useVttDiceHistory(sceneId: string | null) {
   const supabase = useMemo(() => createClient(), []);
+  const requestVersion = useRef(0);
   const [rolls, setRolls] = useState<VttDiceHistoryRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -45,6 +46,7 @@ export function useVttDiceHistory(sceneId: string | null) {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (quiet = false) => {
+    const request = ++requestVersion.current;
     if (!sceneId) {
       setRolls([]);
       setError(null);
@@ -60,6 +62,7 @@ export function useVttDiceHistory(sceneId: string | null) {
       .order("created_at", { ascending: false })
       .limit(100);
 
+    if (request !== requestVersion.current) return;
     if (response.error) {
       setError(friendlyError(response.error.message));
     } else {
@@ -70,8 +73,9 @@ export function useVttDiceHistory(sceneId: string | null) {
   }, [sceneId, supabase]);
 
   useEffect(() => {
-    void load();
-    if (!sceneId) return;
+    let active = true;
+    void Promise.resolve().then(() => { if (active) void load(); });
+    if (!sceneId) return () => { active = false; };
 
     const channel = supabase
       .channel(`vtt-dice-history-${sceneId}`)
@@ -87,9 +91,10 @@ export function useVttDiceHistory(sceneId: string | null) {
           void load(true);
         },
       )
-      .subscribe();
+      .subscribe((status) => { if (status === "SUBSCRIBED") void load(true); });
 
     return () => {
+      active = false;
       void supabase.removeChannel(channel);
     };
   }, [load, sceneId, supabase]);
@@ -142,7 +147,7 @@ export function useVttDiceHistory(sceneId: string | null) {
   }, [sceneId, supabase]);
 
   return {
-    rolls,
+    rolls: rolls.filter((roll) => roll.scene_id === sceneId),
     loading,
     saving,
     clearing,

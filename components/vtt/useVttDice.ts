@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { subscribeVttChannel } from "./vttRealtime";
 import { createClient } from "@/lib/supabase/client";
 import { useCampaignDiceConfiguration } from "@/components/dice-physics/useCampaignDiceConfiguration";
 import {
@@ -14,7 +15,10 @@ import { getSharedDiceSoundEngine } from "@/components/dice-physics/diceSound";
 import { getDiceCosmetic } from "@/components/dice-physics/diceCosmetics";
 import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-physics/dicePhysicsTypes";
 import type { DiceGroup, RolledGroup, SupportedDie } from "@/components/dice/diceUtils";
+import { resolveDuality, type DualityResult } from "./vttDuality";
 import { useVttDiceHistory } from "./useVttDiceHistory";
+
+export type VttRollKind = "custom" | "duality";
 
 export type VttDiceMode = "normal" | "advantage" | "disadvantage";
 
@@ -27,6 +31,7 @@ export type VttDiceEnvelope = {
   mode: VttDiceMode;
   modifier: number;
   sourceGroups: DiceGroup[];
+  rollKind?: VttRollKind;
   request: PhysicsRollRequest;
   createdAt: number;
 };
@@ -40,6 +45,7 @@ export type VttDiceResultToast = {
   mode: VttDiceMode;
   total: number;
   keptDie: number | null;
+  duality?: DualityResult;
 };
 
 type PendingLocalRoll = {
@@ -85,7 +91,11 @@ function isEnvelope(value: unknown): value is VttDiceEnvelope {
     && typeof record.rollerId === "string"
     && typeof record.rollerName === "string"
     && typeof record.expression === "string"
-    && typeof record.request === "object"
+    && record.request !== null && typeof record.request === "object"
+    && Array.isArray(record.request.dice) && record.request.dice.length > 0 && record.request.dice.length <= MAX_VTT_PHYSICAL_DICE
+    && record.request.dice.every((die) => ["d4", "d6", "d8", "d10", "d12", "d20"].includes(die.kind))
+    && ["normal", "advantage", "disadvantage"].includes(record.mode ?? "")
+    && Number.isFinite(record.modifier)
     && Array.isArray(record.sourceGroups);
 }
 
@@ -109,11 +119,15 @@ export function useVttDice({
   currentUserId,
   currentUserName,
   sceneId,
+  daggerheart = false,
+  sharedScene = false,
 }: {
   campaignId: string;
   currentUserId: string;
   currentUserName: string;
   sceneId: string | null;
+  daggerheart?: boolean;
+  sharedScene?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const configuration = useCampaignDiceConfiguration({ campaignId, currentUserId });
@@ -134,7 +148,8 @@ export function useVttDice({
   const clearTimerRef = useRef<number | null>(null);
   const remoteWatchdogRef = useRef<number | null>(null);
 
-  const [counts, setCounts] = useState<Counts>(() => defaultCounts());
+  const [rollKind, setRollKind] = useState<VttRollKind>(daggerheart ? "duality" : "custom");
+  const [counts, setCounts] = useState<Counts>(() => daggerheart ? { ...emptyCounts(), 12: 2 } : defaultCounts());
   const [modifier, setModifier] = useState(0);
   const [mode, setMode] = useState<VttDiceMode>("normal");
   const [activeRoll, setActiveRoll] = useState<VttDiceEnvelope | null>(null);
@@ -142,34 +157,36 @@ export function useVttDice({
   const [localError, setLocalError] = useState<string | null>(null);
 
   const groups = useMemo(() => groupsFromCounts(counts), [counts]);
-  const canUseD20Mode = useMemo(() => d20ModeAllowed(groups), [groups]);
+  const duality = rollKind === "duality";
+  const canUseD20Mode = useMemo(() => duality || d20ModeAllowed(groups), [duality, groups]);
   const effectiveMode = canUseD20Mode ? mode : "normal";
   const physicalGroups = useMemo(
-    () => canUseD20Mode && effectiveMode !== "normal"
-      ? [{ diceCount: 2, sides: 20 as const }]
-      : groups,
-    [canUseD20Mode, effectiveMode, groups],
+    () => duality
+      ? [{ diceCount: 2, sides: 12 as const }, ...(effectiveMode === "normal" ? [] : [{ diceCount: 1, sides: 6 as const }])]
+      : canUseD20Mode && effectiveMode !== "normal" ? [{ diceCount: 2, sides: 20 as const }] : groups,
+    [canUseD20Mode, duality, effectiveMode, groups],
   );
   const physicalCount = useMemo(() => countPhysicalDice(physicalGroups), [physicalGroups]);
-  const expression = useMemo(() => expressionFromGroups(groups, modifier), [groups, modifier]);
+  const expression = useMemo(() => duality ? `Hope d12 + Fear d12${modifier ? ` ${modifier > 0 ? "+" : "−"} ${Math.abs(modifier)}` : ""}${effectiveMode === "normal" ? "" : effectiveMode === "advantage" ? " + d6" : " − d6"}` : expressionFromGroups(groups, modifier), [duality, effectiveMode, groups, modifier]);
   const cosmetic = useMemo(
     () => getDiceCosmetic(configuration.appearance.cosmeticId),
     [configuration.appearance.cosmeticId],
   );
 
-  useEffect(() => {
-    sceneIdRef.current = sceneId;
+  const [rollSceneId, setRollSceneId] = useState(sceneId);
+  if (rollSceneId !== sceneId) {
+    setRollSceneId(sceneId);
     setLatestResult(null);
     setActiveRoll(null);
+  }
+
+  useEffect(() => {
+    sceneIdRef.current = sceneId;
     activeRef.current = null;
     pendingLocalRef.current = null;
     if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
     if (remoteWatchdogRef.current) window.clearTimeout(remoteWatchdogRef.current);
   }, [sceneId]);
-
-  useEffect(() => {
-    if (!canUseD20Mode && mode !== "normal") setMode("normal");
-  }, [canUseD20Mode, mode]);
 
   const clearActiveAfter = useCallback((rollId: string, milliseconds = 3200) => {
     if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
@@ -194,8 +211,9 @@ export function useVttDice({
   }, []);
 
   useEffect(() => {
+    if (!sceneId || !sharedScene) return;
     const channel = supabase
-      .channel(`vtt-dice-${campaignId}`)
+      .channel(`vtt:dice:${sceneId}`, { config: { private: true } })
       .on("broadcast", { event: "roll-start" }, ({ payload }) => {
         if (!isEnvelope(payload)) return;
         if (payload.sceneId !== sceneIdRef.current) return;
@@ -211,13 +229,13 @@ export function useVttDice({
         if (activeRef.current?.rollId === payload.rollId) clearActiveAfter(payload.rollId);
       });
 
-    channel.subscribe();
+    const unsubscribe = subscribeVttChannel(supabase, channel);
     channelRef.current = channel;
     return () => {
       channelRef.current = null;
-      void supabase.removeChannel(channel);
+      unsubscribe();
     };
-  }, [beginEnvelope, campaignId, clearActiveAfter, currentUserId, supabase]);
+  }, [beginEnvelope, clearActiveAfter, currentUserId, sceneId, sharedScene, supabase]);
 
   useEffect(() => () => {
     if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
@@ -226,16 +244,21 @@ export function useVttDice({
 
   const addDie = useCallback((sides: SupportedDie) => {
     if (activeRef.current) return;
+    setRollKind("custom");
+    setMode("normal");
     setCounts((current) => ({ ...current, [sides]: Math.min(12, current[sides] + 1) }));
   }, []);
 
   const removeDie = useCallback((sides: SupportedDie) => {
     if (activeRef.current) return;
+    setRollKind("custom");
+    setMode("normal");
     setCounts((current) => ({ ...current, [sides]: Math.max(0, current[sides] - 1) }));
   }, []);
 
   const clearDice = useCallback(() => {
     if (activeRef.current) return;
+    setRollKind("custom");
     setCounts(emptyCounts());
     setModifier(0);
     setMode("normal");
@@ -254,7 +277,7 @@ export function useVttDice({
 
     const rollId = createRollId();
     try {
-      const dice = buildPhysicsDiceFromGroups(physicalGroups, `vtt-${rollId}`);
+      const dice = buildPhysicsDiceFromGroups(physicalGroups, `vtt-${rollId}`).map((die) => duality && die.groupIndex === 0 ? { ...die, tone: die.logicalDieIndex === 0 ? "hope" as const : "fear" as const } : die);
       const envelope: VttDiceEnvelope = {
         rollId,
         sceneId,
@@ -263,7 +286,8 @@ export function useVttDice({
         expression,
         mode: effectiveMode,
         modifier,
-        sourceGroups: groups,
+        sourceGroups: duality ? physicalGroups : groups,
+        rollKind,
         request: {
           rollId,
           startedAt: performance.now(),
@@ -291,7 +315,7 @@ export function useVttDice({
       setActiveRoll(null);
       setLocalError(cause instanceof Error ? cause.message : "Could not prepare the VTT dice roll.");
     }
-  }, [configuration.appearance, configuration.loading, configuration.physics, currentUserId, currentUserName, effectiveMode, expression, groups, historySaving, modifier, physicalCount, physicalGroups, sceneId, soundEngine]);
+  }, [configuration.appearance, configuration.loading, configuration.physics, currentUserId, currentUserName, duality, effectiveMode, expression, groups, historySaving, modifier, physicalCount, physicalGroups, rollKind, sceneId, soundEngine]);
 
   const handlePhysicsComplete = useCallback(async (physicsResult: PhysicsRollResult) => {
     const envelope = activeRef.current;
@@ -316,7 +340,24 @@ export function useVttDice({
     let keptIndex: number | null = null;
     let total: number;
 
-    if (envelope.mode !== "normal") {
+    let dualityResult: DualityResult | undefined;
+    if (envelope.rollKind === "duality") {
+      try {
+        dualityResult = resolveDuality(
+          physicsResult.dice.find((die) => die.tone === "hope")?.value ?? 0,
+          physicsResult.dice.find((die) => die.tone === "fear")?.value ?? 0,
+          envelope.modifier, envelope.mode,
+          physicsResult.dice.find((die) => die.groupIndex === 1)?.value ?? null,
+        );
+      } catch (cause) {
+        pendingLocalRef.current = null;
+        setLocalError(cause instanceof Error ? cause.message : "Could not read Duality Dice.");
+        clearActiveAfter(envelope.rollId, 500);
+        return;
+      }
+      rolledGroups = physicsResultToGroups(envelope.sourceGroups, physicsResult);
+      total = dualityResult.total;
+    } else if (envelope.mode !== "normal") {
       const values = physicsResult.dice.map((die) => die.value).slice(0, 2);
       keptIndex = envelope.mode === "advantage"
         ? (values[0] >= values[1] ? 0 : 1)
@@ -338,8 +379,10 @@ export function useVttDice({
       mode: envelope.mode,
       total,
       keptDie,
+      duality: dualityResult,
     };
 
+    pendingLocalRef.current = null;
     await saveHistoryRoll({
       rollKey: envelope.rollId,
       sceneId: envelope.sceneId,
@@ -349,6 +392,7 @@ export function useVttDice({
       total,
       details: {
         groups: rolledGroups,
+        ...(dualityResult ? { duality: dualityResult, system: "daggerheart", roll_kind: "action" } : {}),
         kept_die: keptDie,
         kept_index: keptIndex,
         physics: {
@@ -370,7 +414,7 @@ export function useVttDice({
       },
     });
 
-    pendingLocalRef.current = null;
+    if (sceneIdRef.current !== envelope.sceneId) return;
     setLatestResult(toast);
     void channelRef.current?.send({ type: "broadcast", event: "roll-result", payload: toast });
     clearActiveAfter(envelope.rollId);
@@ -382,7 +426,7 @@ export function useVttDice({
     soundEngine.impact(force);
   }, [soundEngine]);
 
-  const error = localError ?? configuration.error;
+  const error = localError ?? configuration.error ?? historyError;
   const canRoll = Boolean(sceneId)
     && groups.length > 0
     && physicalCount <= MAX_VTT_PHYSICAL_DICE
@@ -391,6 +435,15 @@ export function useVttDice({
     && !historySaving;
 
   return {
+    rollKind,
+    selectDuality: () => {
+      if (!daggerheart || activeRef.current) return;
+      setRollKind("duality"); setCounts({ ...emptyCounts(), 12: 2 }); setMode("normal");
+    },
+    selectAdversary: () => {
+      if (activeRef.current) return;
+      setRollKind("custom"); setCounts(defaultCounts()); setMode("normal");
+    },
     counts,
     modifier,
     mode: effectiveMode,

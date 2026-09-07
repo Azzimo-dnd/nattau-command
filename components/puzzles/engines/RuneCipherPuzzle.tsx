@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { CampaignPuzzleRow, CampaignPuzzleRunRow, JsonRecord } from "@/lib/puzzles/puzzleTypes";
-import { getNattauRuneDefinition } from "@/lib/puzzles/nattauRunes";
+import { getCampaignRuneDefinition } from "@/lib/puzzles/campaignRunes";
 
 function RuneBadge({
   rune,
@@ -21,7 +21,7 @@ function RuneBadge({
     );
   }
 
-  const definition = getNattauRuneDefinition(rune);
+  const definition = getCampaignRuneDefinition(rune);
   if (!definition) {
     return (
       <span className={`flex h-full w-full items-center justify-center text-3xl font-black text-yellow-100 ${className}`}>
@@ -96,10 +96,10 @@ export function RuneCipherPuzzle({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-yellow-500/90">Current inscription</p>
-            <p className="mt-1 text-sm text-yellow-100/55">Arrange the island glyphs in the forgotten order of Nattau.</p>
+            <p className="mt-1 text-sm text-yellow-100/55">{puzzle.public_config.campaign_theme === "barovia" ? "Arrange the mourning signs. The seal answers only in the correct order." : "Arrange the island glyphs in the forgotten order of Nattau."}</p>
           </div>
           <div className="hidden rounded-full border border-yellow-500/20 bg-yellow-500/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-yellow-200/70 sm:block">
-            Seal of the Forgotten Tongue
+            {puzzle.title}
           </div>
         </div>
 

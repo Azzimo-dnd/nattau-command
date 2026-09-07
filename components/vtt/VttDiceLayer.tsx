@@ -395,7 +395,7 @@ export function VttDiceLayer({
   onImpact: (force: number) => void;
 }) {
   const profile = useMemo(() => getVttProfile(request.dice.length), [request.dice.length]);
-  const [dice, setDice] = useState<SpawnedDie[]>([]);
+  const [dice, setDice] = useState<SpawnedDie[]>(() => request.dice.map((spec, index) => createSpawn(spec, index, request.dice.length, request, sceneWidth, sceneHeight)));
   const asleepRef = useRef(new Set<string>());
   const resultsRef = useRef(new Map<string, PhysicsDieResult>());
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -406,28 +406,10 @@ export function VttDiceLayer({
   const timeoutRescuesRef = useRef(0);
   const completedRef = useRef(false);
 
-  useEffect(() => {
-    const initialDice = request.dice.map((spec, index) => createSpawn(
-      spec,
-      index,
-      request.dice.length,
-      request,
-      sceneWidth,
-      sceneHeight,
-    ));
-    asleepRef.current.clear();
-    resultsRef.current.clear();
-    peakImpactRef.current = 0;
-    forcedSettlesRef.current = 0;
-    escapeCountRef.current = 0;
-    rescuedDiceRef.current = 0;
-    timeoutRescuesRef.current = 0;
-    completedRef.current = false;
-    setDice(initialDice);
-    return () => {
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    };
-  }, [request, sceneHeight, sceneWidth]);
+  // The parent keys this physics world by roll ID; a new throw gets fresh state.
+  useEffect(() => () => {
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+  }, []);
 
   const rescueDice = useCallback((ids: Set<string>, source: "escape" | "timeout") => {
     if (ids.size === 0 || completedRef.current) return;

@@ -1,5 +1,6 @@
 "use client";
 
+import { dualityLabel, type DualityResult } from "./vttDuality";
 import type { VttDiceHistoryRow } from "./useVttDiceHistory";
 
 function formatTime(value: string) {
@@ -65,6 +66,7 @@ export function VttDiceHistoryPanel({
             <div className="space-y-2">
               {rolls.map((roll) => {
                 const label = modeLabel(roll.mode);
+                const duality = roll.details.duality as DualityResult | undefined;
                 return (
                   <article key={roll.id} className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
                     <div className="flex items-start justify-between gap-3">
@@ -75,6 +77,7 @@ export function VttDiceHistoryPanel({
                         </div>
                         <p className="mt-1 truncate text-[11px] font-bold text-slate-400">{roll.expression}</p>
                         <p className="mt-1 text-[9px] text-slate-600">{formatTime(roll.created_at)}</p>
+                        {duality && <p className="mt-1 text-[10px] text-rose-200">Hope {duality.hope} · Fear {duality.fear} · {dualityLabel(duality.outcome)}</p>}
                       </div>
                       <div className="shrink-0 rounded-xl border border-yellow-400/25 bg-yellow-400/10 px-3 py-2 text-xl font-black text-yellow-100">
                         {roll.total}

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { snapTokenCoordinate } from "./vttGridMath";
+import { subscribeVttChannel } from "./vttRealtime";
 import { isFogPointRevealed } from "./vttFogMath";
 import type {
   VttFogBaseState,
@@ -21,6 +23,7 @@ type Props = {
   scene: VttScene | null;
   tokens: VttToken[];
   supabase: ReturnType<typeof createClient>;
+  refreshTokens: (sceneId: string) => Promise<void>;
 };
 
 type FogSceneRow = {
@@ -46,14 +49,11 @@ function normalizeRegion(row: unknown): VttFogRegion {
   return { ...value, points };
 }
 
-function tokenSignature(tokens: VttToken[]) {
-  return tokens.map((token) => `${token.id}:${token.revision}:${token.x}:${token.z}:${token.visible_to_players ? 1 : 0}`).join("|");
-}
-
-export function useVttFog({ campaignId, currentUserId, isDm, playerPreview, scene, tokens, supabase }: Props) {
+export function useVttFog({ campaignId, currentUserId, isDm, playerPreview, scene, tokens, supabase, refreshTokens }: Props) {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const rectangleStartRef = useRef<VttFogPoint | null>(null);
-  const freshTokenSignatureRef = useRef<string | null>(null);
+  const requestVersion = useRef(0);
+  const [loadedSceneId, setLoadedSceneId] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [baseState, setBaseState] = useState<VttFogBaseState>("revealed");
   const [regions, setRegions] = useState<VttFogRegion[]>([]);
@@ -64,10 +64,14 @@ export function useVttFog({ campaignId, currentUserId, isDm, playerPreview, scen
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [freshPlayerTokens, setFreshPlayerTokens] = useState<VttToken[] | null>(null);
 
   const sceneId = scene?.id ?? null;
-  const currentTokenSignature = useMemo(() => tokenSignature(tokens), [tokens]);
+  const [draftSceneId, setDraftSceneId] = useState(sceneId);
+  if (draftSceneId !== sceneId) {
+    setDraftSceneId(sceneId);
+    setDraftPoints([]);
+    setDrawingRectangle(false);
+  }
 
   const clampPoint = useCallback((point: VttFogPoint): VttFogPoint => {
     if (!scene) return point;
@@ -77,29 +81,23 @@ export function useVttFog({ campaignId, currentUserId, isDm, playerPreview, scen
     ];
   }, [scene]);
 
-  const loadFreshPlayerTokens = useCallback(async () => {
-    if (!sceneId || isDm) return;
-    const signatureBefore = currentTokenSignature;
-    const { data, error: tokenError } = await supabase.rpc("list_vtt_scene_tokens", { p_scene_id: sceneId });
-    if (tokenError) return;
-    freshTokenSignatureRef.current = signatureBefore;
-    setFreshPlayerTokens((data ?? []) as VttToken[]);
-  }, [currentTokenSignature, isDm, sceneId, supabase]);
-
   const refresh = useCallback(async (includeFreshTokens = false) => {
     if (!sceneId) {
       setEnabled(false);
       setBaseState("revealed");
       setRegions([]);
-      setFreshPlayerTokens(null);
+      setLoadedSceneId(null);
       return;
     }
+    const version = ++requestVersion.current;
     setLoading(true);
     const [{ data: sceneData, error: sceneError }, { data: regionData, error: regionError }] = await Promise.all([
       supabase.from("vtt_scenes").select("fog_enabled,fog_base_state").eq("id", sceneId).single(),
       supabase.from("vtt_fog_regions").select("id,scene_id,operation,shape,points,created_at").eq("scene_id", sceneId).order("id", { ascending: true }),
     ]);
+    if (version !== requestVersion.current) return;
     if (sceneError || regionError) {
+      setLoadedSceneId(null);
       setError(sceneError?.message ?? regionError?.message ?? "Could not load Fog of War.");
       setLoading(false);
       return;
@@ -108,41 +106,37 @@ export function useVttFog({ campaignId, currentUserId, isDm, playerPreview, scen
     setEnabled(Boolean(row.fog_enabled));
     setBaseState(row.fog_base_state ?? "revealed");
     setRegions((regionData ?? []).map(normalizeRegion));
+    setLoadedSceneId(sceneId);
     setError(null);
     setLoading(false);
-    if (includeFreshTokens) await loadFreshPlayerTokens();
-  }, [loadFreshPlayerTokens, sceneId, supabase]);
+    if (includeFreshTokens) await refreshTokens(sceneId).catch(() => setError("Could not refresh revealed miniatures."));
+  }, [refreshTokens, sceneId, supabase]);
 
   useEffect(() => {
     rectangleStartRef.current = null;
-    setDraftPoints([]);
-    setDrawingRectangle(false);
-    setFreshPlayerTokens(null);
-    freshTokenSignatureRef.current = null;
-    void refresh(false);
+    let active = true;
+    void Promise.resolve().then(() => { if (active) void refresh(false); });
+    return () => { active = false; };
   }, [refresh, sceneId]);
 
   useEffect(() => {
-    if (!freshPlayerTokens || freshTokenSignatureRef.current === null) return;
-    if (freshTokenSignatureRef.current !== currentTokenSignature) {
-      setFreshPlayerTokens(null);
-      freshTokenSignatureRef.current = null;
-    }
-  }, [currentTokenSignature, freshPlayerTokens]);
-
-  useEffect(() => {
     const channel = supabase
-      .channel(`vtt-fog-${campaignId}`)
+      .channel(`vtt:fog:${campaignId}`, { config: { private: true } })
       .on("broadcast", { event: "fog-refresh" }, ({ payload }) => {
         const next = payload as { sceneId?: string };
         if (!next.sceneId || next.sceneId !== sceneId) return;
         void refresh(!isDm);
       });
-    channel.subscribe();
+    const unsubscribe = subscribeVttChannel(supabase, channel, (status) => {
+      if (status === "SUBSCRIBED") void refresh(!isDm);
+    });
+    const recover = () => { if (document.visibilityState === "visible") void refresh(!isDm); };
+    document.addEventListener("visibilitychange", recover);
     channelRef.current = channel;
     return () => {
+      document.removeEventListener("visibilitychange", recover);
       channelRef.current = null;
-      void supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [campaignId, isDm, refresh, sceneId, supabase]);
 
@@ -267,15 +261,17 @@ export function useVttFog({ campaignId, currentUserId, isDm, playerPreview, scen
   }, [commitRegion, draftPoints, operation, shape]);
 
   const displayTokens = useMemo(() => {
-    const values = !isDm && freshPlayerTokens ? freshPlayerTokens : tokens;
-    if (isDm && !playerPreview) return values;
-    return values.filter((token) => token.visible_to_players && isFogPointRevealed(enabled, baseState, regions, token.x, token.z));
-  }, [baseState, enabled, freshPlayerTokens, isDm, playerPreview, regions, tokens]);
+    if (isDm && !playerPreview) return tokens;
+    if (loadedSceneId !== sceneId) return [];
+    return tokens.filter((token) => token.visible_to_players && isFogPointRevealed(enabled, baseState, regions, snapTokenCoordinate(token.x, scene?.grid_width ?? 24, token.size_squares), snapTokenCoordinate(token.z, scene?.grid_height ?? 18, token.size_squares)));
+  }, [baseState, enabled, isDm, loadedSceneId, playerPreview, regions, sceneId, scene?.grid_width, scene?.grid_height, tokens]);
 
+  const waitingForFog = Boolean(sceneId) && loadedSceneId !== sceneId;
+  const protectPlayerView = (!isDm || playerPreview) && waitingForFog;
   return {
-    enabled,
-    baseState,
-    regions,
+    enabled: protectPlayerView ? true : enabled,
+    baseState: protectPlayerView ? "covered" as const : baseState,
+    regions: protectPlayerView ? [] : regions,
     operation,
     shape,
     draftPoints,

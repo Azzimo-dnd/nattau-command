@@ -3,7 +3,9 @@ import {
   findCircuitRotation,
   rotateCircuitMask,
 } from "./arcaneCircuit";
-import type { JsonRecord, PuzzlePreset, PuzzleType } from "./puzzleTypes";
+import { applyPuzzleAtmosphere } from "./puzzleAtmosphere";
+import { BAROVIA_RUNE_IDS } from "./campaignRunes";
+import type { JsonRecord, PuzzlePreset, PuzzleType, PuzzleTheme } from "./puzzleTypes";
 import { NATTAU_RUNE_IDS } from "./nattauRunes";
 import {
   buildCircuitPathVariant,
@@ -20,6 +22,7 @@ export const DEFAULT_RUNES = ["ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ", "ᚷ", "
 
 export type PuzzlePresetOptions = {
   sigilMaterial?: SigilMaterialMode;
+  theme?: PuzzleTheme;
 };
 
 function shuffle<T>(items: T[]) {
@@ -236,7 +239,7 @@ function buildCircuitConfig(difficulty: string) {
   };
 }
 
-export function buildPuzzlePreset(
+function buildMechanicalPreset(
   type: PuzzleType,
   difficulty = "Medium",
   options: PuzzlePresetOptions = {},
@@ -249,7 +252,7 @@ export function buildPuzzlePreset(
   if (type === "rune_cipher") {
     const codeLength = easy ? 3 : insane ? 6 : hard ? 5 : 4;
     const poolSize = hard ? 8 : easy ? 5 : 6;
-    const pool = shuffle(NATTAU_RUNE_IDS).slice(0, poolSize);
+    const pool = shuffle(options.theme === "barovia" ? BAROVIA_RUNE_IDS : NATTAU_RUNE_IDS).slice(0, poolSize);
     const allowRepeats = hard ? true : Math.random() < 0.5;
     const solution = randomRuneSequence(pool, codeLength, allowRepeats);
     return {
@@ -320,7 +323,7 @@ export function buildPuzzlePreset(
   }
 
   const poolSize = hard ? 8 : easy ? 5 : 6;
-  const pool = shuffle(NATTAU_RUNE_IDS).slice(0, poolSize);
+  const pool = shuffle(options.theme === "barovia" ? BAROVIA_RUNE_IDS : NATTAU_RUNE_IDS).slice(0, poolSize);
   const baseLength = easy ? 2 : 3;
   const maxLevel = easy ? 4 : insane ? 7 : hard ? 6 : 5;
   const totalLength = baseLength + maxLevel - 1;
@@ -347,4 +350,8 @@ export function buildPuzzlePreset(
       sequence,
     },
   };
+}
+
+export function buildPuzzlePreset(type: PuzzleType, difficulty = "Medium", options: PuzzlePresetOptions = {}): PuzzlePreset {
+  return applyPuzzleAtmosphere(buildMechanicalPreset(type, difficulty, options), type, options.theme ?? "nattau");
 }

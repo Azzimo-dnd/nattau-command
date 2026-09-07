@@ -1,5 +1,6 @@
 "use client";
 
+import { dualityLabel } from "./vttDuality";
 import type { SupportedDie } from "@/components/dice/diceUtils";
 import type { VttDiceEnvelope, VttDiceMode, VttDiceResultToast } from "./useVttDice";
 
@@ -13,6 +14,10 @@ function modeLabel(mode: VttDiceMode) {
 
 export function VttDiceBar({
   isFullscreen,
+  daggerheart = false,
+  duality = false,
+  onDuality,
+  onAdversary,
   counts,
   modifier,
   mode,
@@ -37,6 +42,10 @@ export function VttDiceBar({
   onRoll,
 }: {
   isFullscreen: boolean;
+  daggerheart?: boolean;
+  duality?: boolean;
+  onDuality?: () => void;
+  onAdversary?: () => void;
   counts: Record<SupportedDie, number>;
   modifier: number;
   mode: VttDiceMode;
@@ -74,6 +83,7 @@ export function VttDiceBar({
                 {latestResult.expression}{latestResult.mode === "normal" ? "" : ` · ${latestResult.mode}`}
               </p>
               <p className="mt-1 text-2xl font-black text-white">{latestResult.total}</p>
+              {latestResult.duality && <p className="mt-1 text-xs font-bold text-rose-200">Hope {latestResult.duality.hope} · Fear {latestResult.duality.fear} · {dualityLabel(latestResult.duality.outcome)}</p>}
             </div>
           </div>
         ) : null}
@@ -92,6 +102,8 @@ export function VttDiceBar({
             </div>
           </div>
 
+          {daggerheart && <button type="button" disabled={busy} aria-pressed={duality} onClick={onDuality} className={`mb-2 min-h-10 w-full rounded-xl border px-3 text-xs font-bold disabled:opacity-40 ${duality ? "border-rose-300 bg-rose-400/15 text-rose-100" : "border-slate-700 text-slate-300"}`}>Hope & Fear · Action roll</button>}
+          {daggerheart && onAdversary && <button type="button" disabled={busy} onClick={onAdversary} className="mb-2 min-h-9 rounded-xl border border-slate-700 px-3 text-xs text-slate-300 disabled:opacity-40">Adversary · d20</button>}
           <div className="flex gap-1.5 overflow-x-auto pb-1">
             {QUICK_DICE.map((sides) => {
               const count = counts[sides];
@@ -144,7 +156,7 @@ export function VttDiceBar({
                   disabled={busy || (entry !== "normal" && !canUseD20Mode)}
                   onClick={() => onMode(entry)}
                   className={`min-h-9 min-w-9 border-r border-slate-800 px-2 text-[10px] font-black last:border-r-0 disabled:opacity-25 ${mode === entry ? (entry === "advantage" ? "bg-emerald-400/15 text-emerald-200" : entry === "disadvantage" ? "bg-rose-400/15 text-rose-200" : "bg-cyan-400/15 text-cyan-100") : "text-slate-500 hover:text-slate-200"}`}
-                  title={entry === "normal" ? "Normal d20" : entry === "advantage" ? "Advantage" : "Disadvantage"}
+                  title={entry === "normal" ? "Normal roll" : duality ? entry === "advantage" ? "Add an advantage d6" : "Subtract a disadvantage d6" : entry === "advantage" ? "Advantage" : "Disadvantage"}
                 >
                   {modeLabel(entry)}
                 </button>

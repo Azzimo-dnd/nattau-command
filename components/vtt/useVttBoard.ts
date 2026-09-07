@@ -1,20 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { subscribeVttChannel } from "./vttRealtime";
 import { createClient } from "@/lib/supabase/client";
 import type { VttMeasurePoint, VttPing, VttToolMode } from "./VttCanvas";
 import type { VttEnemyModel, VttScene, VttToken } from "./vttTypes";
 
 const MAX_MAP_BYTES = 20 * 1024 * 1024;
-const SCENE_FIELDS = "id,campaign_id,name,grid_width,grid_height,feet_per_square,is_active,visible_to_players,map_storage_path,map_original_name,map_opacity,grid_opacity,show_grid,show_nameplates,initiative_active,initiative_round,initiative_current_token_id";
+const SCENE_FIELDS = "id,campaign_id,name,grid_width,grid_height,feet_per_square,is_active,visible_to_players,map_storage_path,map_original_name,map_opacity,grid_opacity,show_grid,show_nameplates,initiative_active,initiative_round,initiative_current_token_id,map_scale,map_offset_x,map_offset_z";
 const ENEMY_FIELDS = "id,campaign_id,name,storage_path,web_storage_path,original_name,file_size_bytes,web_file_size_bytes,triangle_count,width_mm,depth_mm,height_mm,created_at";
-
-type CalibrationRow = {
-  id: string;
-  map_scale: number | null;
-  map_offset_x: number | null;
-  map_offset_z: number | null;
-};
 
 type DirectTokenRow = {
   character_miniature_id: string | null;
@@ -43,7 +37,7 @@ function storagePathExtension(path: string) {
   return match?.[1] ?? "webp";
 }
 
-function withCalibration(scene: Partial<VttScene>, calibration?: CalibrationRow): VttScene {
+function withCalibration(scene: Partial<VttScene>): VttScene {
   return {
     ...scene,
     visible_to_players: scene.visible_to_players ?? true,
@@ -51,9 +45,9 @@ function withCalibration(scene: Partial<VttScene>, calibration?: CalibrationRow)
     initiative_active: scene.initiative_active ?? false,
     initiative_round: scene.initiative_round ?? 1,
     initiative_current_token_id: scene.initiative_current_token_id ?? null,
-    map_scale: calibration?.map_scale ?? scene.map_scale ?? 1,
-    map_offset_x: calibration?.map_offset_x ?? scene.map_offset_x ?? 0,
-    map_offset_z: calibration?.map_offset_z ?? scene.map_offset_z ?? 0,
+    map_scale: scene.map_scale ?? 1,
+    map_offset_x: scene.map_offset_x ?? 0,
+    map_offset_z: scene.map_offset_z ?? 0,
   } as VttScene;
 }
 
@@ -76,10 +70,13 @@ function duplicateEnemyName(name: string, allNames: string[]) {
   return `${base} ${max + 1}`;
 }
 
-export function useVttBoard(campaignId: string, isDm: boolean) {
+export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: string) {
   const supabase = useMemo(() => createClient(), []);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const workspaceSceneIdRef = useRef<string | null>(null);
+  const tokenRequestRef = useRef(0);
+  const sceneRequestRef = useRef(0);
+  const [connection, setConnection] = useState<"connecting" | "live" | "offline">("connecting");
   const mapInputRef = useRef<HTMLInputElement | null>(null);
 
   const [scenes, setScenes] = useState<VttScene[]>([]);
@@ -107,39 +104,52 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    workspaceSceneIdRef.current = scene?.id ?? null;
-  }, [scene?.id]);
-
-  const loadCalibrationMap = useCallback(async () => {
-    const { data, error: calibrationError } = await supabase
-      .from("vtt_scenes")
-      .select("id,map_scale,map_offset_x,map_offset_z")
-      .eq("campaign_id", campaignId);
-    if (calibrationError) return new Map<string, CalibrationRow>();
-    return new Map((data ?? []).map((row) => [row.id, row as CalibrationRow]));
-  }, [campaignId, supabase]);
+  const selectWorkspace = useCallback((next: VttScene | null) => {
+    if (workspaceSceneIdRef.current !== (next?.id ?? null)) {
+      ++tokenRequestRef.current;
+      setTokens([]);
+      setSelectedIds([]);
+      setMeasureStart(null);
+      setMeasureEnd(null);
+      setPlayerPreview(false);
+      setPing(null);
+      setMapFile(null);
+      if (next) {
+        setDraftName(next.name);
+        setDraftWidth(next.grid_width);
+        setDraftHeight(next.grid_height);
+        setDraftMapOpacity(Math.round(next.map_opacity * 100));
+        setDraftGridOpacity(Math.round(next.grid_opacity * 100));
+        setDraftShowGrid(next.show_grid);
+        setDraftMapScale(next.map_scale);
+        setDraftMapOffsetX(next.map_offset_x);
+        setDraftMapOffsetZ(next.map_offset_z);
+      }
+    }
+    workspaceSceneIdRef.current = next?.id ?? null;
+    setScene(next);
+  }, []);
 
   const refreshScenes = useCallback(async (preferredId?: string | null) => {
     if (!isDm) return [] as VttScene[];
-    const [{ data, error: sceneError }, calibration] = await Promise.all([
-      supabase.from("vtt_scenes").select(SCENE_FIELDS).eq("campaign_id", campaignId).order("created_at", { ascending: true }),
-      loadCalibrationMap(),
-    ]);
+    const request = ++sceneRequestRef.current;
+    const { data, error: sceneError } = await supabase.from("vtt_scenes").select(SCENE_FIELDS).eq("campaign_id", campaignId).order("created_at", { ascending: true });
     if (sceneError) throw sceneError;
 
-    const nextScenes = (data ?? []).map((item) => withCalibration(item as unknown as Partial<VttScene>, calibration.get(item.id)));
+    const nextScenes = (data ?? []).map((item) => withCalibration(item as unknown as Partial<VttScene>));
+    if (request !== sceneRequestRef.current) return nextScenes;
     setScenes(nextScenes);
     const wantedId = preferredId ?? workspaceSceneIdRef.current;
     const workspace = nextScenes.find((item) => item.id === wantedId)
       ?? nextScenes.find((item) => item.is_active)
       ?? nextScenes[0]
       ?? null;
-    setScene(workspace);
+    selectWorkspace(workspace);
     return nextScenes;
-  }, [campaignId, isDm, loadCalibrationMap, supabase]);
+  }, [campaignId, isDm, selectWorkspace, supabase]);
 
   const refreshPlayerScene = useCallback(async () => {
+    const request = ++sceneRequestRef.current;
     const { data, error: sceneError } = await supabase
       .from("vtt_scenes")
       .select(SCENE_FIELDS)
@@ -148,14 +158,18 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
       .maybeSingle();
     if (sceneError) throw sceneError;
     const next = data ? withCalibration(data as unknown as Partial<VttScene>) : null;
-    setScene(next);
+    if (request !== sceneRequestRef.current) return null;
+    selectWorkspace(next);
     return next;
-  }, [campaignId, supabase]);
+  }, [campaignId, selectWorkspace, supabase]);
 
   const refreshTokens = useCallback(async (sceneId: string) => {
+    const request = ++tokenRequestRef.current;
     const { data, error: rpcError } = await supabase.rpc("list_vtt_scene_tokens", { p_scene_id: sceneId });
     if (rpcError) throw rpcError;
-    setTokens((data ?? []) as VttToken[]);
+    if (request === tokenRequestRef.current && workspaceSceneIdRef.current === sceneId) {
+      setTokens((data ?? []) as VttToken[]);
+    }
   }, [supabase]);
 
   const refreshEnemies = useCallback(async () => {
@@ -177,12 +191,12 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
     if (isDm) {
       await refreshScenes();
       const workspaceId = workspaceSceneIdRef.current;
-      if (workspaceId) await refreshTokens(workspaceId).catch(() => undefined);
+      if (workspaceId) await refreshTokens(workspaceId);
       return;
     }
     const active = await refreshPlayerScene();
     if (active) await refreshTokens(active.id);
-    else setTokens([]);
+    else if (!workspaceSceneIdRef.current) setTokens([]);
   }, [isDm, refreshPlayerScene, refreshScenes, refreshTokens]);
 
   useEffect(() => {
@@ -192,14 +206,9 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
       setError(null);
       try {
         if (isDm) {
-          const { error: rpcError } = await supabase.rpc("ensure_vtt_alpha_scene", { p_campaign_id: campaignId });
-          if (rpcError) throw rpcError;
-          const nextScenes = await refreshScenes();
-          const workspace = nextScenes.find((item) => item.is_active) ?? nextScenes[0] ?? null;
-          if (!cancelled && workspace) {
-            setScene(workspace);
-            await refreshTokens(workspace.id);
-          }
+          await refreshScenes();
+          const workspaceId = workspaceSceneIdRef.current;
+          if (!cancelled && workspaceId) await refreshTokens(workspaceId);
           await refreshEnemies();
         } else {
           const active = await refreshPlayerScene();
@@ -217,38 +226,30 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
 
   useEffect(() => {
     const channel = supabase
-      .channel(`vtt-campaign-${campaignId}`)
-      .on("broadcast", { event: "refresh" }, () => { void refreshFromBroadcast().catch(() => undefined); })
+      .channel(`vtt:campaign:${campaignId}`, { config: { private: true } })
+      .on("broadcast", { event: "refresh" }, () => { void refreshFromBroadcast().catch(() => setError("Could not refresh the table. Check your connection and try again.")); })
       .on("broadcast", { event: "ping" }, ({ payload }) => {
         const next = payload as { sceneId?: string; id?: string; x?: number; z?: number };
-        if (next.sceneId !== workspaceSceneIdRef.current || typeof next.x !== "number" || typeof next.z !== "number") return;
+        if (next.sceneId !== workspaceSceneIdRef.current || typeof next.x !== "number" || typeof next.z !== "number" || !Number.isFinite(next.x) || !Number.isFinite(next.z)) return;
         setPing({ id: next.id ?? crypto.randomUUID(), x: next.x, z: next.z });
       });
-    channel.subscribe();
+    const unsubscribe = subscribeVttChannel(supabase, channel, (status) => {
+      setConnection(status === "SUBSCRIBED" ? "live" : status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED" ? "offline" : "connecting");
+      if (status === "SUBSCRIBED") void refreshFromBroadcast().catch(() => setError("Could not refresh the table. Check your connection and try again."));
+    });
+    const recover = () => {
+      if (document.visibilityState === "visible") void refreshFromBroadcast().catch(() => setError("Could not refresh the table. Check your connection and try again."));
+    };
+    document.addEventListener("visibilitychange", recover);
+    window.addEventListener("online", recover);
     channelRef.current = channel;
     return () => {
+      document.removeEventListener("visibilitychange", recover);
+      window.removeEventListener("online", recover);
       channelRef.current = null;
-      void supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [campaignId, refreshFromBroadcast, supabase]);
-
-  useEffect(() => {
-    if (!scene) return;
-    setDraftName(scene.name);
-    setDraftWidth(scene.grid_width);
-    setDraftHeight(scene.grid_height);
-    setDraftMapOpacity(Math.round(scene.map_opacity * 100));
-    setDraftGridOpacity(Math.round(scene.grid_opacity * 100));
-    setDraftShowGrid(scene.show_grid);
-    setDraftMapScale(scene.map_scale);
-    setDraftMapOffsetX(scene.map_offset_x);
-    setDraftMapOffsetZ(scene.map_offset_z);
-    setSelectedIds([]);
-    setMeasureStart(null);
-    setMeasureEnd(null);
-    setPlayerPreview(false);
-    if (isDm) void refreshTokens(scene.id).catch(() => undefined);
-  }, [isDm, refreshTokens, scene?.id]);
 
   useEffect(() => {
     if (!ping) return;
@@ -266,9 +267,9 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
   const rotationDegrees = selected ? Math.round(normalizeRotation(selected.rotation) * 180 / Math.PI) : 0;
   const canvasScene = scene ? {
     ...scene,
-    map_scale: draftMapScale,
-    map_offset_x: draftMapOffsetX,
-    map_offset_z: draftMapOffsetZ,
+    map_scale: isDm && !playerPreview ? draftMapScale : scene.map_scale,
+    map_offset_x: isDm && !playerPreview ? draftMapOffsetX : scene.map_offset_x,
+    map_offset_z: isDm && !playerPreview ? draftMapOffsetZ : scene.map_offset_z,
   } : null;
 
   const selectToken = useCallback((id: string | null, additive: boolean) => {
@@ -372,14 +373,13 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
       grid_height: scene?.grid_height ?? 18,
       feet_per_square: scene?.feet_per_square ?? 5,
       is_active: false,
-      visible_to_players: true,
+      visible_to_players: false,
       show_nameplates: false,
     }).select(SCENE_FIELDS).single();
     if (insertError) setError(insertError.message);
     else {
       const next = withCalibration(data as unknown as Partial<VttScene>);
       await refreshScenes(next.id);
-      setScene(next);
       setTokens([]);
       setMessage(`${next.name} created privately. Players cannot see it until you make it live.`);
     }
@@ -389,67 +389,69 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
   const duplicateScene = useCallback(async (target: VttScene) => {
     if (!isDm || busy) return;
     setBusy(true); setError(null); setMessage(null);
-
-    const { data: created, error: createError } = await supabase.from("vtt_scenes").insert({
-      campaign_id: campaignId,
-      name: `${target.name} copy`,
-      grid_width: target.grid_width,
-      grid_height: target.grid_height,
-      feet_per_square: target.feet_per_square,
-      is_active: false,
-      visible_to_players: true,
-      map_opacity: target.map_opacity,
-      grid_opacity: target.grid_opacity,
-      show_grid: target.show_grid,
-      show_nameplates: target.show_nameplates,
-      map_scale: target.map_scale,
-      map_offset_x: target.map_offset_x,
-      map_offset_z: target.map_offset_z,
-    }).select("id").single();
-
-    if (createError || !created) {
-      setError(createError?.message ?? "Could not duplicate scene.");
-      setBusy(false);
-      return;
-    }
-
-    const newSceneId = created.id as string;
+    let newSceneId: string | null = null;
     let copiedMapPath: string | null = null;
-
-    if (target.map_storage_path) {
-      const { data: mapBlob, error: mapDownloadError } = await supabase.storage.from("vtt-maps").download(target.map_storage_path);
-      if (!mapDownloadError && mapBlob) {
-        copiedMapPath = `${campaignId}/${newSceneId}/${crypto.randomUUID()}.${storagePathExtension(target.map_storage_path)}`;
-        const { error: mapUploadError } = await supabase.storage.from("vtt-maps").upload(copiedMapPath, mapBlob, { contentType: mapBlob.type || undefined, upsert: false });
-        if (mapUploadError) copiedMapPath = null;
+    try {
+      const [source, actorRows, fogRows, rosterRows] = await Promise.all([
+        supabase.from("vtt_scenes").select(`${SCENE_FIELDS},fog_enabled,fog_base_state,party_roster_configured`).eq("id", target.id).single(),
+        supabase.from("vtt_tokens").select("character_miniature_id,enemy_model_id,name,x,z,rotation,scale,size_squares,visible_to_players").eq("scene_id", target.id),
+        supabase.from("vtt_fog_regions").select("operation,shape,points").eq("scene_id", target.id).order("id"),
+        supabase.from("vtt_scene_party_members").select("user_id").eq("scene_id", target.id),
+      ]);
+      for (const result of [source, actorRows, fogRows, rosterRows]) if (result.error) throw result.error;
+      const { id: sourceId, ...settings } = source.data!;
+      void sourceId;
+      const { data: created, error: createError } = await supabase.from("vtt_scenes").insert({
+        ...settings, name: `${target.name} copy`, is_active: false, visible_to_players: false,
+        map_storage_path: null, map_original_name: null,
+        initiative_active: false, initiative_round: 1, initiative_current_token_id: null,
+      }).select("id").single();
+      if (createError || !created) throw createError ?? new Error("Could not create the scene copy.");
+      newSceneId = created.id;
+      if (settings.map_storage_path) {
+        const { data: blob, error: downloadError } = await supabase.storage.from("vtt-maps").download(settings.map_storage_path);
+        if (downloadError || !blob) throw downloadError ?? new Error("Could not read the source map.");
+        copiedMapPath = `${campaignId}/${newSceneId}/${crypto.randomUUID()}.${storagePathExtension(settings.map_storage_path)}`;
+        const { error: uploadError } = await supabase.storage.from("vtt-maps").upload(copiedMapPath, blob, { contentType: blob.type || undefined, upsert: false });
+        if (uploadError) throw uploadError;
+        const { error: mapError } = await supabase.from("vtt_scenes").update({ map_storage_path: copiedMapPath, map_original_name: settings.map_original_name }).eq("id", newSceneId);
+        if (mapError) throw mapError;
       }
-    }
-
-    if (copiedMapPath) {
-      await supabase.from("vtt_scenes").update({ map_storage_path: copiedMapPath, map_original_name: target.map_original_name }).eq("id", newSceneId);
-    }
-
-    const { data: sourceRows } = await supabase.from("vtt_tokens")
-      .select("character_miniature_id,enemy_model_id,name,x,z,rotation,scale,size_squares,visible_to_players")
-      .eq("scene_id", target.id);
-
-    if (sourceRows?.length) {
-      const inserts = (sourceRows as DirectTokenRow[]).map((row) => ({ ...row, scene_id: newSceneId, initiative: null }));
-      await supabase.from("vtt_tokens").insert(inserts);
-    }
-
-    await refreshScenes(newSceneId);
-    await refreshTokens(newSceneId);
-    setMessage(`${target.name} duplicated as a private prepared scene.`);
-    setBusy(false);
-  }, [busy, campaignId, isDm, refreshScenes, refreshTokens, supabase]);
+      if (actorRows.data?.length) {
+        const { error: actorError } = await supabase.from("vtt_tokens").insert(actorRows.data.map((row: DirectTokenRow) => ({ ...row, scene_id: newSceneId, initiative: null })));
+        if (actorError) throw actorError;
+      }
+      if (rosterRows.data?.length) {
+        const { error: rosterError } = await supabase.from("vtt_scene_party_members").insert(rosterRows.data.map((row) => ({ ...row, scene_id: newSceneId })));
+        if (rosterError) throw rosterError;
+      }
+      // Sequential inserts preserve reveal/cover order even across database plans.
+      for (const region of fogRows.data ?? []) {
+        const { error: fogError } = await supabase.from("vtt_fog_regions").insert({ ...region, scene_id: newSceneId, created_by: currentUserId });
+        if (fogError) throw fogError;
+      }
+      await refreshScenes(newSceneId);
+      await refreshTokens(newSceneId!);
+      setMessage(`${target.name} copied with its map, fog and party roster. The copy is private.`);
+    } catch (cause) {
+      // Never report a partially copied encounter as ready.
+      if (newSceneId) {
+        const { error: cleanupError } = await supabase.from("vtt_scenes").delete().eq("id", newSceneId).eq("is_active", false);
+        if (!cleanupError && copiedMapPath) await supabase.storage.from("vtt-maps").remove([copiedMapPath]);
+      }
+      setError(cause && typeof cause === "object" && "message" in cause ? String(cause.message) : "Scene copy failed. Check the prepared scenes before trying again.");
+      await refreshScenes(target.id).catch(() => undefined);
+    } finally { setBusy(false); }
+  }, [busy, campaignId, currentUserId, isDm, refreshScenes, refreshTokens, supabase]);
 
   const openScene = useCallback(async (next: VttScene) => {
     if (busy || next.id === scene?.id) return;
-    setScene(next); setSelectedIds([]); setError(null);
+    ++sceneRequestRef.current;
+    selectWorkspace(next);
+    setError(null);
     setMessage(next.is_active ? "Editing the live scene." : `Editing prepared scene: ${next.name}.`);
     await refreshTokens(next.id).catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load scene tokens."));
-  }, [busy, refreshTokens, scene?.id]);
+  }, [busy, refreshTokens, scene?.id, selectWorkspace]);
 
   const setScenePlayerVisibility = useCallback(async (target: VttScene, visible: boolean) => {
     if (!isDm || busy || !target.is_active) return;
@@ -488,10 +490,10 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
   const deleteScene = useCallback(async (target: VttScene) => {
     if (!isDm || busy || target.is_active) return;
     setBusy(true); setError(null); setMessage(null);
-    if (target.map_storage_path) await supabase.storage.from("vtt-maps").remove([target.map_storage_path]);
     const { error: deleteError } = await supabase.from("vtt_scenes").delete().eq("id", target.id);
     if (deleteError) setError(deleteError.message);
     else {
+      if (target.map_storage_path) await supabase.storage.from("vtt-maps").remove([target.map_storage_path]);
       const remaining = await refreshScenes();
       const next = remaining.find((item) => item.is_active) ?? remaining[0] ?? null;
       if (next) await refreshTokens(next.id); else setTokens([]);
@@ -701,6 +703,19 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
     setBusy(false);
   }, [broadcastRefresh, busy, initiativeTokens, isDm, refreshScenes, scene, supabase]);
 
+  const setSpotlight = useCallback(async (tokenId: string | null) => {
+    if (!scene || !isDm || busy || (tokenId && !tokens.some((token) => token.id === tokenId))) return;
+    setBusy(true); setError(null);
+    try {
+      const { error: updateError } = await supabase.from("vtt_scenes").update({ initiative_active: tokenId !== null, initiative_current_token_id: tokenId }).eq("id", scene.id);
+      if (updateError) throw updateError;
+      await refreshScenes(scene.id);
+      if (scene.is_active) broadcastRefresh();
+    } catch (cause) {
+      setError(cause && typeof cause === "object" && "message" in cause ? String(cause.message) : "Could not pass the spotlight.");
+    } finally { setBusy(false); }
+  }, [broadcastRefresh, busy, isDm, refreshScenes, scene, supabase, tokens]);
+
   const selectToolMode = useCallback((mode: VttToolMode) => {
     setToolMode(mode); setMeasureStart(null); setMeasureEnd(null);
   }, []);
@@ -721,7 +736,7 @@ export function useVttBoard(campaignId: string, isDm: boolean) {
   }, [measureEnd, measureStart, scene, toolMode]);
 
   return {
-    supabase, mapInputRef,
+    supabase, mapInputRef, connection, refreshTokens, refreshFromBroadcast, setSpotlight,
     scenes, scene, canvasScene, tokens: visibleTokens, allTokens: tokens, enemyModels, selectedIds, selectedTokens, initiativeTokens,
     loading, busy, playerPreview, toolMode, measureStart, measureEnd, measurement, ping,
     mapFile, draftName, draftWidth, draftHeight, draftMapOpacity, draftGridOpacity, draftShowGrid,

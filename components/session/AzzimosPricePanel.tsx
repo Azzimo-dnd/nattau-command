@@ -2,13 +2,17 @@ type AzzimosPricePanelProps = {
   debuffs: string[];
   compact?: boolean;
   title?: string;
+  campaignSlug?: string;
 };
 
 export function AzzimosPricePanel({
   debuffs,
   compact = false,
-  title = "Azzimo's Price",
+  title,
+  campaignSlug = "nattau",
 }: AzzimosPricePanelProps) {
+  const barovia = campaignSlug === "barovia";
+  const heading = title ?? (barovia ? "Marks of the Mists" : "Azzimo's Price");
   const activeDebuffs = debuffs.map((debuff) => debuff.trim()).filter(Boolean);
 
   if (activeDebuffs.length === 0) {
@@ -24,9 +28,9 @@ export function AzzimosPricePanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-fuchsia-300/80">
-            Payment due next session
+            {barovia ? "Agreed consequences for the next session" : "Payment due next session"}
           </p>
-          <h3 className="mt-1 text-lg font-bold text-rose-100">☠ {title}</h3>
+          <h3 className="mt-1 text-lg font-bold text-rose-100">☠ {heading}</h3>
         </div>
         <span className="rounded-full border border-rose-500/35 bg-rose-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-rose-200">
           {activeDebuffs.length} {activeDebuffs.length === 1 ? "debuff" : "debuffs"}
@@ -46,7 +50,7 @@ export function AzzimosPricePanel({
       </ul>
 
       <p className="mt-3 text-xs italic text-fuchsia-200/60">
-        The Carnival has already performed. Azzimo remembers every debt.
+        {barovia ? "Carry forward only the consequences agreed at your table." : "The Carnival has already performed. Azzimo remembers every debt."}
       </p>
     </section>
   );

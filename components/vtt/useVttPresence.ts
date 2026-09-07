@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { subscribeVttChannel } from "./vttRealtime";
 import { createClient } from "@/lib/supabase/client";
 
 export type VttPresenceMember = {
@@ -21,8 +22,8 @@ export function useVttPresence({ campaignId, currentUserId, currentUserName, isD
   const [members, setMembers] = useState<VttPresenceMember[]>([]);
 
   useEffect(() => {
-    const channel = supabase.channel(`vtt-presence-${campaignId}`, {
-      config: { presence: { key: currentUserId } },
+    const channel = supabase.channel(`vtt:presence:${campaignId}`, {
+      config: { private: true, presence: { key: currentUserId } },
     });
 
     const sync = () => {
@@ -44,14 +45,14 @@ export function useVttPresence({ campaignId, currentUserId, currentUserName, isD
     channel
       .on("presence", { event: "sync" }, sync)
       .on("presence", { event: "join" }, sync)
-      .on("presence", { event: "leave" }, sync)
-      .subscribe(async (status) => {
+      .on("presence", { event: "leave" }, sync);
+    const unsubscribe = subscribeVttChannel(supabase, channel, async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({ name: currentUserName, role: isDm ? "dm" : "player", online_at: new Date().toISOString() });
         }
       });
 
-    return () => { void supabase.removeChannel(channel); };
+    return unsubscribe;
   }, [campaignId, currentUserId, currentUserName, isDm, supabase]);
 
   return members;

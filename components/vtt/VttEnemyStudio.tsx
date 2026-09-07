@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { campaignPath } from "@/lib/campaigns/campaignPresentation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MiniatureViewer, type MiniatureModelInfo } from "@/components/miniatures/MiniatureViewer";
 import { createWebGlbFromStl } from "@/components/miniatures/miniatureModelFiles";
 import { createClient } from "@/lib/supabase/client";
 import type { VttEnemyModel } from "./vttTypes";
 
-type Props = { campaignId: string };
+type Props = { campaignId: string; campaignSlug?: string };
 type Candidate = { file: File; info: MiniatureModelInfo };
 const BUCKET = "vtt-enemy-models";
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -17,7 +18,7 @@ function formatBytes(value: number | null) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function VttEnemyStudio({ campaignId }: Props) {
+export function VttEnemyStudio({ campaignId, campaignSlug = "nattau" }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [models, setModels] = useState<VttEnemyModel[]>([]);
   const [candidate, setCandidate] = useState<Candidate | null>(null);
@@ -40,7 +41,7 @@ export function VttEnemyStudio({ campaignId }: Props) {
 
   useEffect(() => {
     let alive = true;
-    refresh().catch((cause) => { if (alive) setError(cause instanceof Error ? cause.message : "Could not load enemy library."); }).finally(() => { if (alive) setLoading(false); });
+    void Promise.resolve().then(() => { if (alive) return refresh(); }).catch((cause) => { if (alive) setError(cause instanceof Error ? cause.message : "Could not load enemy library."); }).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [refresh]);
 
@@ -127,7 +128,7 @@ export function VttEnemyStudio({ campaignId }: Props) {
         <div className="rounded-[26px] border border-slate-800 bg-slate-900/70 p-5">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-rose-300">Pending enemy</p>
           <label className="mt-4 block text-xs font-bold text-slate-500">Enemy name
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Lizardfolk Warrior" className="mt-2 min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm font-bold text-slate-100 outline-none focus:border-rose-400/50" />
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder={campaignSlug === "barovia" ? "Graveyard sentinel" : "Lizardfolk Warrior"} className="mt-2 min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm font-bold text-slate-100 outline-none focus:border-rose-400/50" />
           </label>
           {candidate ? <p className="mt-3 text-xs text-slate-500">{candidate.file.name} · {formatBytes(candidate.file.size)} · {candidate.info.triangles.toLocaleString()} triangles · {candidate.info.height.toFixed(1)} mm high</p> : null}
           <button type="button" disabled={!candidate || !name.trim() || uploading} onClick={() => void upload()} className="mt-5 min-h-12 w-full rounded-xl bg-rose-400 px-5 text-sm font-black text-slate-950 disabled:opacity-30 sm:w-auto">{uploading ? "Preparing enemy…" : "Upload STL + generate GLB"}</button>
@@ -147,7 +148,7 @@ export function VttEnemyStudio({ campaignId }: Props) {
               <div key={model.id} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                 <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate font-black text-slate-100">{model.name}</h3><p className="mt-1 truncate text-[11px] text-slate-600">{model.original_name}</p></div><span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[9px] font-black uppercase text-emerald-200">GLB</span></div>
                 <p className="mt-3 text-[11px] text-slate-500">STL {formatBytes(model.file_size_bytes)} · Web {formatBytes(model.web_file_size_bytes)} · {model.triangle_count?.toLocaleString() ?? "?"} triangles</p>
-                <div className="mt-4 flex gap-2"><Link href={`/gm/vtt/enemies/paint?model=${encodeURIComponent(model.id)}`} className="inline-flex min-h-9 items-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/10 px-3 text-[11px] font-black text-fuchsia-100">Paint</Link><Link href="/vtt" className="inline-flex min-h-9 items-center rounded-xl border border-cyan-400/25 px-3 text-[11px] font-bold text-cyan-200">Open VTT</Link></div>
+                <div className="mt-4 flex gap-2"><Link href={campaignPath(campaignSlug, `/gm/vtt/enemies/paint?model=${encodeURIComponent(model.id)}`)} className="inline-flex min-h-9 items-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/10 px-3 text-[11px] font-black text-fuchsia-100">Paint</Link><Link href={campaignPath(campaignSlug, "/vtt")} className="inline-flex min-h-9 items-center rounded-xl border border-cyan-400/25 px-3 text-[11px] font-bold text-cyan-200">Open VTT</Link></div>
               </div>
             ))}
           </div>

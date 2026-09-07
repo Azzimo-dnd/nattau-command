@@ -1,28 +1,13 @@
 "use client";
 
 import { useMemo, type ComponentProps } from "react";
+import { snapTokenCoordinate } from "./vttGridMath";
+
 import { VttCanvas as RawVttCanvas } from "./VttCanvas";
 
 export type { VttToolMode } from "./VttCanvas";
 
 type Props = ComponentProps<typeof RawVttCanvas>;
-
-function tokenFootprint(sizeSquares: number) {
-  // Tiny creatures still occupy one selectable D&D grid space. Larger creatures
-  // use their actual square footprint so a 2x2 / 3x3 / 4x4 base stays centered
-  // over a valid block of cells instead of drifting onto grid edges.
-  return Math.max(1, sizeSquares);
-}
-
-export function snapTokenCoordinate(value: number, totalSquares: number, sizeSquares: number) {
-  const halfExtent = totalSquares / 2;
-  const footprint = Math.min(totalSquares, tokenFootprint(sizeSquares));
-  const halfFootprint = footprint / 2;
-  const firstValidCenter = -halfExtent + halfFootprint;
-  const lastValidCenter = halfExtent - halfFootprint;
-  const snapped = firstValidCenter + Math.round(value - firstValidCenter);
-  return Math.max(firstValidCenter, Math.min(lastValidCenter, snapped));
-}
 
 export function VttCanvas(props: Props) {
   const { scene, tokens, onLocalMove, onCommitMove } = props;

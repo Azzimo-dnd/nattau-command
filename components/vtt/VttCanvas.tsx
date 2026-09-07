@@ -62,11 +62,13 @@ type Props = {
   onDiceImpact: (force: number) => void;
 };
 
-const assetCache = new Map<string, Promise<LoadedTokenAsset>>();
+type TokenAssetDescriptor = Pick<VttToken, "source_kind" | "model_storage_path" | "paint_storage_path" | "model_file_name" | "model_format">;
+const tokenAssetKey = (token: TokenAssetDescriptor) => `${token.source_kind}:${token.model_storage_path}:${token.paint_storage_path ?? "none"}`;
+type TokenAssetCache = Map<string, Promise<LoadedTokenAsset>>;
 
-function clampAndSnap(value: number, halfExtent: number) {
+function clampCoordinate(value: number, halfExtent: number) {
   const limit = Math.max(0.5, halfExtent - 0.5);
-  return Math.max(-limit, Math.min(limit, Math.round(value)));
+  return Math.max(-limit, Math.min(limit, value));
 }
 
 function isEditableTarget(target: EventTarget | null) {
@@ -79,8 +81,8 @@ function defaultCameraPosition(width: number, height: number) {
   return new THREE.Vector3(width * 0.42, Math.max(width, height) * 0.62, height * 0.72);
 }
 
-async function loadTokenAsset(supabase: ReturnType<typeof createClient>, token: VttToken): Promise<LoadedTokenAsset> {
-  const key = `${token.source_kind}:${token.model_storage_path}:${token.paint_storage_path ?? "none"}`;
+async function loadTokenAsset(supabase: ReturnType<typeof createClient>, token: TokenAssetDescriptor, assetCache: TokenAssetCache): Promise<LoadedTokenAsset> {
+  const key = tokenAssetKey(token);
   const cached = assetCache.get(key);
   if (cached) return cached;
   const promise = (async () => {
@@ -91,6 +93,7 @@ async function loadTokenAsset(supabase: ReturnType<typeof createClient>, token: 
     const file = new File([modelBlob], token.model_file_name, { type: modelBlob.type || (token.model_format === "glb" ? "model/gltf-binary" : "application/octet-stream") });
     const loaded = await loadMiniatureGeometry(file);
     const geometry = loaded.geometry;
+    try {
     let hasColors = false;
     if (token.paint_storage_path) {
       const { data: paintBlob, error: paintError } = await supabase.storage.from(paintBucket).download(token.paint_storage_path);
@@ -103,6 +106,7 @@ async function loadTokenAsset(supabase: ReturnType<typeof createClient>, token: 
     if (!box) throw new Error("Could not determine token model bounds.");
     const footprint = Math.max(box.max.x - box.min.x, box.max.y - box.min.y, 0.001);
     return { geometry, baseScale: 0.82 / footprint, hasColors };
+    } catch (error) { geometry.dispose(); throw error; }
   })().catch((error) => { assetCache.delete(key); throw error; });
   assetCache.set(key, promise);
   return promise;
@@ -192,22 +196,23 @@ function BoardBase({ width, height }: { width: number; height: number }) {
   return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.025, 0]} receiveShadow><planeGeometry args={[width, height]} /><meshBasicMaterial color="#121a26" side={THREE.DoubleSide} /></mesh>;
 }
 
-function BattleMap({ scene, supabase }: { scene: VttScene; supabase: ReturnType<typeof createClient> }) {
+function BattleMap({ scene, supabase, onError }: { scene: VttScene; supabase: ReturnType<typeof createClient>; onError: (path: string) => void }) {
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   useEffect(() => {
-    let alive = true; let objectUrl: string | null = null; let loadedTexture: THREE.Texture | null = null; setTexture(null);
+    let alive = true; let objectUrl: string | null = null; let loadedTexture: THREE.Texture | null = null;
     if (!scene.map_storage_path) return () => undefined;
     void supabase.storage.from("vtt-maps").download(scene.map_storage_path).then(({ data, error }) => {
-      if (!alive || error || !data) return;
+      if (!alive) return;
+      if (error || !data) { onError(scene.map_storage_path!); return; }
       objectUrl = URL.createObjectURL(data);
       new THREE.TextureLoader().load(objectUrl, (next) => {
         if (!alive) { next.dispose(); return; }
         next.colorSpace = THREE.SRGBColorSpace; next.wrapS = THREE.ClampToEdgeWrapping; next.wrapT = THREE.ClampToEdgeWrapping; next.needsUpdate = true;
         loadedTexture = next; setTexture(next); if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-      });
-    });
+      }, undefined, () => { if (alive) onError(scene.map_storage_path!); });
+    }).catch(() => { if (alive) onError(scene.map_storage_path!); });
     return () => { alive = false; if (objectUrl) URL.revokeObjectURL(objectUrl); loadedTexture?.dispose(); };
-  }, [scene.map_storage_path, supabase]);
+  }, [onError, scene.map_storage_path, supabase]);
   if (!texture) return null;
   return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[scene.map_offset_x, -0.012, scene.map_offset_z]} receiveShadow><planeGeometry args={[scene.grid_width * scene.map_scale, scene.grid_height * scene.map_scale]} /><meshBasicMaterial color="#ffffff" map={texture} opacity={scene.map_opacity} transparent={scene.map_opacity < 0.999} side={THREE.DoubleSide} /></mesh>;
 }
@@ -256,14 +261,15 @@ function TokenNameplate({ name, size }: { name: string; size: number }) {
   return <sprite position={[0, 1.05 * Math.max(1, size), 0]} scale={[labelHeight * aspect, labelHeight, 1]}><spriteMaterial map={texture} transparent depthTest={false} depthWrite={false} /></sprite>;
 }
 
-function TokenMesh({ token, selected, currentTurn, showNameplate, isDm, canDrag, supabase, onSelect, onDragStart, onAssetSettled }: { token: VttToken; selected: boolean; currentTurn: boolean; showNameplate: boolean; isDm: boolean; canDrag: boolean; supabase: ReturnType<typeof createClient>; onSelect: (id: string, additive: boolean) => void; onDragStart: (id: string) => void; onAssetSettled: (id: string, ok: boolean) => void }) {
+function TokenMesh({ token, selected, currentTurn, showNameplate, isDm, canDrag, supabase, onSelect, onDragStart, onAssetSettled, assetCache }: { assetCache: TokenAssetCache; token: VttToken; selected: boolean; currentTurn: boolean; showNameplate: boolean; isDm: boolean; canDrag: boolean; supabase: ReturnType<typeof createClient>; onSelect: (id: string, additive: boolean) => void; onDragStart: (id: string) => void; onAssetSettled: (id: string, ok: boolean) => void }) {
   const [asset, setAsset] = useState<LoadedTokenAsset | null>(null);
   const [failed, setFailed] = useState(false);
+  const descriptor = useMemo(() => ({ source_kind: token.source_kind, model_storage_path: token.model_storage_path, paint_storage_path: token.paint_storage_path, model_file_name: token.model_file_name, model_format: token.model_format }), [token.source_kind, token.model_storage_path, token.paint_storage_path, token.model_file_name, token.model_format]);
   useEffect(() => {
-    let alive = true; setAsset(null); setFailed(false);
-    loadTokenAsset(supabase, token).then((next) => { if (alive) { setAsset(next); onAssetSettled(token.id, true); } }).catch(() => { if (alive) { setFailed(true); onAssetSettled(token.id, false); } });
+    let alive = true;
+    loadTokenAsset(supabase, descriptor, assetCache).then((next) => { if (alive) { setAsset(next); onAssetSettled(tokenAssetKey(descriptor), true); } }).catch(() => { if (alive) { setFailed(true); onAssetSettled(tokenAssetKey(descriptor), false); } });
     return () => { alive = false; };
-  }, [onAssetSettled, supabase, token, token.id]);
+  }, [assetCache, descriptor, onAssetSettled, supabase]);
   const material = useMemo(() => new THREE.MeshStandardMaterial({ color: asset?.hasColors ? 0xffffff : token.source_kind === "enemy" ? 0x93615a : 0x8f949b, roughness: 0.7, metalness: 0.06, vertexColors: Boolean(asset?.hasColors), transparent: isDm && !token.visible_to_players, opacity: isDm && !token.visible_to_players ? 0.42 : 1 }), [asset?.hasColors, isDm, token.source_kind, token.visible_to_players]);
   useEffect(() => () => material.dispose(), [material]);
   const down = (event: ThreeEvent<PointerEvent>) => { event.stopPropagation(); const additive = event.shiftKey || event.ctrlKey || event.metaKey; onSelect(token.id, additive); if (isDm && canDrag && event.button === 0 && !additive) onDragStart(token.id); };
@@ -273,7 +279,7 @@ function TokenMesh({ token, selected, currentTurn, showNameplate, isDm, canDrag,
     {currentTurn ? <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}><ringGeometry args={[0.5 * token.size_squares, 0.62 * token.size_squares, 64]} /><meshBasicMaterial color="#fbbf24" transparent opacity={0.95} depthTest={false} side={THREE.DoubleSide} /></mesh> : null}
     {selected ? <><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}><ringGeometry args={[0.42 * token.size_squares, 0.52 * token.size_squares, 48]} /><meshBasicMaterial color={ringColor} transparent opacity={0.9} side={THREE.DoubleSide} /></mesh><mesh position={[0, 0.045, -0.62 * token.size_squares]} rotation={[-Math.PI / 2, 0, 0]}><coneGeometry args={[0.11 * token.size_squares, 0.28 * token.size_squares, 3]} /><meshBasicMaterial color={ringColor} depthTest={false} /></mesh></> : null}
     {showNameplate ? <TokenNameplate name={token.name} size={token.size_squares} /> : null}
-    {asset ? <mesh geometry={asset.geometry} material={material} rotation={[-Math.PI / 2, 0, 0]} scale={worldScale} castShadow receiveShadow onPointerDown={down} /> : <mesh onPointerDown={down} position={[0, 0.34, 0]}><cylinderGeometry args={[0.34, 0.42, 0.68, 20]} /><meshStandardMaterial color={failed ? "#7f1d1d" : token.source_kind === "enemy" ? "#7f4650" : "#53657b"} /></mesh>}
+    {asset ? <mesh dispose={null} geometry={asset.geometry} material={material} rotation={[-Math.PI / 2, 0, 0]} scale={worldScale} castShadow receiveShadow onPointerDown={down} /> : <mesh onPointerDown={down} position={[0, 0.34, 0]}><cylinderGeometry args={[0.34, 0.42, 0.68, 20]} /><meshStandardMaterial color={failed ? "#7f1d1d" : token.source_kind === "enemy" ? "#7f4650" : "#53657b"} /></mesh>}
   </group>;
 }
 
@@ -312,14 +318,21 @@ export function VttCanvas({
 }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [measuring, setMeasuring] = useState(false);
+  const [assetAttempt, setAssetAttempt] = useState(0);
+  const [mapError, setMapError] = useState<string | null>(null);
   const [assetState, setAssetState] = useState<Record<string, boolean>>({});
   const halfW = scene.grid_width / 2; const halfH = scene.grid_height / 2;
 
-  useEffect(() => { setAssetState({}); }, [scene.id, tokens.map((token) => `${token.id}:${token.model_storage_path}:${token.paint_storage_path ?? ""}`).join("|")]);
+  const assetCache = useMemo<TokenAssetCache>(() => new Map(), []);
+  useEffect(() => () => {
+    for (const pending of assetCache.values()) void pending.then((asset) => asset.geometry.dispose()).catch(() => undefined);
+    assetCache.clear();
+  }, [assetCache]);
+  const loadedCount = tokens.filter((token) => assetState[tokenAssetKey(token)] === true).length;
+  const failedCount = tokens.filter((token) => assetState[tokenAssetKey(token)] === false).length;
   useEffect(() => {
-    const values = Object.values(assetState);
-    onAssetProgress?.({ loaded: values.filter(Boolean).length, failed: values.filter((value) => !value).length, total: tokens.length });
-  }, [assetState, onAssetProgress, tokens.length]);
+    onAssetProgress?.({ loaded: loadedCount, failed: failedCount, total: tokens.length });
+  }, [failedCount, loadedCount, onAssetProgress, tokens.length]);
   const assetSettled = useCallback((id: string, ok: boolean) => setAssetState((current) => current[id] === ok ? current : { ...current, [id]: ok }), []);
 
   const planeDown = (event: ThreeEvent<PointerEvent>) => {
@@ -340,7 +353,7 @@ export function VttCanvas({
       onFogPointerMove([event.point.x, event.point.z]);
       return;
     }
-    if (draggingId && isDm && !diceRequest) { event.stopPropagation(); onLocalMove(draggingId, clampAndSnap(event.point.x, halfW), clampAndSnap(event.point.z, halfH)); return; }
+    if (draggingId && isDm && !diceRequest) { event.stopPropagation(); onLocalMove(draggingId, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
     if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) { event.stopPropagation(); onMeasureMove([event.point.x, event.point.z]); }
   };
 
@@ -350,22 +363,22 @@ export function VttCanvas({
       onFogPointerUp([event.point.x, event.point.z]);
       return;
     }
-    if (draggingId && isDm && !diceRequest) { event.stopPropagation(); const id = draggingId; setDraggingId(null); onCommitMove(id, clampAndSnap(event.point.x, halfW), clampAndSnap(event.point.z, halfH)); return; }
+    if (draggingId && isDm && !diceRequest) { event.stopPropagation(); const id = draggingId; setDraggingId(null); onCommitMove(id, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
     if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) { event.stopPropagation(); setMeasuring(false); onMeasureEnd([event.point.x, event.point.z]); }
   };
 
-  return <Canvas shadows dpr={[1, 1.5]} camera={{ position: defaultCameraPosition(scene.grid_width, scene.grid_height).toArray() as [number, number, number], fov: 44, near: 0.1, far: 300 }} onPointerMissed={() => { if (toolMode === "navigate" && !diceRequest && !fogEditing) onSelect(null, false); }}>
+  return <>{(failedCount > 0 || (mapError && mapError === scene.map_storage_path)) && <div role="alert" className="absolute right-3 top-14 z-30 max-w-xs rounded-xl border border-rose-400/30 bg-slate-950 p-3 text-xs text-rose-100"><p>{mapError === scene.map_storage_path ? "The map image could not be loaded." : "Some miniature files could not be loaded."}</p><button type="button" onClick={() => { setMapError(null); setAssetState({}); setAssetAttempt((attempt) => attempt + 1); }} className="mt-2 min-h-9 rounded-lg border border-rose-300/30 px-3 font-bold">Retry assets</button></div>}<Canvas fallback={<div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-300">The 3D table needs WebGL. Enable hardware acceleration or open it in another browser.</div>} shadows dpr={[1, 1.5]} camera={{ position: defaultCameraPosition(scene.grid_width, scene.grid_height).toArray() as [number, number, number], fov: 44, near: 0.1, far: 300 }} onPointerMissed={() => { if (toolMode === "navigate" && !diceRequest && !fogEditing) onSelect(null, false); }}>
     <color attach="background" args={["#070b11"]} /><ambientLight intensity={1.25} /><directionalLight position={[12, 22, 10]} intensity={2.5} castShadow /><directionalLight position={[-12, 10, -8]} intensity={0.8} />
     <BoardBase width={scene.grid_width} height={scene.grid_height} />
-    <BattleMap scene={scene} supabase={supabase} />
+    <BattleMap key={`${scene.map_storage_path}:${assetAttempt}`} scene={scene} supabase={supabase} onError={setMapError} />
     <VttFogLayer width={scene.grid_width} height={scene.grid_height} enabled={fogEnabled} baseState={fogBaseState} regions={fogRegions} isDm={isDm} />
     <InteractionSurface width={scene.grid_width} height={scene.grid_height} onPointerDown={planeDown} onPointerMove={planeMove} onPointerUp={planeUp} />
     {scene.show_grid ? <BattleGrid width={scene.grid_width} height={scene.grid_height} opacity={scene.grid_opacity} /> : null}
     {fogEditing ? <VttFogDraftOverlay points={fogDraftPoints} shape={fogShape} operation={fogOperation} /> : null}
     <MeasurementOverlay mode={toolMode} start={measureStart} end={measureEnd} />
     <PingOverlay ping={ping} />
-    {tokens.map((token) => <TokenMesh key={token.id} token={token} selected={selectedIds.includes(token.id)} currentTurn={scene.initiative_active && token.id === scene.initiative_current_token_id} showNameplate={scene.show_nameplates} isDm={isDm} canDrag={toolMode === "navigate" && !diceRequest && !fogEditing} supabase={supabase} onSelect={onSelect} onDragStart={(id) => setDraggingId(id)} onAssetSettled={assetSettled} />)}
+    {tokens.map((token) => <TokenMesh key={`${token.id}:${tokenAssetKey(token)}:${assetAttempt}`} assetCache={assetCache} token={token} selected={selectedIds.includes(token.id)} currentTurn={scene.initiative_active && token.id === scene.initiative_current_token_id} showNameplate={scene.show_nameplates} isDm={isDm} canDrag={toolMode === "navigate" && !diceRequest && !fogEditing} supabase={supabase} onSelect={onSelect} onDragStart={(id) => setDraggingId(id)} onAssetSettled={assetSettled} />)}
     {diceRequest ? <VttDiceLayer key={diceRequest.rollId} request={diceRequest} sceneWidth={scene.grid_width} sceneHeight={scene.grid_height} onComplete={onDiceComplete} onImpact={onDiceImpact} /> : null}
     <VttOrbitControls disabled={Boolean(draggingId) || measuring || fogEditing} width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
-  </Canvas>;
+  </Canvas></>;
 }

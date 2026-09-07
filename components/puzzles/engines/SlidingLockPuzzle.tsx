@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { getNattauRuneDefinition } from "@/lib/puzzles/nattauRunes";
+import { getCampaignRuneDefinition } from "@/lib/puzzles/campaignRunes";
 import type { CampaignPuzzleRow, CampaignPuzzleRunRow, JsonRecord } from "@/lib/puzzles/puzzleTypes";
 import styles from "./SlidingLockPuzzle.module.css";
 
@@ -48,17 +48,17 @@ function getMoveRange(block: Block | null, blocks: Block[], width: number, heigh
   return result;
 }
 
-function runeFor(block: Block, index: number) { return block.target ? "koru" : BLOCK_RUNES[index % BLOCK_RUNES.length]; }
+function runeFor(block: Block, index: number, barovia = false) { return barovia ? block.target ? "key" : ["raven", "thorn", "candle", "moon", "bell", "mirror", "rose"][index % 7] : block.target ? "koru" : BLOCK_RUNES[index % BLOCK_RUNES.length]; }
 function directionFromSteps(axis: Axis, steps: number): Direction | null {
   if (!steps) return null;
   return axis === "h" ? (steps < 0 ? "left" : "right") : (steps < 0 ? "up" : "down");
 }
 
-function EngravedGlyph({ runeId, target }: { runeId: string; target?: boolean }) {
-  const rune = getNattauRuneDefinition(runeId);
+function EngravedGlyph({ runeId, target, barovia }: { runeId: string; target?: boolean; barovia?: boolean }) {
+  const rune = getCampaignRuneDefinition(runeId);
   if (!rune) return null;
-  const highlight = target ? "rgba(220,235,211,.34)" : "rgba(235,226,211,.28)";
-  const shadow = target ? "rgba(14,28,19,.88)" : "rgba(25,20,17,.9)";
+  const highlight = barovia ? "rgba(245,228,241,.6)" : target ? "rgba(220,235,211,.34)" : "rgba(235,226,211,.28)";
+  const shadow = barovia ? "rgba(28,18,31,.9)" : target ? "rgba(14,28,19,.88)" : "rgba(25,20,17,.9)";
   return (
     <svg viewBox="0 0 24 24" className={styles.glyph} fill="none" aria-hidden="true">
       <g stroke={shadow} strokeWidth="3.1" strokeLinecap="round" strokeLinejoin="round" transform="translate(.45 .55)">
@@ -88,11 +88,13 @@ function Control({ children, disabled, onClick, label, accent }: { children: Rea
 export function SlidingLockPuzzle({ puzzle, run, disabled, onAction }: {
   puzzle: CampaignPuzzleRow; run: CampaignPuzzleRunRow; disabled: boolean; onAction: (action: JsonRecord) => Promise<unknown>;
 }) {
+  const barovia = puzzle.public_config.campaign_theme === "barovia";
   const width = Number(puzzle.public_config.width ?? 6);
   const height = Number(puzzle.public_config.height ?? 6);
   const exitRow = Number(puzzle.public_config.exit_row ?? 2);
   const blocks = useMemo(() => Array.isArray(run.state.blocks) ? run.state.blocks as unknown as Block[] : [], [run.state.blocks]);
   const boardRef = useRef<HTMLDivElement>(null);
+  const motionId = useRef(0);
   const [selected, setSelected] = useState<string | null>(() => blocks.find((b) => b.target)?.id ?? blocks[0]?.id ?? null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [moving, setMoving] = useState(false);
@@ -111,7 +113,7 @@ export function SlidingLockPuzzle({ puzzle, run, disabled, onAction }: {
   }, [blocks]);
 
   const fireMotion = (blockId: string, direction: Direction) => {
-    const nonce = Date.now() + Math.random();
+    const nonce = ++motionId.current;
     setMotion({ blockId, direction, nonce });
     window.setTimeout(() => setMotion((current) => current?.nonce === nonce ? null : current), 620);
   };
@@ -158,7 +160,7 @@ export function SlidingLockPuzzle({ puzzle, run, disabled, onAction }: {
   };
 
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} ${barovia ? styles.barovia : ""}`}>
       <div className={styles.monolith}><div className={styles.rim}>
         <div ref={boardRef} className={styles.board}>
           {tracks.map((block) => <span key={`track-${block.id}`} className={`${styles.track} ${block.axis === "h" ? styles.trackH : styles.trackV}`} style={block.axis === "h" ? {left:"2.5%",top:`${(block.y/height)*100+.7}%`,width:"95%",height:`${(block.h/height)*100-1.4}%`} : {left:`${(block.x/width)*100+.7}%`,top:"2.5%",width:`${(block.w/width)*100-1.4}%`,height:"95%"}} />)}
@@ -170,14 +172,14 @@ export function SlidingLockPuzzle({ puzzle, run, disabled, onAction }: {
             const isDragging = drag?.blockId === block.id;
             const preview = isDragging ? drag.previewSteps : 0;
             const px = block.axis === "h" ? preview : 0; const py = block.axis === "v" ? preview : 0;
-            const runeId = runeFor(block,index); const rune = getNattauRuneDefinition(runeId);
+            const runeId = runeFor(block,index,barovia); const rune = getCampaignRuneDefinition(runeId);
             const classes = [styles.ward, block.target && styles.target, isSelected && styles.selected, isDragging && styles.dragging, settling===block.id && styles.settle].filter(Boolean).join(" ");
             return (
               <button key={block.id} type="button" disabled={locked} className={classes}
                 onPointerDown={(e)=>beginDrag(e,block)} onPointerMove={(e)=>updateDrag(e,block)} onPointerUp={(e)=>finishDrag(e,block)} onPointerCancel={()=>setDrag(null)} onClick={()=>setSelected(block.id)}
                 style={{left:`${((block.x+px)/width)*100}%`,top:`${((block.y+py)/height)*100}%`,width:`${(block.w/width)*100}%`,height:`${(block.h/height)*100}%`}}
-                aria-label={`${block.target ? "Koru gate seal" : "Stone ward"} ${rune?.label ?? block.id}`}>
-                <span className={styles.face}><EngravedGlyph runeId={runeId} target={block.target} /><span className={styles.label}>{block.target ? "Koru" : rune?.label ?? block.label ?? block.id}</span></span>
+                aria-label={`${block.target ? barovia ? "Silver key" : "Koru gate seal" : barovia ? "Iron ward" : "Stone ward"} ${rune?.label ?? block.id}`}>
+                <span className={styles.face}><EngravedGlyph runeId={runeId} target={block.target} barovia={barovia} /><span className={styles.label}>{block.target ? barovia ? "Key" : "Koru" : rune?.label ?? block.label ?? block.id}</span></span>
                 {motion?.blockId===block.id ? <DustBurst direction={motion.direction} nonce={motion.nonce} /> : null}
               </button>
             );
@@ -187,9 +189,9 @@ export function SlidingLockPuzzle({ puzzle, run, disabled, onAction }: {
 
       <div className={styles.controls}>
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-stone-500">Carved ward</p>
-          <p className="mt-1 truncate font-bold text-stone-200">{active ? active.target ? "Koru Gate Seal" : getNattauRuneDefinition(runeFor(active,blocks.indexOf(active)))?.label ?? active.label ?? active.id : "None"}</p>
-          <p className="mt-1 text-xs leading-5 text-stone-500">Drag the stone directly. One complete slide costs one move, no matter the distance.</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-stone-500">{barovia ? "Iron ward" : "Carved ward"}</p>
+          <p className="mt-1 truncate font-bold text-stone-200">{active ? active.target ? barovia ? "Silver Key" : "Koru Gate Seal" : getCampaignRuneDefinition(runeFor(active,blocks.indexOf(active),barovia))?.label ?? active.label ?? active.id : "None"}</p>
+          <p className="mt-1 text-xs leading-5 text-stone-500">{barovia ? "Drag the iron wards along their grooves. One complete slide costs one move." : "Drag the stone directly. One complete slide costs one move, no matter the distance."}</p>
         </div>
         {active?.axis === "h" ? <div className={styles.controlGrid4}>
           <Control disabled={locked||!range.left} onClick={()=>moveSelected("left","max")} label="Slide left to the stop" accent>⇤</Control><Control disabled={locked||!range.left} onClick={()=>moveSelected("left","one")} label="Slide one cell left">←</Control><Control disabled={locked||!range.right} onClick={()=>moveSelected("right","one")} label="Slide one cell right">→</Control><Control disabled={locked||!range.right} onClick={()=>moveSelected("right","max")} label="Slide right to the stop" accent>⇥</Control>

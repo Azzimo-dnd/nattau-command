@@ -1,5 +1,6 @@
 "use client";
 
+import atmosphere from "./PuzzleAtmosphere.module.css";
 import type {
   CampaignPuzzleRow,
   CampaignPuzzleRunRow,
@@ -107,7 +108,7 @@ function makePreviewRun(type: PuzzleType, publicConfig: JsonRecord): CampaignPuz
   };
 }
 
-const noAction = async (_action: JsonRecord) => null;
+const noAction = async () => null;
 const noReveal = async () => null;
 
 export function PuzzleWorkshopPreview(props: Props) {
@@ -170,7 +171,7 @@ export function PuzzleWorkshopPreview(props: Props) {
   }
 
   return (
-    <div className="puzzle-workshop-preview pointer-events-none select-none">
+    <div className={`puzzle-workshop-preview pointer-events-none select-none ${atmosphere.frame} ${props.publicConfig.campaign_theme === "barovia" ? atmosphere.barovia : ""}`}>
       {engine}
       <style jsx global>{`
         .puzzle-workshop-preview button:disabled {

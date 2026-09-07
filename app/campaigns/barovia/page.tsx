@@ -1,3 +1,4 @@
+import { loadCampaignSessionSettings } from "@/lib/campaign/sessionSettings";
 import type { Metadata } from "next";
 import { BaroviaDashboard } from "@/components/campaigns/BaroviaDashboard";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
@@ -12,6 +13,7 @@ export default async function BaroviaDashboardPage() {
 
   return (
     <BaroviaDashboard
+      session={await loadCampaignSessionSettings(access.membership.campaignId)}
       displayName={access.displayName}
       role={access.membership.role}
     />
