@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { HighTarokkaArtwork } from "./HighTarokkaArtwork";
 
 type TarokkaArtworkProps = {
   artKey: string;
@@ -163,6 +164,7 @@ function Mists() {
 }
 
 export function TarokkaArtwork({ artKey, sigil, className }: TarokkaArtworkProps) {
+  if (artKey.startsWith("high-")) return <div className={className}><HighTarokkaArtwork artKey={artKey} /></div>;
   const artwork = (() => {
     switch (artKey) {
       case "lantern": return <Lantern />;

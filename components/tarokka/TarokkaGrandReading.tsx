@@ -68,7 +68,7 @@ export function TarokkaGrandReading({
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[#aa9da2]">
             The reading binds the party&apos;s past, path, ally, shadow and fate
             into a single prophecy. Cards are prepared privately and revealed
-            one by one by the Game Master.
+            one by one by the Game Master. These narrative prophecies grant no mechanical effects.
           </p>
           {isDm ? (
             <button
@@ -103,8 +103,7 @@ export function TarokkaGrandReading({
               {reading.title}
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-[#aa9da2]">
-              Each position is a question asked of the Mists. A reversed card is
-              physically turned upside down, exactly as it would lie on the table.
+              Each position is a question asked of the Mists. This campaign reading is a narrative guide: it grants no additional Personal Omen or mechanical effect.
             </p>
           </div>
           <span className="rounded-full border border-[#613342] bg-black/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#b98c99]">
