@@ -1,145 +1,75 @@
 "use client";
 
-import type { TarokkaCycle, TarokkaProgressRow } from "./tarokkaTypes";
+import { useState } from "react";
+import { omenStatus, type TarokkaCycle, type TarokkaDraw, type TarokkaProgressRow, type TarokkaEvent } from "./tarokkaTypes";
+import styles from "./Tarokka.module.css";
 
-type TarokkaAdminProps = {
-  cycle: TarokkaCycle | null;
-  progress: TarokkaProgressRow[];
-  busy: boolean;
-  onStartNextCycle: () => Promise<void>;
-  onResetPlayer: (playerId: string) => Promise<void>;
+type Props = {
+  cycle: TarokkaCycle | null; progress: TarokkaProgressRow[]; draws: TarokkaDraw[]; events: TarokkaEvent[]; busy: boolean;
+  onStartNextCycle: (title: string) => Promise<boolean>;
+  onResetPlayer: (playerId: string, reason: string, drawId: string) => Promise<boolean>;
+  onSetUsed: (drawId: string, used: boolean, note: string) => Promise<boolean>;
+  onSetOpen: (open: boolean) => Promise<boolean>;
 };
 
-export function TarokkaAdmin({
-  cycle,
-  progress,
-  busy,
-  onStartNextCycle,
-  onResetPlayer,
-}: TarokkaAdminProps) {
+export function TarokkaAdmin({ cycle, progress, draws, events, busy, onStartNextCycle, onResetPlayer, onSetUsed, onSetOpen }: Props) {
+  const [title, setTitle] = useState("");
+  const [nextCycle, setNextCycle] = useState(false);
+  const [correction, setCorrection] = useState<{ playerId: string; drawId: string; kind: "return" | "restore" } | null>(null);
+  const [reason, setReason] = useState("");
   const counted = progress.filter((row) => row.counts_toward_progress);
-  const drawn = counted.filter((row) => row.draw_id);
-  const revealed = counted.filter((row) => row.revealed_at);
-
-  return (
-    <div className="space-y-5">
-      <section className="rounded-[30px] border border-[#5a3040] bg-[#130d11]/92 p-5 sm:p-7">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.32em] text-[#a7566d]">
-              Game Master controls
-            </p>
-            <h2 className="mt-2 font-serif text-3xl font-black text-[#ead8ce]">
-              The Turning of the Mists
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#a99ba1]">
-              A Personal Omen can be drawn once by every player during the active cycle.
-              Test accounts remain visible here but do not change campaign progress.
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void onStartNextCycle()}
-            className="min-h-11 rounded-xl border border-[#9a4860] bg-[#6b2035]/45 px-5 py-2 text-sm font-bold text-[#efc7d1] transition hover:bg-[#7d2b42]/60 disabled:cursor-wait disabled:opacity-60"
-          >
-            {busy ? "Turning the deck..." : "Begin the next cycle"}
-          </button>
+  const liveDraws = draws.filter((draw) => draw.cycle_id === cycle?.id && !draw.voided_at);
+  const spent = counted.filter((row) => liveDraws.some((draw) => draw.id === row.draw_id && draw.used_at));
+  const beginCorrection = (playerId: string, drawId: string, kind: "return" | "restore") => { setCorrection({ playerId, drawId, kind }); setReason(""); };
+  return <div className={styles.stack}>
+    <section className={`${styles.panel} ${styles.mistPanel}`}>
+      <div className={styles.relative}><p className={styles.eyebrow}>Game Master · session desk</p><h2 className={styles.heading}>The Turning of the Mists</h2>
+        <p className={styles.muted}>Give each player a moment with the deck between sessions. A new Turning expires unused omens and grants everyone a fresh draw.</p>
+        <div className={styles.stats}>
+          <div><span>Current Turning</span><strong>{cycle?.title ?? "The deck is waiting"}</strong></div>
+          <div><span>Omens chosen</span><strong>{counted.filter((row) => row.draw_id).length} / {counted.length}</strong></div>
+          <div><span>Omens used</span><strong>{spent.length} / {counted.length}</strong></div>
         </div>
-
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-[#492934] bg-black/20 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#826e75]">Active cycle</p>
-            <p className="mt-2 font-serif text-xl font-black text-[#e2cfd5]">
-              {cycle?.title ?? "No active cycle"}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[#492934] bg-black/20 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#826e75]">Omens drawn</p>
-            <p className="mt-2 text-3xl font-black text-[#d98ba1]">
-              {drawn.length}<span className="text-base text-[#75666b]">/{counted.length}</span>
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[#492934] bg-black/20 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#826e75]">Omens revealed</p>
-            <p className="mt-2 text-3xl font-black text-[#d8c5ad]">
-              {revealed.length}<span className="text-base text-[#75666b]">/{counted.length}</span>
-            </p>
-          </div>
+        <div className={styles.actions}>
+          {cycle && <button className={styles.secondary} disabled={busy} onClick={() => void onSetOpen(!cycle.draws_open)}>{cycle.draws_open ? "Pause drawing" : "Reopen drawing"}</button>}
+          <button className={styles.button} disabled={busy} onClick={() => setNextCycle(true)}>{cycle ? "Prepare next Turning" : "Begin first Turning"}</button>
+          <span className={styles.badge}>{!cycle ? "No active Turning" : cycle.draws_open ? "Drawing open" : "Drawing paused · held omens still work"}</span>
         </div>
-      </section>
-
-      <section className="rounded-[30px] border border-[#4c2934] bg-[#120d11]/90 p-4 sm:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#a7566d]">
-              Souls in the cycle
-            </p>
-            <h3 className="mt-2 font-serif text-2xl font-black text-[#e7d4ca]">
-              Player progress
-            </h3>
-          </div>
-          <span className="rounded-full border border-[#53303b] bg-black/20 px-3 py-1 text-xs text-[#9d8a91]">
-            {progress.length} profiles
-          </span>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          {progress.length === 0 ? (
-            <p className="rounded-2xl border border-[#432832] bg-black/20 p-4 text-sm text-[#8f8187]">
-              No player members are assigned to Barovia yet.
-            </p>
-          ) : (
-            progress.map((row) => (
-              <article
-                key={row.player_id}
-                className="flex flex-col gap-3 rounded-2xl border border-[#432832] bg-black/20 p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate font-semibold text-[#e1d1d6]">{row.display_name}</p>
-                    {!row.counts_toward_progress && (
-                      <span className="rounded-full border border-[#675661] bg-black/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-[#918087]">
-                        Test account
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-sm text-[#8f8187]">
-                    {!row.draw_id
-                      ? "No omen drawn"
-                      : row.revealed_at
-                        ? `${row.card_name ?? "Card revealed"}${row.is_reversed ? " · Reversed" : " · Upright"}`
-                        : "Card drawn, still face-down"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${
-                      row.revealed_at
-                        ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
-                        : row.draw_id
-                          ? "border-[#9c6e40]/35 bg-[#7d5227]/15 text-[#d5ad7b]"
-                          : "border-[#5d454e] bg-black/20 text-[#8c7b82]"
-                    }`}
-                  >
-                    {row.revealed_at ? "Revealed" : row.draw_id ? "Drawn" : "Waiting"}
-                  </span>
-                  {row.draw_id && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void onResetPlayer(row.player_id)}
-                      className="min-h-10 rounded-xl border border-[#623444] bg-[#2b151e] px-3 py-2 text-xs font-semibold text-[#c99aa7] transition hover:border-[#8c465c] hover:text-[#e4b9c5] disabled:opacity-60"
-                    >
-                      Return card
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))
-          )}
-        </div>
-      </section>
-    </div>
-  );
+        {nextCycle && <form className={styles.confirmBox} onSubmit={async (event) => { event.preventDefault(); if (await onStartNextCycle(title)) { setNextCycle(false); setTitle(""); } }}>
+          <label className={styles.label}>Name the next Turning<input className={styles.field} maxLength={100} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. The road to Vallaki" disabled={busy} /></label>
+          <p className={styles.muted}>Opening it will expire every unused omen from the current Turning. All cards and notes remain in history.</p>
+          <div className={styles.actions}><button className={styles.button} disabled={busy}>Confirm new Turning</button><button className={styles.secondary} type="button" disabled={busy} onClick={() => setNextCycle(false)}>Cancel</button></div>
+        </form>}
+      </div>
+    </section>
+    <section className={styles.panel}><p className={styles.eyebrow}>Souls at the table</p><h3 className={styles.heading}>Held omens</h3>
+      {!progress.length && <p className={styles.muted}>No active player profiles are assigned to this campaign.</p>}
+      <div className={styles.stack}>{progress.map((row) => {
+        const draw = liveDraws.find((item) => item.id === row.draw_id);
+        return <article key={row.player_id} className={styles.playerRow}>
+          <div className={styles.split}><div><h4>{row.display_name} {!row.counts_toward_progress && <span className={styles.badge}>Test profile</span>}</h4>
+            <p className={styles.muted}>{draw ? `${draw.card_name_snapshot} · ${draw.is_reversed ? "Reversed" : "Upright"}` : "Waiting for a card"}</p></div>
+            <span className={styles.badge}>{draw ? omenStatus(draw, cycle?.id) : "Waiting"}</span></div>
+          {draw && <>
+            <details className={styles.details}><summary>{draw.effect_title_snapshot}</summary><p>{draw.effect_description_snapshot}</p>{draw.use_note && <p>Table note: {draw.use_note}</p>}</details>
+            <div className={styles.actions}>
+              {draw.revealed_at && <button className={styles.secondary} disabled={busy} onClick={() => draw.used_at ? beginCorrection(row.player_id, draw.id, "restore") : void onSetUsed(draw.id, true, "Marked by the GM")}>{draw.used_at ? "Restore use…" : "Mark used"}</button>}
+              <button className={styles.secondary} disabled={busy} onClick={() => beginCorrection(row.player_id, draw.id, "return")}>Return card…</button>
+            </div>
+          </>}
+          {correction?.playerId === row.player_id && <form className={styles.confirmBox} onSubmit={async (event) => {
+            event.preventDefault(); const ok = correction.kind === "return" ? await onResetPlayer(correction.playerId, reason, correction.drawId) : await onSetUsed(correction.drawId, false, reason); if (ok) setCorrection(null);
+          }}><label className={styles.label}>{correction.kind === "return" ? "Reason for returning the card" : "Reason for restoring its use"}<input className={styles.field} required maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} disabled={busy} /></label>
+            <p className={styles.muted}>{correction.kind === "return" ? "The player can draw again. This card and the reason stay in their history." : "The same omen becomes available again. The correction is recorded."}</p>
+            <div className={styles.actions}><button className={styles.button} disabled={busy || !reason.trim()}>Confirm {correction.kind}</button><button className={styles.secondary} type="button" disabled={busy} onClick={() => setCorrection(null)}>Cancel</button></div>
+          </form>}
+        </article>;
+      })}</div>
+    </section>
+    <section className={styles.panel}><p className={styles.eyebrow}>GM log · latest 50 changes</p>
+      {!events.length ? <p className={styles.muted}>Deck edits, uses and corrections will appear here.</p> : <ol className={styles.eventList}>{events.map((event) => <li key={event.id}>
+        <span>{event.kind.replaceAll("_", " ")}{event.note && ` · ${event.note}`}</span><time dateTime={event.created_at}>{new Date(event.created_at).toLocaleString("en-GB")}</time>
+      </li>)}</ol>}
+    </section>
+  </div>;
 }

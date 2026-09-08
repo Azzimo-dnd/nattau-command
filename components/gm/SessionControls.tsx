@@ -66,6 +66,7 @@ export function SessionControls({
   initialSettings,
   campaignSlug,
 }: SessionControlsProps) {
+  const barovia = campaignSlug === "barovia";
   const router = useRouter();
   const [status, setStatus] = useState<CampaignSessionStatus>(
     initialSettings.status,
@@ -150,7 +151,7 @@ export function SessionControls({
       }
 
       setDebuffs(previewDebuffs);
-      setSuccess("Session settings and Azzimo's price are now published.");
+      setSuccess(barovia ? "The next gathering and its notes are now published." : "Session settings and Azzimo's price are now published.");
       router.refresh();
     } catch (saveError) {
       setError(
@@ -182,8 +183,7 @@ export function SessionControls({
             Next Session Controls
           </h2>
           <p className="mt-2 text-sm text-slate-400">
-            Publish the next session date, a short note and any price owed to
-            Azzimo. Campaign members see the result on the Command Center.
+            {barovia ? "Announce the next gathering, leave a note for the party and record any consequences already agreed at the table." : "Publish the next session date, a short note and any price owed to Azzimo. Campaign members see the result on the Command Center."}
           </p>
         </div>
 
@@ -270,10 +270,10 @@ export function SessionControls({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-fuchsia-300/80">
-                Special deployment debt
+                {barovia ? "Carried into the next chapter" : "Special deployment debt"}
               </p>
               <h3 className="mt-1 text-lg font-bold text-rose-100">
-                ☠ Azzimo's Price
+                {barovia ? "☾ Marks of the Mists" : "☠ Azzimo's Price"}
               </h3>
               <p className="mt-1 max-w-xl text-sm text-slate-400">
                 Add the debuffs agreed with the players for the next session.
@@ -288,7 +288,7 @@ export function SessionControls({
           <div className="mt-4 space-y-3">
             {debuffs.length === 0 ? (
               <div className="rounded-xl border border-dashed border-fuchsia-500/20 bg-black/10 px-4 py-5 text-center text-sm text-slate-500">
-                No debt is currently assigned to the next session.
+                {barovia ? "No lingering consequences recorded for the next gathering." : "No debt is currently assigned to the next session."}
               </div>
             ) : (
               debuffs.map((debuff, index) => (
@@ -336,11 +336,7 @@ export function SessionControls({
 
         {!initialSettings.databaseReady ? (
           <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
-            The campaign session schema is not ready. Apply
-            <code className="mx-1 rounded bg-black/25 px-1.5 py-0.5">
-              supabase/campaign-session-controls-v2.sql
-            </code>
-            before publishing these settings.
+            Session settings could not be loaded. Refresh the page before publishing.
           </div>
         ) : null}
 
@@ -416,7 +412,7 @@ export function SessionControls({
           </div>
 
           <div className="mt-4">
-            <AzzimosPricePanel debuffs={previewDebuffs} compact />
+            <AzzimosPricePanel campaignSlug={campaignSlug} debuffs={previewDebuffs} compact />
           </div>
         </section>
 
@@ -454,7 +450,7 @@ export function SessionControls({
           </dl>
 
           <div className="mt-5">
-            <AzzimosPricePanel debuffs={initialSettings.debuffs} compact />
+            <AzzimosPricePanel campaignSlug={campaignSlug} debuffs={initialSettings.debuffs} compact />
           </div>
         </section>
       </aside>

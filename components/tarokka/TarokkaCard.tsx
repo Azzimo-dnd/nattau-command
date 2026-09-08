@@ -11,6 +11,7 @@ type TarokkaCardProps = {
   disabled?: boolean;
   onClick?: () => void;
   ariaLabel?: string;
+  turned?: boolean;
 };
 
 export function TarokkaCard({
@@ -22,6 +23,7 @@ export function TarokkaCard({
   disabled = false,
   onClick,
   ariaLabel,
+  turned = false,
 }: TarokkaCardProps) {
   const reversed = Boolean(card?.isReversed);
 
@@ -33,12 +35,12 @@ export function TarokkaCard({
       aria-label={ariaLabel ?? (revealed && card ? card.name : "Face-down Tarokka card")}
       className={`${styles.cardButton} ${compact ? styles.cardCompact : ""} ${
         interactive ? styles.cardInteractive : styles.cardStatic
-      } ${selected ? styles.cardSelected : ""}`}
+      } ${selected ? styles.cardSelected : ""} ${card?.artKey.startsWith("high-") ? styles.highCard : ""}`}
     >
       <span className={styles.cardPerspective}>
         <span
           className={`${styles.cardInner} ${revealed ? styles.cardRevealed : ""} ${
-            revealed && reversed ? styles.cardReversed : ""
+            revealed && reversed ? styles.cardReversed : !revealed && turned ? styles.cardTurned : ""
           }`}
         >
           <span className={`${styles.cardFace} ${styles.cardBack}`}>

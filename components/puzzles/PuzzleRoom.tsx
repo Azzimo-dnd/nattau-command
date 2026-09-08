@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { PUZZLE_TYPE_LABELS, type PuzzleTheme } from "@/lib/puzzles/puzzleTypes";
 import { PuzzleEngine } from "./PuzzleEngine";
 import { usePuzzleRoom } from "./usePuzzleRoom";
@@ -78,11 +78,8 @@ export function PuzzleRoom({
 
   const backHref = campaignSlug === "barovia" ? "/campaigns/barovia/puzzles" : "/puzzles";
   const workshopHref = campaignSlug === "barovia" ? "/campaigns/barovia/gm/puzzles" : "/gm/puzzles";
-  const controllerExpired = useMemo(() => {
-    if (!room.run?.controller_user_id) return true;
-    if (!room.run.control_expires_at) return true;
-    return new Date(room.run.control_expires_at).getTime() <= now;
-  }, [now, room.run?.control_expires_at, room.run?.controller_user_id]);
+  const controllerExpired = !room.run?.controller_user_id || !room.run.control_expires_at
+    || new Date(room.run.control_expires_at).getTime() <= now;
 
   if (room.loading) {
     return (
@@ -263,6 +260,7 @@ export function PuzzleRoom({
             </div>
 
             <PuzzleEngine
+              key={run.id}
               puzzle={puzzle}
               run={run}
               disabled={!room.hasControl || room.busy || run.status !== "active"}

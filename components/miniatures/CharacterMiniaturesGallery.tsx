@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { campaignPath } from "@/lib/campaigns/campaignPresentation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { MiniatureSkinViewer } from "./MiniatureSkinViewer";
@@ -41,6 +42,7 @@ type PaintJobRow = {
 
 type Props = {
   campaignId: string;
+  campaignSlug?: string;
   currentUserId: string;
   isDm: boolean;
   preferredPlayerId?: string | null;
@@ -54,7 +56,7 @@ function formatBytes(bytes: number | null) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function CharacterMiniaturesGallery({ campaignId, currentUserId, isDm, preferredPlayerId = null }: Props) {
+export function CharacterMiniaturesGallery({ campaignId, campaignSlug = "nattau", currentUserId, isDm, preferredPlayerId = null }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -203,7 +205,7 @@ export function CharacterMiniaturesGallery({ campaignId, currentUserId, isDm, pr
   const hasDefault = skins.some((skin) => skin.is_default);
   const canSetDefault = Boolean(selected && (isDm || selected.player_id === currentUserId));
   const canPaintSelected = Boolean(selected?.miniature_id);
-  const paintHref = selected ? isDm ? "/gm/miniatures/paint" : `/characters/paint?character=${encodeURIComponent(selected.player_id)}` : isDm ? "/gm/miniatures/paint" : "/characters/paint";
+  const paintHref = campaignPath(campaignSlug, isDm ? "/gm/miniatures/paint" : selected ? `/characters/paint?character=${encodeURIComponent(selected.player_id)}` : "/characters/paint");
 
   return (
     <div className="space-y-5">

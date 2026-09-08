@@ -1,0 +1,10 @@
+.frame { --relic-accent: #dcc48b; }
+.barovia { --relic-accent: #ddacbe; }
+.invocation { position: relative; margin-bottom: 1rem; border: 1px solid #765f393d; border-radius: 1rem; padding: 1rem 1.25rem; background: linear-gradient(110deg, #2b221850, #0c1014); color: #c8beb0; line-height: 1.7; font-family: Georgia, serif; }
+.barovia .invocation { border-color: #77425766; background: radial-gradient(ellipse at top left, #49202d80, #120e14 80%); color: #d3bbc4; }
+.seal { color: var(--relic-accent); font-size: .65rem; letter-spacing: .22em; text-transform: uppercase; font-family: sans-serif; font-weight: 700; }
+.barovia :global(.text-yellow-100), .barovia :global(.text-yellow-200), .barovia :global(.text-yellow-500\/90) { color: #e7bfd0; }
+.barovia :global(.bg-yellow-500) { background-color: #ae637e; }
+.barovia :global(.nattau-arcane-wire) { background: #a28198; }
+.barovia :global(.nattau-arcane-flow) { background: #ffdbac; box-shadow: 0 0 12px #ffc083; }
+.barovia :global(.nattau-arcane-terminal-source) { background-color: #f3bd76; box-shadow: 0 0 24px #c26e3970; }

@@ -114,7 +114,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
   const barovia = theme === "barovia";
   const vault = usePuzzleVault({ campaignId });
   const [editor, setEditor] = useState<EditorState>(() =>
-    presetToEditor("rune_cipher", buildPuzzlePreset("rune_cipher", "Medium")),
+    presetToEditor("rune_cipher", buildPuzzlePreset("rune_cipher", "Medium", { theme })),
   );
   const [saving, setSaving] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -140,6 +140,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
 
   const regenerate = (type = editor.type, difficulty = editor.difficulty) => {
     const preset = buildPuzzlePreset(type, difficulty, {
+      theme,
       sigilMaterial: type === "shattered_sigil" ? editor.sigilMaterialMode : undefined,
     });
     setEditor((current) => ({
@@ -158,7 +159,8 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
       presetToEditor(
         type,
         buildPuzzlePreset(type, editor.difficulty, {
-          sigilMaterial: type === "shattered_sigil" ? "auto" : undefined,
+          theme,
+      sigilMaterial: type === "shattered_sigil" ? "auto" : undefined,
         }),
         null,
       ),
@@ -169,6 +171,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
 
   const changeDifficulty = (difficulty: string) => {
     const preset = buildPuzzlePreset(editor.type, difficulty, {
+      theme,
       sigilMaterial:
         editor.type === "shattered_sigil" ? editor.sigilMaterialMode : undefined,
     });
@@ -185,6 +188,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
 
   const changeSigilMaterial = (mode: SigilMaterialMode) => {
     const preset = buildPuzzlePreset("shattered_sigil", editor.difficulty, {
+      theme,
       sigilMaterial: mode,
     });
     setEditor((current) => ({
@@ -308,7 +312,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
       const supabase = createClient();
       for (let index = 0; index < TYPES.length; index += 1) {
         const type = TYPES[index];
-        const preset = buildPuzzlePreset(type, "Medium");
+        const preset = buildPuzzlePreset(type, "Medium", { theme });
         const { error } = await supabase.rpc("save_campaign_puzzle", {
           p_campaign_slug: campaignSlug,
           p_puzzle_id: null,
@@ -339,7 +343,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
 
   const resetDraft = () => {
     setEditor(
-      presetToEditor("rune_cipher", buildPuzzlePreset("rune_cipher", "Medium")),
+      presetToEditor("rune_cipher", buildPuzzlePreset("rune_cipher", "Medium", { theme })),
     );
     setMessage(null);
     setFormError(null);

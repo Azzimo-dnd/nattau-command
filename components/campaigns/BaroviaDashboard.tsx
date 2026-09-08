@@ -2,6 +2,10 @@ import Link from "next/link";
 import type { AppRole } from "@/components/navigation/navigationTypes";
 import { CampaignChatUnreadBadge } from "@/components/notifications/CampaignChatNotifications";
 
+import { NextSessionCountdown } from "@/components/home/NextSessionCountdown";
+import { AzzimosPricePanel } from "@/components/session/AzzimosPricePanel";
+import type { CampaignSessionSettings } from "@/lib/campaign/sessionTypes";
+
 type ModuleStatus = "active" | "preview";
 
 const modules: Array<{
@@ -12,6 +16,12 @@ const modules: Array<{
   mark: string;
   status: ModuleStatus;
 }> = [
+  {
+    eyebrow: "At the table", title: "Tabletop of the Mists", description: "Gather the party, reveal the fog, roll Hope and Fear and pass the spotlight.", href: "/campaigns/barovia/vtt", mark: "V", status: "active",
+  },
+  {
+    eyebrow: "Puzzles", title: "Sealed Relics", description: "Unseal iron reliquaries, restore broken rites and answer the echoes waiting in the dark.", href: "/campaigns/barovia/puzzles", mark: "R", status: "active",
+  },
   {
     eyebrow: "Scheduling",
     title: "The Gathering",
@@ -52,10 +62,10 @@ const modules: Array<{
     eyebrow: "Party",
     title: "Lost Souls",
     description:
-      "Character cards for the heroes, their players, relationships and current state within the Mists.",
+      "Inspect the party's current 3D miniatures and contribute painted skins.",
     href: "/campaigns/barovia/characters",
     mark: "S",
-    status: "preview",
+    status: "active",
   },
   {
     eyebrow: "World",
@@ -71,9 +81,11 @@ const modules: Array<{
 export function BaroviaDashboard({
   displayName,
   role,
+  session,
 }: {
   displayName: string;
   role: AppRole;
+  session: CampaignSessionSettings;
 }) {
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-9 xl:px-8">
@@ -96,12 +108,23 @@ export function BaroviaDashboard({
             Welcome to Barovia, {displayName}
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-7 text-[#b8adb1] sm:text-base">
-            The first campaign tools are awake. Gather the party, roll Hope and
-            Fear, and draw the omens that follow every soul through Barovia's
-            private campaign space.
+            A lantern burns beside the road. Gather those who can answer its light; the Mists will keep the others until their story resumes.
           </p>
         </div>
       </section>
+
+      <section className="mt-6 grid gap-4 lg:grid-cols-2" aria-label="Next gathering">
+        <NextSessionCountdown status={session.status} target={session.nextSessionAt} message={session.message} />
+        <div className="rounded-2xl border border-[#4c2934] bg-[#150e13] p-5">
+          <p className="font-serif text-xl font-bold text-[#e8d8ce]">Before the lanterns are lit</p>
+          <div className="mt-4 flex flex-wrap gap-3 text-sm text-[#dfacbd]">
+            <Link href="/campaigns/barovia/session-planner">Share availability →</Link>
+            <Link href="/campaigns/barovia/tarokka">Read your omen →</Link>
+            {role === "dm" && <><Link href="/campaigns/barovia/gm/session">Announce the gathering →</Link><Link href="/campaigns/barovia/gm/members">Invite the party →</Link><Link href="/campaigns/barovia/gm/puzzles">Prepare a relic →</Link></>}
+          </div>
+        </div>
+      </section>
+      <div className="mt-4"><AzzimosPricePanel campaignSlug="barovia" debuffs={session.debuffs} /></div>
 
       <section className="mt-7">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -114,7 +137,7 @@ export function BaroviaDashboard({
             </h2>
           </div>
           <span className="rounded-full border border-[#713143]/50 bg-[#35151f]/40 px-3 py-1 text-xs text-[#c48c9b]">
-            5 active modules
+            {modules.filter((module) => module.status === "active").length} active modules
           </span>
         </div>
 

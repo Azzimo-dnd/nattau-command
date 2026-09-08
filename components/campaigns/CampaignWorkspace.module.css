@@ -1,0 +1,10 @@
+.workspace { background: #070b11; }
+.header { border-color: #263249; background: radial-gradient(ellipse at top left, #24354a, #101720 70%); }
+.barovia { background: #0d0b10; color: #ecded7; }
+.barovia .header { border-color: #633044; background: radial-gradient(ellipse at top right, #481e2e, #171016 70%); }
+.barovia :global(.text-cyan-300), .barovia :global(.text-cyan-200) { color: #dca6b8; }
+.barovia :global(.text-cyan-100) { color: #f1d4df; }
+.barovia :global(.bg-slate-900\/70) { background-color: rgb(30 19 29 / 85%); }
+.barovia :global(.border-slate-800) { border-color: #3d2937; }
+.barovia :global(.border-cyan-300) { border-color: #d08aa3; }
+.barovia :global(.bg-cyan-300\/15), .barovia :global(.bg-cyan-400\/10) { background-color: rgb(167 76 109 / 15%); }

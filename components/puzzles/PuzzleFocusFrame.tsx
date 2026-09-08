@@ -1,15 +1,17 @@
 "use client";
 
+import styles from "./PuzzleAtmosphere.module.css";
 import { useEffect, useState, type ReactNode } from "react";
 
 type Props = {
+  theme?: string;
   title: string;
   status: string;
   movesLabel: string;
   children: ReactNode;
 };
 
-export function PuzzleFocusFrame({ title, status, movesLabel, children }: Props) {
+export function PuzzleFocusFrame({ title, status, movesLabel, children, theme }: Props) {
   const [focused, setFocused] = useState(false);
 
   useEffect(() => {
@@ -34,11 +36,11 @@ export function PuzzleFocusFrame({ title, status, movesLabel, children }: Props)
 
   return (
     <div
-      className={
+      className={`${styles.frame} ${theme === "barovia" ? styles.barovia : ""} ${
         focused
           ? "fixed inset-0 z-[120] flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#070a0e]"
           : "relative"
-      }
+      }`}
     >
       {!focused ? (
         <div className="mb-3 flex items-center justify-end md:hidden">

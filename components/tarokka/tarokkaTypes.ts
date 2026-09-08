@@ -8,6 +8,7 @@ export type TarokkaCycle = {
   cycle_number: number;
   title: string;
   is_active: boolean;
+  draws_open: boolean;
   started_at: string;
   closed_at: string | null;
 };
@@ -31,6 +32,12 @@ export type TarokkaDraw = {
   effect_description_snapshot: string;
   drawn_at: string;
   revealed_at: string | null;
+  used_at: string | null;
+  used_by: string | null;
+  use_note: string;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string;
 };
 
 export type TarokkaClaimResult = {
@@ -103,7 +110,33 @@ export type TarokkaReadingPosition = {
   revealed_at: string | null;
 };
 
-export type TarokkaTab = "omen" | "reading" | "history" | "gm";
+export type TarokkaTab = "omen" | "reading" | "history" | "gm" | "deck";
+
+export type TarokkaDeckCard = {
+  id: number; campaign_id: string; slug: string; name: string; card_number: string;
+  subtitle: string; meaning: string; sigil: string; art_key: string; sort_order: number;
+  upright_title: string; upright_description: string; reversed_title: string; reversed_description: string;
+  prophecy_upright: string; prophecy_reversed: string; deck_key: string; is_active: boolean; revision: number;
+};
+export type TarokkaCardPatch = Pick<TarokkaDeckCard, "subtitle" | "meaning" | "upright_title" | "upright_description" | "reversed_title" | "reversed_description" | "prophecy_upright" | "prophecy_reversed">;
+export type TarokkaEvent = {
+  id: string; actor_id: string | null; draw_id: string | null; card_id: number | null;
+  kind: string; note: string; created_at: string;
+};
+
+export function omenStatus(draw: TarokkaDraw, activeCycleId?: string) {
+  if (draw.voided_at) return "Returned";
+  if (draw.used_at) return "Used";
+  if (draw.cycle_id !== activeCycleId) return "Expired";
+  return draw.revealed_at ? "Available" : "Face-down";
+}
+
+export function deckToCardView(card: TarokkaDeckCard, reversed = false): TarokkaCardView {
+  return { number: card.card_number, name: card.name, subtitle: card.subtitle, meaning: card.meaning,
+    sigil: card.sigil, artKey: card.art_key, isReversed: reversed,
+    effectTitle: reversed ? card.reversed_title : card.upright_title,
+    effectDescription: reversed ? card.reversed_description : card.upright_description };
+}
 
 export type TarokkaCardView = {
   number: string;

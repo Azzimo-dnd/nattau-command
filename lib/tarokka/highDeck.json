@@ -1,0 +1,100 @@
+[
+  {
+    "slug": "high-artifact", "name": "The Artifact", "card_number": "★ I", "subtitle": "Power remembers its maker", "sigil": "✦", "art_key": "high-artifact", "sort_order": 10,
+    "meaning": "A relic outlives the hand that forged it. What you inherit may be a key, a burden, or both.",
+    "upright_title": "The Relic Remembers", "upright_description": "Once this cycle, before a Knowledge action roll to study a crafted or magical object, apply one relevant Experience without spending its usual Hope. Its normal bonus and all other limits still apply.",
+    "reversed_title": "Borrowed Splendour", "reversed_description": "Once this cycle, after rolling your damage but before it is applied, mark 1 Stress to reroll up to two damage dice. Keep the new values, even if lower. This changes neither the attack roll nor its Hope/Fear outcome.",
+    "prophecy_upright": "An overlooked possession carries the answer. Seek its maker, previous bearer, or unfinished purpose.", "prophecy_reversed": "Something precious demands a new owner. Ask what was taken to give it power."
+  },
+  {
+    "slug": "high-beast", "name": "The Beast", "card_number": "♦ J", "subtitle": "The hunger behind the eyes", "sigil": "♦", "art_key": "high-beast", "sort_order": 20,
+    "meaning": "Passion can defend the hearth or devour it. The difference is what you refuse to consume.",
+    "upright_title": "Teeth in the Dark", "upright_description": "Once this cycle, after a successful melee attack and before damage is applied, add 1d6 to that attack's damage against one target. This extra die is not multiplied by Proficiency or a critical success.",
+    "reversed_title": "Cornered Animal", "reversed_description": "Once this cycle, after a failed Strength action roll but before its consequences resolve, mark 1 Stress to reroll both Duality Dice. Keep the new pair and resolve only its outcome. Modifiers remain unchanged.",
+    "prophecy_upright": "A fierce protector guards something fragile. Discover what it loves before deciding what it is.", "prophecy_reversed": "An appetite has been mistaken for a need. Find who profits when restraint is lost."
+  },
+  {
+    "slug": "high-broken-one", "name": "The Broken One", "card_number": "♦ K", "subtitle": "A heart that still beats", "sigil": "♦", "art_key": "high-broken-one", "sort_order": 30,
+    "meaning": "Defeat leaves a shape in the soul. A broken thing may still shelter a smaller flame.",
+    "upright_title": "Still Here", "upright_description": "Once this cycle, after you fail an action roll with Fear, clear 1 Stress. The failure, the GM's Fear, and the consequences of that roll remain unchanged.",
+    "reversed_title": "Splinters into Shelter", "reversed_description": "Once this cycle, when one effect would make you mark Stress, mark 1 Hit Point instead of that effect's Stress. You can choose this only if at least one Hit Point will remain unmarked. Armor cannot reduce this cost.",
+    "prophecy_upright": "Aid waits with someone the world has discarded. Their failure taught them what victory could not.", "prophecy_reversed": "Old grief is being used as a chain. Name the promise that keeps someone kneeling."
+  },
+  {
+    "slug": "high-darklord", "name": "The Darklord", "card_number": "♠ K", "subtitle": "A crown with no horizon", "sigil": "♠", "art_key": "high-darklord", "sort_order": 40,
+    "meaning": "Dominion can become a prison. Every throne asks who is truly permitted to leave.",
+    "upright_title": "The Voice of Command", "upright_description": "Once this cycle, before a Presence action roll to intimidate an adversary or rally frightened NPCs, gain advantage. This grants no control over another player's character and does not compel obedience without a successful roll.",
+    "reversed_title": "Debt of Blood", "reversed_description": "Once this cycle, when you would spend at least 2 Hope on one feature or move, spend 1 less Hope and give the GM 1 Fear instead. Pay every other cost normally. You must still spend at least 1 Hope.",
+    "prophecy_upright": "A ruler's strength reveals the boundary of their prison. Study what their commands cannot change.", "prophecy_reversed": "The vacant throne already has a claimant. Beware the bargain that makes captivity look like inheritance."
+  },
+  {
+    "slug": "high-donjon", "name": "The Donjon", "card_number": "♣ K", "subtitle": "Stone remembers every captive", "sigil": "♣", "art_key": "high-donjon", "sort_order": 50,
+    "meaning": "Walls can keep a horror out or a soul in. Someone has forgotten which side they guard.",
+    "upright_title": "The Missing Key", "upright_description": "Once this cycle, before a Finesse action roll to pick a lock, escape bindings, or dismantle a mechanical trap, gain advantage. You still need a plausible method and any required tools.",
+    "reversed_title": "A Prison for the Pain", "reversed_description": "Once this cycle, when an attack would deal damage to you, mark 1 Stress to reduce that damage's severity by one threshold, in addition to normal Armor. Afterward you are Restrained until the end of your next action. This cannot reduce direct Hit Point costs.",
+    "prophecy_upright": "A barrier protects more than its keeper admits. The useful question is why it was first built.", "prophecy_reversed": "The cage travels with its prisoner. Freedom begins with a promise, habit, or fear being broken."
+  },
+  {
+    "slug": "high-executioner", "name": "The Executioner", "card_number": "♠ J", "subtitle": "The sentence draws its breath", "sigil": "♠", "art_key": "high-executioner", "sort_order": 60,
+    "meaning": "An ending can be justice, cruelty, or mercy. The blade does not decide which.",
+    "upright_title": "The Final Measure", "upright_description": "Once this cycle, after rolling damage against an adversary that has harmed an ally during this scene, change one of those damage dice to its maximum face. Do this before damage is applied; no other dice or flat bonuses change.",
+    "reversed_title": "A Bitter Sentence", "reversed_description": "Once this cycle, before an attack roll, mark 1 Stress. If the attack hits, one target adversary also marks 1 Stress if it has a Stress track. If the attack misses, both the cost and this omen are still spent.",
+    "prophecy_upright": "Something must be brought to an end. Decide who has the right to pronounce that sentence.", "prophecy_reversed": "A punishment has survived its crime. Follow the sentence back to the person who first demanded it."
+  },
+  {
+    "slug": "high-ghost", "name": "The Ghost", "card_number": "♥ K", "subtitle": "The room is never empty", "sigil": "♥", "art_key": "high-ghost", "sort_order": 70,
+    "meaning": "The past has not finished speaking. A haunting can be a warning or a request to be remembered.",
+    "upright_title": "Almost a Memory", "upright_description": "Once this cycle, after an adversary rolls an attack against you but before damage resolves, increase your Evasion by 2 against that attack only. If it now misses, resolve it as a miss. This does not protect anyone else targeted by the attack.",
+    "reversed_title": "A Name Left Behind", "reversed_description": "Once this cycle, in a quiet moment, ask whether this place holds an echo of its dead. If the GM confirms one exists, mark 1 Stress and ask one question about an event that happened here; receive a truthful sensory fragment. It cannot reveal what the dead never witnessed. If no echo exists, the omen is unspent.",
+    "prophecy_upright": "An unfinished kindness still binds someone to this place. Hear the memory before following the apparition.", "prophecy_reversed": "A voice repeats the past because the living will not face it. Find whose version of the story is missing."
+  },
+  {
+    "slug": "high-horseman", "name": "The Horseman", "card_number": "★ II", "subtitle": "Hooves beyond the last lantern", "sigil": "✦", "art_key": "high-horseman", "sort_order": 80,
+    "meaning": "Change approaches whether you welcome it or not. Choose what rides with you when the road turns.",
+    "upright_title": "Ride Before the Bell", "upright_description": "Once this cycle, before your action, move to a point within Far range without a separate movement roll. The route must be traversable; barriers, dangerous terrain, and other consequences still apply. This grants no additional attack or action.",
+    "reversed_title": "Not at This Crossing", "reversed_description": "Once this cycle, after failing an Agility reaction roll against a fall, collapse, or environmental hazard, mark 1 Stress to reroll it. Keep the new result and the same modifiers. As a reaction roll it still generates neither Hope nor Fear.",
+    "prophecy_upright": "A departure will change more than a destination. Prepare for the arrival that follows it.", "prophecy_reversed": "An ending has been delayed, not escaped. Seek the unfinished farewell before the road demands payment."
+  },
+  {
+    "slug": "high-innocent", "name": "The Innocent", "card_number": "♥ Q", "subtitle": "A candle held against the wind", "sigil": "♥", "art_key": "high-innocent", "sort_order": 90,
+    "meaning": "Gentleness is not ignorance. A small act of trust can deny cruelty its final victory.",
+    "upright_title": "An Unbroken Light", "upright_description": "Once this cycle, when another player character within Close range would mark Stress, prevent 1 of those Stress marks. Describe a word or gesture they can perceive. You do not transfer the omen or its remaining use to them.",
+    "reversed_title": "The Wound You Choose", "reversed_description": "Once this cycle, after an ally within Very Close range resolves Armor against an attack but before marking Hit Points, take 1 of those Hit Point marks yourself instead. Armor cannot reduce the transferred mark. All other damage and effects stay with their original target.",
+    "prophecy_upright": "Someone vulnerable holds a choice that power cannot make for them. Protect their chance to choose.", "prophecy_reversed": "Protection is becoming possession. Ask whose wishes have disappeared beneath another person's good intentions."
+  },
+  {
+    "slug": "high-marionette", "name": "The Marionette", "card_number": "♥ J", "subtitle": "Whose hand holds the thread?", "sigil": "♥", "art_key": "high-marionette", "sort_order": 100,
+    "meaning": "Influence is strongest when it feels like your own idea. A helping hand and a controlling hand can look alike.",
+    "upright_title": "A Guiding Thread", "upright_description": "Once this cycle, after another player within Close range rolls an action but before its outcome resolves, add +2 to the total. Describe a useful cue they can perceive. This is not an advantage die and does not change which Duality Die is higher.",
+    "reversed_title": "Cut the Strings", "reversed_description": "Once this cycle, mark 1 Stress to end one temporary Restrained or Vulnerable condition affecting you. Describe how you break its hold. This cannot end a permanent curse or erase the source of the condition; that source may impose it again.",
+    "prophecy_upright": "Follow the smallest tug to the hand above it. A servant may know a master better than an enemy does.", "prophecy_reversed": "A broken thread leaves a dangerous freedom. Decide what will guide the person who no longer has orders."
+  },
+  {
+    "slug": "high-mists", "name": "The Mists", "card_number": "♠ Q", "subtitle": "No road promises a return", "sigil": "♠", "art_key": "high-mists", "sort_order": 110,
+    "meaning": "Certainty thins at the edge of the lantern light. A hidden path is not necessarily a safe one.",
+    "upright_title": "The Unseen Path", "upright_description": "Once this cycle, before an Instinct action roll to navigate, track a trail, or find shelter, gain advantage. This does not open a sealed Domain border or reveal a destination the GM has established as unreachable.",
+    "reversed_title": "Step out of the Story", "reversed_description": "Once this cycle, before your action, mark 1 Stress and vanish into mist, reappearing at an unoccupied point you can see within Close range. You cannot pass through a solid barrier or use this while Restrained. This grants neither invisibility afterward nor an extra action.",
+    "prophecy_upright": "An uncertain route will reveal a necessary truth. Watch what the fog chooses to leave visible.", "prophecy_reversed": "A familiar road leads somewhere different. What returns may not be exactly what departed."
+  },
+  {
+    "slug": "high-raven", "name": "The Raven", "card_number": "♣ Q", "subtitle": "A witness on the crooked branch", "sigil": "♣", "art_key": "high-raven", "sort_order": 120,
+    "meaning": "Help may arrive in an unsettling shape. An observer sees the danger that those inside it cannot.",
+    "upright_title": "Eyes on the Road", "upright_description": "Once this cycle, while observing a present threat, ask the GM for one practical detail about useful cover, a safer approach, or an immediate weakness. The answer is truthful and actionable, but need not disclose a stat block or a future secret.",
+    "reversed_title": "The Messenger's Price", "reversed_description": "Once this cycle, mark 1 Stress to send a message of up to 25 words to a known, willing ally elsewhere in Barovia. They may send one equally short reply. The GM describes the raven or omen carrying it. This does not reveal their location, compel a reply, or cross the Mists out of the Domain.",
+    "prophecy_upright": "A watchful stranger has already noticed the party. Kindness offered quietly may return as aid.", "prophecy_reversed": "A warning arrives in a form easy to dismiss. Learn why its messenger cannot speak plainly."
+  },
+  {
+    "slug": "high-seer", "name": "The Seer", "card_number": "♣ J", "subtitle": "The future blinks first", "sigil": "♣", "art_key": "high-seer", "sort_order": 130,
+    "meaning": "Seeing a possibility is not choosing it. Foreknowledge asks what you are willing to change.",
+    "upright_title": "The Other Reflection", "upright_description": "Once this cycle, after rolling your Duality Dice but before resolving the action, swap the Hope and Fear values. The total stays the same; resolve only the final Hope/Fear outcome. Matching dice remain a critical success.",
+    "reversed_title": "A Future Paid For", "reversed_description": "Once this cycle, before an action roll, mark 1 Stress and roll an extra d12. After rolling the Duality Dice, you may replace either one with that extra value. Keep the resulting pair and resolve only its outcome, including any critical success. The omen is spent even if you keep the original pair.",
+    "prophecy_upright": "A choice glimpsed early can still be changed. Find the decision hidden inside what seems inevitable.", "prophecy_reversed": "Someone has mistaken one possible future for a command. Ask what their prediction leaves out."
+  },
+  {
+    "slug": "high-tempter", "name": "The Tempter", "card_number": "♦ Q", "subtitle": "Every gift casts a shadow", "sigil": "♦", "art_key": "high-tempter", "sort_order": 140,
+    "meaning": "A useful bargain may be the most dangerous one. Listen for the price that was never spoken aloud.",
+    "upright_title": "Honey on the Tongue", "upright_description": "Once this cycle, after rolling a Presence action to bargain or deceive but before resolving its outcome, spend 1 Hope to add +3 to the total. This changes neither the Duality Dice nor their Hope/Fear outcome, and does not compel another player's character.",
+    "reversed_title": "The Bargain Below", "reversed_description": "Once this cycle, after a failed non-attack action roll but before its consequences resolve, ask the GM to offer a concrete complication. If you accept, add 1d6 to that roll's total; its Hope/Fear outcome is unchanged and it may still fail. This is a Tarokka bonus, not advantage. If you refuse the offered price, the omen is unspent.",
+    "prophecy_upright": "A willing bargain offers a narrow way forward. Make every condition speak its name.", "prophecy_reversed": "A gift is collecting interest. Discover what its giver considers payment before accepting another."
+  }
+]

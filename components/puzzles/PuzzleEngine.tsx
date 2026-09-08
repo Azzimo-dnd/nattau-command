@@ -1,5 +1,6 @@
 "use client";
 
+import styles from "./PuzzleAtmosphere.module.css";
 import type {
   CampaignPuzzleRow,
   CampaignPuzzleRunRow,
@@ -77,7 +78,11 @@ export function PuzzleEngine({
         : `${Math.max(0, puzzle.move_limit - run.move_count)} moves left`;
 
   return (
-    <PuzzleFocusFrame title={puzzle.title} status={run.status} movesLabel={movesLabel}>
+    <PuzzleFocusFrame theme={String(puzzle.public_config.campaign_theme ?? "nattau")} title={puzzle.title} status={run.status} movesLabel={movesLabel}>
+      <div className={styles.invocation}>
+        <p className={styles.seal}>{puzzle.public_config.campaign_theme === "barovia" ? "A relic beyond the Mists" : "An artifact of the expedition"}</p>
+        <p className="mt-2">{run.status === "solved" ? String(puzzle.public_config.success_message ?? "The mechanism yields.") : run.status === "failed" ? puzzle.failure_message : puzzle.description}</p>
+      </div>
       {engine}
     </PuzzleFocusFrame>
   );

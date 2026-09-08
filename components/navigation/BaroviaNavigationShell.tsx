@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { NavIcon } from "./NavIcon";
 import {
   CampaignChatNotificationsProvider,
@@ -67,6 +67,17 @@ const desktopItems: NavigationItem[] = [
     href: "/campaigns/barovia/map",
     icon: "map",
   },
+];
+
+const sessionItems: NavigationItem[] = [
+  { label: "Tabletop of the Mists", href: "/campaigns/barovia/vtt", icon: "war-room" },
+  { label: "Sealed Relics", href: "/campaigns/barovia/puzzles", icon: "spark" },
+];
+const gmSessionItems: NavigationItem[] = [
+  { label: "Next Gathering", href: "/campaigns/barovia/gm/session", icon: "session" },
+  { label: "Relic Workshop", href: "/campaigns/barovia/gm/puzzles", icon: "spark" },
+  { label: "Miniature Studio", href: "/campaigns/barovia/gm/miniatures", icon: "account" },
+  { label: "Creatures of the Mists", href: "/campaigns/barovia/gm/vtt/enemies", icon: "war-room" },
 ];
 
 function isActive(pathname: string, item: NavigationItem) {
@@ -138,7 +149,7 @@ function DesktopSidebar({
           The Mists
         </p>
         <div className="space-y-1">
-          {desktopItems.map((item) => (
+          {[...desktopItems, ...sessionItems].map((item) => (
             <DesktopItem key={item.href} item={item} pathname={pathname} />
           ))}
         </div>
@@ -149,6 +160,7 @@ function DesktopSidebar({
               Game Master
             </p>
             <div className="space-y-2">
+              {gmSessionItems.map((item) => <DesktopItem key={item.href} item={item} pathname={pathname} />)}
               <Link
                 href="/campaigns/barovia/gm/members"
                 className={`relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
@@ -348,6 +360,12 @@ function MobileMoreSheet({
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2">
+          {[...sessionItems, ...(role === "dm" ? gmSessionItems : [])].map((item) => (
+            <Link key={item.href} href={item.href} className="flex min-h-20 flex-col justify-between rounded-2xl border border-[#694053] bg-[#2a111a]/65 p-3 text-[#e2bdc7]">
+              <NavIcon name={item.icon} className="h-5 w-5" />
+              <span className="mt-3 text-sm font-semibold">{item.label}</span>
+            </Link>
+          ))}
           <Link
             href="/campaigns/barovia/whispers"
             className="relative flex min-h-20 flex-col justify-between rounded-2xl border border-[#432832] bg-black/20 p-3 text-[#d1b6be]"
@@ -442,11 +460,11 @@ function BaroviaNavigationContent({
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const pageKey = useMemo(() => pathname, [pathname]);
-
-  useEffect(() => {
+  const [previousPath, setPreviousPath] = useState(pathname);
+  if (previousPath !== pathname) {
+    setPreviousPath(pathname);
     setMoreOpen(false);
-  }, [pageKey]);
+  }
 
   useEffect(() => {
     if (!moreOpen) return;

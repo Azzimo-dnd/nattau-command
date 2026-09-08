@@ -429,3 +429,93 @@
     transition-duration: 1ms;
   }
 }
+
+/* High Deck: bone, ink and tarnished wine; distinct from Nattau's Fate deck. */
+.highCard .cardFront { background: linear-gradient(135deg, #ded2ba, #bdb096); border-color: #8e7365; }
+.highCard .frontOuterFrame { border-color: #493238; }
+.highCard .frontInnerFrame { border-color: #8d7064; }
+.highCard .cardNumber, .highCard .cardName { color: #342329; text-shadow: none; }
+.highCard .cardSubtitle { color: #5d4547; }
+.highCard .cardFooterSigil, .highCard .cornerTopLeft, .highCard .cornerTopRight, .highCard .cornerBottomLeft, .highCard .cornerBottomRight { color: #723642; }
+.highCard .cardArtwork { left: 10%; right: 10%; top: 13%; height: 59%; filter: none; }
+.highCard.cardCompact .cardArtwork { top: 14%; height: 54%; }
+.highCard.cardCompact .cardName { line-height: 1.15; }
+.cardTurned { transform: rotateZ(180deg); }
+.panel { padding: clamp(1.1rem, 3vw, 2rem); border: 1px solid #54313e; border-radius: 24px; background: #120d12f5; color: #d8c5c8; }
+.stack { display: grid; gap: 1.2rem; }
+.relative { position: relative; }
+.eyebrow { margin: 0 0 .65rem; color: #d092a3; font-size: .65rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
+.heading { margin: .3rem 0 1rem; color: #edddce; font: 700 clamp(1.5rem, 3vw, 2rem)/1.2 Georgia, serif; }
+.muted { margin: .6rem 0; color: #b4a4aa; font-size: .84rem; line-height: 1.8; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; margin-top: 1rem; }
+.button, .secondary { min-height: 44px; padding: .6rem 1rem; border-radius: 10px; border: 1px solid #9b5368; background: #612337; color: #f6dfe5; font-size: .8rem; font-weight: 650; cursor: pointer; }
+.secondary { background: #24151e; border-color: #5f3d4a; color: #d4b9c3; }
+.button:hover, .secondary:hover { border-color: #d795a8; background-color: #77374b; }
+.button:disabled, .secondary:disabled, .turnButton:disabled { opacity: .5; cursor: default; }
+.moduleRoot button:focus-visible, .moduleRoot summary:focus-visible, .field:focus-visible { outline: 2px solid #e6bdc7; outline-offset: 4px; }
+.toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem; padding: .75rem; margin-bottom: 1.2rem; border: 1px solid #4b2c37; border-radius: 16px; background: #130d12; }
+.toolbar .actions { margin: 0; }
+.badge { display: inline-block; border: 1px solid #6d4756; border-radius: 20px; padding: .3rem .65rem; color: #dab8c5; font-size: .67rem; font-weight: 600; }
+.split { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 1rem; }
+.split > :first-child { flex: 1 1 260px; min-width: 0; }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.label { display: grid; gap: .5rem; font-size: .78rem; color: #d2b6c1; }
+.field { width: 100%; min-width: 0; padding: .75rem; border: 1px solid #644451; border-radius: 8px; background: #0c090d; color: #eee0d8; font-size: .88rem; line-height: 1.6; resize: vertical; }
+.editor { margin-top: 1.25rem; }
+.effect { padding: 1.15rem; margin-top: 1rem; border: 1px solid #756450; border-radius: 12px; background: #28211b55; line-height: 1.8; font-size: .87rem; color: #d1c1bc; }
+.effect h4 { margin: .5rem 0; font: 700 1.2rem Georgia, serif; color: #f2dfc9; }
+.effect p { margin-top: .6rem; }
+.price { border-color: #794052; background: #39132066; }
+.gallery { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .9rem; margin-top: 1.75rem; }
+.galleryItem, .gallerySelected { min-width: 0; text-align: center; padding: .55rem; border: 1px solid transparent; border-radius: 12px; }
+.gallerySelected { border-color: #c58599; background: #47232f77; }
+.gallery .cardButton { width: 100%; }
+.gallery p { margin-top: .8rem; font: 700 .8rem Georgia, serif; color: #e1ccbe; }
+.gallery small { display: block; margin-top: .3rem; font-size: .63rem; color: #b398a3; }
+.details { margin-top: 1rem; color: #c7b3bb; font-size: .84rem; line-height: 1.8; }
+.details summary { cursor: pointer; padding: .5rem 0; color: #e2c4ce; }
+.details p { margin: .8rem 0; }
+.stats { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }
+.stats > div { border: 1px solid #53303c; border-radius: 14px; padding: 1rem; background: #0d090e90; }
+.stats span { display: block; color: #b095a1; font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; }
+.stats strong { display: block; margin-top: .75rem; font: 700 1.6rem Georgia, serif; color: #e5c7b7; }
+.playerRow { border: 1px solid #4c2d38; border-radius: 14px; padding: 1.1rem; background: #0c090d88; }
+.playerRow h4 { font-weight: 700; color: #ead9d6; }
+.confirmBox { margin: 1rem 0 0; padding: 1rem; border: 1px solid #a2687d; border-radius: 12px; background: #2b1720; }
+.eventList { padding: 0; margin: 0; list-style: none; }
+.eventList li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; padding: .7rem 0; border-bottom: 1px solid #3c2731; font-size: .8rem; }
+.eventList time { font-size: .7rem; color: #ad949f; }
+.filters { display: flex; flex-wrap: wrap; gap: 1rem; }
+.filters > label { flex: 1 1 180px; }
+.historyRow { display: flex; align-items: start; gap: 1.5rem; }
+.historyRow > .cardButton { flex-shrink: 0; }
+.historyCopy { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.omenHeader { max-width: 720px; text-align: center; margin: 0 auto 1.5rem; }
+.omenHeader .heading { font-size: clamp(1.7rem, 4vw, 2.7rem); }
+.heldCard { display: flex; justify-content: center; padding: 1rem; }
+.heldEffect { max-width: 720px; padding: clamp(1rem, 3vw, 2rem); margin: 2rem auto 0; border: 1px solid #744152; border-radius: 18px; background: #1c1018; line-height: 1.8; }
+.meaning { margin: 1rem 0; padding-top: 1rem; border-top: 1px solid #4c2b38; font-family: Georgia, serif; font-style: italic; color: #bf9eaa; }
+.center { text-align: center; margin-top: 1rem; color: #b89ea8; font-size: .85rem; }
+.empty { display: flex; flex-direction: column; align-items: center; gap: 2rem; margin: 2rem 0; text-align: center; color: #c8b0bb; }
+.handSlot { min-width: 0; text-align: center; }
+.handSlot .cardButton { width: min(24vw, 230px); }
+.turnButton { min-height: 44px; margin-top: 1.5rem; padding: .5rem .75rem; border: 1px solid #7b4859; border-radius: 10px; color: #e1b8c7; background: #2e1722; font-size: .75rem; cursor: pointer; }
+.turnButton[aria-pressed=true] { background: #75364b; color: #fff1e8; }
+.footer { margin: 1.5rem auto; max-width: 840px; text-align: center; color: #ae929e; font-size: .72rem; line-height: 1.8; }
+.error { display: flex; justify-content: space-between; gap: 1rem; padding: 1rem; margin-bottom: 1rem; border: 1px solid #b65d71; border-radius: 12px; color: #ffd4dd; background: #511e31; font-size: .85rem; }
+.error button { text-decoration: underline; }
+@media (max-width: 1050px) { .gallery { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
+  .galleryItem, .gallerySelected { padding: .25rem; }
+  .gallery .cardName { font-size: .5rem; letter-spacing: .02em; }
+  .gallery .cardNumber { font-size: .45rem; }
+  .formGrid { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .stats > :first-child { grid-column: 1 / -1; }
+  .stats strong { font-size: 1.3rem; }
+  .historyRow { flex-direction: column; align-items: center; }
+  .toolbar .actions { gap: .35rem; }
+  .toolbar .button, .toolbar .secondary { padding: .6rem .75rem; font-size: .73rem; }
+  .dealRow .handSlot .cardButton { width: min(24vw, 150px); }
+}
