@@ -180,7 +180,7 @@ export function BestDates({
             {theme.bestTitle}
           </h2>
           <p className={`mt-2 max-w-3xl text-sm leading-6 ${theme.subtle}`}>
-            {theme.bestDescription} Test profiles are not included in the score.
+            {theme.bestDescription} Profiles excluded from session planning are not included in the score.
           </p>
         </div>
         <span className={`rounded-full border px-3 py-1.5 text-xs ${theme.panelMuted} ${theme.body}`}>
