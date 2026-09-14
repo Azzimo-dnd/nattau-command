@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LocalSessionDate } from "./LocalSessionDate";
 import type { CampaignSessionStatus } from "@/lib/campaign/sessionTypes";
 
 type GmOverviewProps = {
@@ -10,20 +11,6 @@ type GmOverviewProps = {
   sessionStatus: CampaignSessionStatus;
   nextSessionAt: string | null;
 };
-
-function formatSessionDate(value: string | null) {
-  if (!value) return "Not announced";
-
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "Not announced";
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 export function GmOverview({
   activeFateCycle,
@@ -53,7 +40,7 @@ export function GmOverview({
               sessionScheduled ? "text-yellow-300" : "text-slate-300"
             }`}
           >
-            {formatSessionDate(nextSessionAt)}
+            <LocalSessionDate value={nextSessionAt} />
           </p>
           <p className="mt-1 text-xs text-slate-600">
             {sessionScheduled ? "Published to players" : "Awaiting announcement"}
