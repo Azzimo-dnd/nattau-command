@@ -171,8 +171,8 @@ export function ProposalBoard({
                   currentUser.role === "player" &&
                   !currentUserCountsTowardPlanning && (
                     <p className="mt-3 text-xs leading-5 text-cyan-300">
-                      Your test vote is saved for interface testing but is not
-                      included in the totals above.
+                      Your vote is saved, but this profile is outside the active party
+                      and is not included in the totals above.
                     </p>
                   )}
 
