@@ -461,8 +461,8 @@ export function SessionPlanner({
     <div className="space-y-6 pb-12 lg:pb-0">
       {currentUser.role === "player" && !currentUserCountsTowardPlanning && (
         <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm leading-6 text-cyan-100">
-          This is a test profile. You may use every planner feature, but your
-          availability and votes do not affect player totals or rankings.
+          This profile is outside the active party. You may still use the planner,
+          but your availability and votes do not affect player totals or rankings.
         </div>
       )}
 
