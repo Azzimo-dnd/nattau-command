@@ -500,6 +500,14 @@ export function CampaignAdministration({
                         Test account
                       </span>
                     )}
+                    {member.role === "player" &&
+                      member.isActive &&
+                      !member.planningEnabled &&
+                      !member.countsTowardProgress && (
+                        <span className="rounded-full border border-slate-600/50 bg-slate-900/35 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+                          Inactive party
+                        </span>
+                      )}
                     {!member.isActive && (
                       <span className="rounded-full border border-red-800/40 bg-red-950/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-red-300">
                         Access disabled
