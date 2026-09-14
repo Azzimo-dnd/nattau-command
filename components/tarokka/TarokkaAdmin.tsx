@@ -47,7 +47,7 @@ export function TarokkaAdmin({ cycle, progress, draws, events, busy, onStartNext
       <div className={styles.stack}>{progress.map((row) => {
         const draw = liveDraws.find((item) => item.id === row.draw_id);
         return <article key={row.player_id} className={styles.playerRow}>
-          <div className={styles.split}><div><h4>{row.display_name} {!row.counts_toward_progress && <span className={styles.badge}>Test profile</span>}</h4>
+          <div className={styles.split}><div><h4>{row.display_name} {!row.counts_toward_progress && <span className={styles.badge}>Not counted</span>}</h4>
             <p className={styles.muted}>{draw ? `${draw.card_name_snapshot} · ${draw.is_reversed ? "Reversed" : "Upright"}` : "Waiting for a card"}</p></div>
             <span className={styles.badge}>{draw ? omenStatus(draw, cycle?.id) : "Waiting"}</span></div>
           {draw && <>
