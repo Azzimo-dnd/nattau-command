@@ -12,6 +12,8 @@ import { SlidingLockPuzzle } from "./engines/SlidingLockPuzzle";
 import { ShatteredSigilPuzzle } from "./engines/ShatteredSigilPuzzle";
 import { ArcaneCircuitPuzzle } from "./engines/ArcaneCircuitPuzzle";
 import { RuneSequencePuzzle } from "./engines/RuneSequencePuzzle";
+import { RunicResonancePuzzle } from "./engines/RunicResonancePuzzle";
+import { AstralWeavePuzzle } from "./engines/AstralWeavePuzzle";
 
 type Props = {
   type: PuzzleType;
@@ -48,6 +50,21 @@ function previewState(type: PuzzleType, publicConfig: JsonRecord): JsonRecord {
         level: 1,
         reveals: 0,
         last_feedback: null,
+      };
+    case "runic_resonance":
+      return {
+        lit: Array.isArray(publicConfig.initial_lit)
+          ? publicConfig.initial_lit
+          : [],
+      };
+    case "astral_weave":
+      return {
+        bridges:
+          publicConfig.initial_bridges &&
+          typeof publicConfig.initial_bridges === "object" &&
+          !Array.isArray(publicConfig.initial_bridges)
+            ? publicConfig.initial_bridges
+            : {},
       };
     case "rune_cipher":
     default:
@@ -165,6 +182,26 @@ export function PuzzleWorkshopPreview(props: Props) {
           disabled
           onAction={noAction}
           onReveal={noReveal}
+        />
+      );
+      break;
+    case "runic_resonance":
+      engine = (
+        <RunicResonancePuzzle
+          puzzle={puzzle}
+          run={run}
+          disabled
+          onAction={noAction}
+        />
+      );
+      break;
+    case "astral_weave":
+      engine = (
+        <AstralWeavePuzzle
+          puzzle={puzzle}
+          run={run}
+          disabled
+          onAction={noAction}
         />
       );
       break;
