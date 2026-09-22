@@ -185,8 +185,9 @@ export function GmPuzzleSolution({ puzzle, run, solution, onClose }: Props) {
             />
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-500">
-            Other valid orientations may also solve the circuit. Only anchored targets
-            must receive power; spare conduits may remain dark.
+            Other valid orientations may also solve the circuit. Every anchored target
+            must receive power, the live network must have no leaks or feedback loops,
+            and spare dark conduits may remain unused.
           </p>
         </div>
       ) : null}
