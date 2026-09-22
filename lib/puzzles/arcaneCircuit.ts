@@ -5,6 +5,14 @@ export type CircuitFlow = {
   distances: number[];
 };
 
+export type CircuitValidation = CircuitFlow & {
+  targetsPowered: boolean;
+  leakCount: number;
+  poweredEdgeCount: number;
+  hasCycle: boolean;
+  solved: boolean;
+};
+
 const DIRECTIONS = [
   { bit: 1, opposite: 4, row: -1, col: 0 },
   { bit: 2, opposite: 8, row: 0, col: 1 },
@@ -108,6 +116,77 @@ export function getCircuitFlow(
   return { rotatedMasks, poweredIndices, energizedMasks, distances };
 }
 
+export function analyzeCircuit(
+  masks: number[],
+  rotations: number[],
+  width: number,
+  sourceIndex: number,
+  targetIndices: number[],
+): CircuitValidation {
+  const flow = getCircuitFlow(masks, rotations, width, sourceIndex);
+  const targetsPowered =
+    targetIndices.length > 0 &&
+    targetIndices.every((index) => flow.poweredIndices.has(index));
+
+  let leakCount = 0;
+  let poweredEdgeCount = 0;
+  const height = width > 0 ? Math.ceil(masks.length / width) : 0;
+
+  for (const current of flow.poweredIndices) {
+    const currentMask = flow.rotatedMasks[current] ?? 0;
+    const row = Math.floor(current / width);
+    const col = current % width;
+
+    for (const direction of DIRECTIONS) {
+      if ((currentMask & direction.bit) === 0) continue;
+
+      const nextRow = row + direction.row;
+      const nextCol = col + direction.col;
+      const outside =
+        nextRow < 0 ||
+        nextCol < 0 ||
+        nextRow >= height ||
+        nextCol >= width;
+
+      if (outside) {
+        leakCount += 1;
+        continue;
+      }
+
+      const next = nextRow * width + nextCol;
+      if (next < 0 || next >= masks.length) {
+        leakCount += 1;
+        continue;
+      }
+
+      const neighborMask = flow.rotatedMasks[next] ?? 0;
+      if ((neighborMask & direction.opposite) === 0) {
+        leakCount += 1;
+        continue;
+      }
+
+      if (current < next && flow.poweredIndices.has(next)) {
+        poweredEdgeCount += 1;
+      }
+    }
+  }
+
+  // The source-powered region is connected by construction. For a connected
+  // undirected graph, E >= V means that at least one closed cycle exists.
+  const hasCycle =
+    flow.poweredIndices.size > 0 &&
+    poweredEdgeCount >= flow.poweredIndices.size;
+
+  return {
+    ...flow,
+    targetsPowered,
+    leakCount,
+    poweredEdgeCount,
+    hasCycle,
+    solved: targetsPowered && leakCount === 0 && !hasCycle,
+  };
+}
+
 export function circuitReachesTargets(
   masks: number[],
   rotations: number[],
@@ -121,4 +200,20 @@ export function circuitReachesTargets(
 
   const flow = getCircuitFlow(masks, rotations, width, sourceIndex);
   return targetIndices.every((index) => flow.poweredIndices.has(index));
+}
+
+export function circuitIsSolved(
+  masks: number[],
+  rotations: number[],
+  width: number,
+  sourceIndex: number,
+  targetIndices: number[],
+) {
+  return analyzeCircuit(
+    masks,
+    rotations,
+    width,
+    sourceIndex,
+    targetIndices,
+  ).solved;
 }
