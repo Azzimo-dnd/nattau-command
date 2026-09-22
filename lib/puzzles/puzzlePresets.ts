@@ -189,9 +189,13 @@ function buildCircuitConfig(difficulty: string) {
 
   while (required.size < Math.min(total - 3, desiredRequired)) {
     const frontier = [...required].flatMap((from) =>
-      neighbors(from)
-        .filter((to) => !required.has(to))
-        .map((to) => ({ from, to })),
+      // Keep the north branch as a genuine three-way junction instead of
+      // letting later growth turn it into another cross.
+      from === north
+        ? []
+        : neighbors(from)
+            .filter((to) => !required.has(to))
+            .map((to) => ({ from, to })),
     );
     if (frontier.length === 0) break;
     const edge = frontier[Math.floor(Math.random() * frontier.length)];
@@ -202,7 +206,16 @@ function buildCircuitConfig(difficulty: string) {
   const degree = (mask: number) =>
     [1, 2, 4, 8].reduce((count, bit) => count + (mask & bit ? 1 : 0), 0);
   const leaves = [...required].filter((index) => degree(solvedMasks[index]) === 1);
-  const sourceIndex = leaves[Math.floor(Math.random() * leaves.length)] ?? hub;
+  const sourceCandidates = leaves.filter((index) => {
+    const connectedNeighbor = neighbors(index).find(
+      (neighbor) =>
+        required.has(neighbor) &&
+        (solvedMasks[index] & directionMask(index, neighbor)) !== 0,
+    );
+    return connectedNeighbor != null && connectedNeighbor !== hub;
+  });
+  const sourcePool = sourceCandidates.length > 0 ? sourceCandidates : leaves;
+  const sourceIndex = sourcePool[Math.floor(Math.random() * sourcePool.length)] ?? hub;
   const targetCount =
     normalized === "easy" ? 1 : normalized === "medium" ? 2 : normalized === "hard" ? 3 : 4;
   const targetIndices = shuffle(leaves.filter((index) => index !== sourceIndex))
@@ -247,17 +260,23 @@ function buildCircuitConfig(difficulty: string) {
     );
   }
 
-  // Extremely unlikely fallback: deliberately misorient a required,
-  // non-symmetric conduit if the random board accidentally starts solved.
+  // Deterministic fallback: if decoys accidentally create an alternate solved
+  // route, break the first reciprocal edge after the fixed one-port source.
+  // Because the source has only one opening, this guarantees an unsolved start.
   if (circuitReachesTargets(publicMasks, initialRotations, size, sourceIndex, targetIndices)) {
-    const adjustableRequired = [...required].find(
-      (index) =>
-        !lockedSet.has(index) &&
-        rotateCircuitMask(publicMasks[index], initialRotations[index] + 1) !==
-          rotateCircuitMask(publicMasks[index], initialRotations[index]),
+    const sourceNeighbor = neighbors(sourceIndex).find(
+      (neighbor) =>
+        required.has(neighbor) &&
+        (solvedMasks[sourceIndex] & directionMask(sourceIndex, neighbor)) !== 0,
     );
-    if (adjustableRequired != null) {
-      initialRotations[adjustableRequired] = (initialRotations[adjustableRequired] + 1) % 4;
+    if (sourceNeighbor != null && !lockedSet.has(sourceNeighbor)) {
+      const reciprocalBit = directionMask(sourceNeighbor, sourceIndex);
+      for (let rotation = 0; rotation < 4; rotation += 1) {
+        if ((rotateCircuitMask(publicMasks[sourceNeighbor], rotation) & reciprocalBit) === 0) {
+          initialRotations[sourceNeighbor] = rotation;
+          break;
+        }
+      }
     }
   }
 
