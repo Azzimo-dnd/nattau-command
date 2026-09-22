@@ -47,6 +47,8 @@ const TYPES: PuzzleType[] = [
   "shattered_sigil",
   "arcane_circuit",
   "rune_sequence",
+  "runic_resonance",
+  "astral_weave",
 ];
 
 const DIFFICULTIES = ["Easy", "Medium", "Hard", "Insane"];
@@ -304,7 +306,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
     return true;
   };
 
-  const createFive = async () => {
+  const createAll = async () => {
     setSaving(true);
     setFormError(null);
     setMessage(null);
@@ -332,7 +334,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
         });
         if (error) throw error;
       }
-      setMessage("Created one hidden Medium draft for each of the five puzzle engines.");
+      setMessage("Created one hidden Medium draft for each of the seven puzzle engines.");
       await vault.refresh(true);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Could not create the puzzle set.");
@@ -384,10 +386,10 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => void createFive()}
+                onClick={() => void createAll()}
                 className={`min-h-11 rounded-xl px-4 text-sm font-black disabled:opacity-40 ${barovia ? "bg-[#77263b] text-[#f6e5e9]" : "bg-yellow-500 text-slate-950"}`}
               >
-                Create all 5 drafts
+                Create all 7 drafts
               </button>
             </div>
           </div>
@@ -428,7 +430,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
               ) : null}
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
               {TYPES.map((type) => (
                 <button
                   key={type}
@@ -730,7 +732,7 @@ export function PuzzleWorkshop({ campaignId, campaignSlug, theme = "nattau" }: P
               <div className="h-40 animate-pulse rounded-3xl border border-slate-800 bg-slate-900/60" />
             ) : vault.puzzles.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-slate-700 p-8 text-center text-sm text-slate-500">
-                No templates yet. Save one or create the five-puzzle starter set.
+                No templates yet. Save one or create the seven-puzzle starter set.
               </div>
             ) : (
               vault.puzzles.map((puzzle) => {

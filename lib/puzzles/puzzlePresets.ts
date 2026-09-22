@@ -1,4 +1,6 @@
 import { buildArcaneCircuitConfig } from "./arcaneCircuitGenerator";
+import { buildAstralWeaveConfig } from "./astralWeave";
+import { buildRunicResonanceConfig } from "./runicResonance";
 import { applyPuzzleAtmosphere } from "./puzzleAtmosphere";
 import { BAROVIA_RUNE_IDS } from "./campaignRunes";
 import type { JsonRecord, PuzzlePreset, PuzzleType, PuzzleTheme } from "./puzzleTypes";
@@ -200,6 +202,42 @@ function buildMechanicalPreset(
       attemptLimit: null,
       timeLimitSeconds: null,
       failureMessage: "The lattice overloads and the light dies from every conduit at once.",
+      publicConfig: config.publicConfig,
+      secretConfig: config.secretConfig,
+    };
+  }
+
+  if (type === "runic_resonance") {
+    const config = buildRunicResonanceConfig(difficulty);
+    const runePool = options.theme === "barovia" ? BAROVIA_RUNE_IDS : NATTAU_RUNE_IDS;
+    const size = Number(config.publicConfig.size ?? 4);
+    const total = size * size;
+    return {
+      title: "Runic Resonance",
+      description: "Each rune answers its neighbours. Touch the lattice carefully until every glyph falls silent at once.",
+      difficultyLabel: difficulty,
+      moveLimit: config.solutionMoves,
+      attemptLimit: null,
+      timeLimitSeconds: null,
+      failureMessage: "The lattice surges out of harmony and the runes scream in answer.",
+      publicConfig: {
+        ...config.publicConfig,
+        glyphs: Array.from({ length: total }, (_, index) => runePool[index % runePool.length]),
+      },
+      secretConfig: config.secretConfig,
+    };
+  }
+
+  if (type === "astral_weave") {
+    const config = buildAstralWeaveConfig(difficulty);
+    return {
+      title: "Astral Weave",
+      description: "A dead sky-map waits for its missing threads. Join the numbered stars into one unbroken constellation without crossing the weave.",
+      difficultyLabel: difficulty,
+      moveLimit: config.solutionMoves,
+      attemptLimit: null,
+      timeLimitSeconds: null,
+      failureMessage: "The star-threads knot into an impossible sky and snap into darkness.",
       publicConfig: config.publicConfig,
       secretConfig: config.secretConfig,
     };

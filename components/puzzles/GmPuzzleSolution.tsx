@@ -9,6 +9,8 @@ import type {
 } from "@/lib/puzzles/puzzleTypes";
 import { ArcaneCircuitPuzzle } from "./engines/ArcaneCircuitPuzzle";
 import { ShatteredSigilPuzzle } from "./engines/ShatteredSigilPuzzle";
+import { RunicResonancePuzzle } from "./engines/RunicResonancePuzzle";
+import { AstralWeavePuzzle } from "./engines/AstralWeavePuzzle";
 
 type Props = {
   puzzle: CampaignPuzzleRow;
@@ -40,6 +42,33 @@ export function GmPuzzleSolution({ puzzle, run, solution, onClose }: Props) {
         state: {
           ...run.state,
           order: arrayOfStrings(secret.target_order),
+        },
+      };
+    }
+
+    if (puzzle.puzzle_type === "runic_resonance") {
+      return {
+        ...run,
+        state: {
+          ...run.state,
+          lit: Array.isArray(puzzle.public_config.target_lit)
+            ? puzzle.public_config.target_lit.map(Boolean)
+            : [],
+        },
+      };
+    }
+
+    if (puzzle.puzzle_type === "astral_weave") {
+      return {
+        ...run,
+        state: {
+          ...run.state,
+          bridges:
+            secret.solution_bridges &&
+            typeof secret.solution_bridges === "object" &&
+            !Array.isArray(secret.solution_bridges)
+              ? secret.solution_bridges
+              : {},
         },
       };
     }
@@ -188,6 +217,52 @@ export function GmPuzzleSolution({ puzzle, run, solution, onClose }: Props) {
             Other valid orientations may also solve the circuit. Every anchored target
             must receive power, the live network must have no leaks or feedback loops,
             and spare dark conduits may remain unused.
+          </p>
+        </div>
+      ) : null}
+
+      {puzzle.puzzle_type === "runic_resonance" ? (
+        <div className="mt-4">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+            Silent resonance state
+          </p>
+          <div className="pointer-events-none">
+            <RunicResonancePuzzle
+              puzzle={puzzle}
+              run={solutionRun}
+              disabled
+              onAction={noAction}
+            />
+          </div>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            Verified press sequence: {arrayOfNumbers(secret.solution_presses).map((index) => index + 1).join(" → ") || "—"}
+          </p>
+        </div>
+      ) : null}
+
+      {puzzle.puzzle_type === "astral_weave" ? (
+        <div className="mt-4">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+              Completed star map
+            </p>
+            {typeof secret.constellation_name === "string" ? (
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-200/80">
+                {secret.constellation_name}
+              </p>
+            ) : null}
+          </div>
+          <div className="pointer-events-none">
+            <AstralWeavePuzzle
+              puzzle={puzzle}
+              run={solutionRun}
+              disabled
+              onAction={noAction}
+            />
+          </div>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            This is the generator-verified unique constellation for this variant. The
+            player view does not reveal the real-world motif name while solving.
           </p>
         </div>
       ) : null}

@@ -12,6 +12,8 @@ import { SlidingLockPuzzle } from "./engines/SlidingLockPuzzle";
 import { ShatteredSigilPuzzle } from "./engines/ShatteredSigilPuzzle";
 import { ArcaneCircuitPuzzle } from "./engines/ArcaneCircuitPuzzle";
 import { RuneSequencePuzzle } from "./engines/RuneSequencePuzzle";
+import { RunicResonancePuzzle } from "./engines/RunicResonancePuzzle";
+import { AstralWeavePuzzle } from "./engines/AstralWeavePuzzle";
 
 type Props = {
   puzzle: CampaignPuzzleRow;
@@ -59,6 +61,26 @@ export function PuzzleEngine({
           disabled={disabled}
           onAction={onAction}
           onReveal={onRevealSequence}
+        />
+      );
+      break;
+    case "runic_resonance":
+      engine = (
+        <RunicResonancePuzzle
+          puzzle={puzzle}
+          run={run}
+          disabled={disabled}
+          onAction={onAction}
+        />
+      );
+      break;
+    case "astral_weave":
+      engine = (
+        <AstralWeavePuzzle
+          puzzle={puzzle}
+          run={run}
+          disabled={disabled}
+          onAction={onAction}
         />
       );
       break;
