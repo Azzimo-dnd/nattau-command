@@ -41,8 +41,12 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const errorUrl = new URL("/campaign-invite", request.url);
-  errorUrl.searchParams.set("error", "confirmation_failed");
+  const recoveryFlow = next === "/reset-password";
+  const errorUrl = new URL(recoveryFlow ? "/forgot-password" : "/campaign-invite", request.url);
+  errorUrl.searchParams.set(
+    "error",
+    recoveryFlow ? "recovery_link_invalid" : "confirmation_failed",
+  );
   return NextResponse.redirect(errorUrl, {
     headers: { "Cache-Control": "private, no-store" },
   });
