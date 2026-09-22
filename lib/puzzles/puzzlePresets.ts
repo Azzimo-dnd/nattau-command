@@ -212,7 +212,11 @@ function buildCircuitConfig(difficulty: string) {
         required.has(neighbor) &&
         (solvedMasks[index] & directionMask(index, neighbor)) !== 0,
     );
-    return connectedNeighbor != null && connectedNeighbor !== hub;
+    return (
+      connectedNeighbor != null &&
+      connectedNeighbor !== hub &&
+      solvedMasks[connectedNeighbor] !== 15
+    );
   });
   const sourcePool = sourceCandidates.length > 0 ? sourceCandidates : leaves;
   const sourceIndex = sourcePool[Math.floor(Math.random() * sourcePool.length)] ?? hub;
