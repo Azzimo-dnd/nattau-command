@@ -8,7 +8,6 @@ import { BAROVIA_RUNE_IDS } from "./campaignRunes";
 import type { JsonRecord, PuzzlePreset, PuzzleType, PuzzleTheme } from "./puzzleTypes";
 import { NATTAU_RUNE_IDS } from "./nattauRunes";
 import {
-  buildCircuitPathVariant,
   buildVerifiedSlidingVariant,
   makeVariantId,
 } from "./puzzleVariants";
@@ -358,7 +357,9 @@ function buildMechanicalPreset(
       timeLimitSeconds: null,
       failureMessage: "The carved wards slam into place and the Koru Gate falls silent.",
       publicConfig: config.publicConfig,
-      secretConfig: {},
+      secretConfig: {
+        solution_moves: config.solutionMoves,
+      },
     };
   }
 
