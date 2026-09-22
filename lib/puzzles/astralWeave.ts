@@ -36,13 +36,13 @@ function shuffle<T>(items: T[]) {
 function configForDifficulty(difficulty: string) {
   switch (difficulty.toLowerCase()) {
     case "easy":
-      return { grid: 6, nodes: 7, extraEdges: 0, doubleChance: 0.15, allowance: 7 };
+      return { grid: 6, nodes: 7, extraEdges: 0, minCandidateSurplus: 0, doubleChance: 0.15, allowance: 7 };
     case "hard":
-      return { grid: 8, nodes: 11, extraEdges: 2, doubleChance: 0.36, allowance: 5 };
+      return { grid: 8, nodes: 11, extraEdges: 2, minCandidateSurplus: 2, doubleChance: 0.36, allowance: 5 };
     case "insane":
-      return { grid: 9, nodes: 13, extraEdges: 3, doubleChance: 0.46, allowance: 4 };
+      return { grid: 9, nodes: 13, extraEdges: 3, minCandidateSurplus: 3, doubleChance: 0.46, allowance: 4 };
     default:
-      return { grid: 7, nodes: 9, extraEdges: 1, doubleChance: 0.25, allowance: 6 };
+      return { grid: 7, nodes: 9, extraEdges: 1, minCandidateSurplus: 1, doubleChance: 0.25, allowance: 6 };
   }
 }
 
@@ -394,7 +394,7 @@ export function buildAstralWeaveConfig(
 
     const edges = withCrossings(points, candidateEdges(points));
     if (!candidateGraphConnected(points, edges)) continue;
-    if (edges.length < points.length - 1) continue;
+    if (edges.length < points.length - 1 + cfg.minCandidateSurplus) continue;
 
     const solved = buildSolvedGraph(
       points,
