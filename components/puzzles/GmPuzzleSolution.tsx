@@ -242,9 +242,16 @@ export function GmPuzzleSolution({ puzzle, run, solution, onClose }: Props) {
 
       {puzzle.puzzle_type === "astral_weave" ? (
         <div className="mt-4">
-          <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-            Completed star map
-          </p>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+              Completed star map
+            </p>
+            {typeof secret.constellation_name === "string" ? (
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-200/80">
+                {secret.constellation_name}
+              </p>
+            ) : null}
+          </div>
           <div className="pointer-events-none">
             <AstralWeavePuzzle
               puzzle={puzzle}
@@ -254,7 +261,8 @@ export function GmPuzzleSolution({ puzzle, run, solution, onClose }: Props) {
             />
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-500">
-            This is the generator-verified unique constellation for this variant.
+            This is the generator-verified unique constellation for this variant. The
+            player view does not reveal the real-world motif name while solving.
           </p>
         </div>
       ) : null}
