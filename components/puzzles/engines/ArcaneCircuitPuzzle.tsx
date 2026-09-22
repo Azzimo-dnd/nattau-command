@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, type CSSProperties } from "react";
-import { getCircuitFlow } from "@/lib/puzzles/arcaneCircuit";
+import { analyzeCircuit } from "@/lib/puzzles/arcaneCircuit";
 import type {
   CampaignPuzzleRow,
   CampaignPuzzleRunRow,
@@ -146,9 +146,12 @@ export function ArcaneCircuitPuzzle({
   );
 
   const flow = useMemo(
-    () => getCircuitFlow(masks, rotations, width, sourceIndex),
-    [masks, rotations, sourceIndex, width],
+    () => analyzeCircuit(masks, rotations, width, sourceIndex, targets),
+    [masks, rotations, sourceIndex, targets, width],
   );
+  const poweredTargetCount = targets.filter((index) =>
+    flow.poweredIndices.has(index),
+  ).length;
 
   return (
     <div className="mx-auto max-w-[640px]">
@@ -218,7 +221,17 @@ export function ArcaneCircuitPuzzle({
         </span>
         <span>Source and anchored targets are fixed.</span>
         <span>Tap a free tile to rotate clockwise.</span>
-        <span>Spare conduits may remain dark — only the targets matter.</span>
+        <span>Dark conduits may remain unused.</span>
+        <span>
+          {poweredTargetCount}/{targets.length} targets powered
+        </span>
+        {flow.hasCycle ? (
+          <span className="font-semibold text-amber-300/80">feedback loop detected</span>
+        ) : flow.leakCount > 0 ? (
+          <span className="font-semibold text-amber-300/80">live circuit has an open arc</span>
+        ) : flow.targetsPowered ? (
+          <span className="font-semibold text-emerald-300/80">stable circuit</span>
+        ) : null}
       </div>
 
       <style jsx global>{`
