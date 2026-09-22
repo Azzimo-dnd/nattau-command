@@ -126,40 +126,111 @@ function buildSigilConfig(
 }
 
 function buildCircuitConfig(difficulty: string) {
-  const hard = ["hard", "insane"].includes(difficulty.toLowerCase());
+  const normalized = difficulty.toLowerCase();
+  const hard = normalized === "hard" || normalized === "insane";
   const size = hard ? 5 : 4;
-  const { path, variantId } = buildCircuitPathVariant(size);
-  const masks = Array.from({ length: size * size }, () => 0);
+  const total = size * size;
+  const indexOf = (row: number, col: number) => row * size + col;
+  const coords = (index: number) => [Math.floor(index / size), index % size] as const;
+  const neighbors = (index: number) => {
+    const [row, col] = coords(index);
+    const result: number[] = [];
+    if (row > 0) result.push(indexOf(row - 1, col));
+    if (col < size - 1) result.push(indexOf(row, col + 1));
+    if (row < size - 1) result.push(indexOf(row + 1, col));
+    if (col > 0) result.push(indexOf(row, col - 1));
+    return result;
+  };
   const directionMask = (from: number, to: number) => {
-    const fromRow = Math.floor(from / size);
-    const fromCol = from % size;
-    const toRow = Math.floor(to / size);
-    const toCol = to % size;
+    const [fromRow, fromCol] = coords(from);
+    const [toRow, toCol] = coords(to);
     if (toRow < fromRow) return 1;
     if (toCol > fromCol) return 2;
     if (toRow > fromRow) return 4;
     return 8;
   };
+  const connect = (a: number, b: number, solvedMasks: number[]) => {
+    solvedMasks[a] |= directionMask(a, b);
+    solvedMasks[b] |= directionMask(b, a);
+  };
 
-  for (let index = 0; index < path.length; index += 1) {
-    const current = path[index];
-    if (index > 0) masks[current] |= directionMask(current, path[index - 1]);
-    if (index < path.length - 1) masks[current] |= directionMask(current, path[index + 1]);
+  // Build a connected *subset* of the board rather than a Hamiltonian path.
+  // The solution always contains a four-way hub and at least one T junction;
+  // unused cells become believable decoys and are allowed to remain dark.
+  const interior = Array.from({ length: total }, (_, index) => index).filter((index) => {
+    const [row, col] = coords(index);
+    return row > 0 && col > 0 && row < size - 1 && col < size - 1;
+  });
+  const hub = interior[Math.floor(Math.random() * interior.length)];
+  const [hubRow, hubCol] = coords(hub);
+  const north = indexOf(hubRow - 1, hubCol);
+  const east = indexOf(hubRow, hubCol + 1);
+  const south = indexOf(hubRow + 1, hubCol);
+  const west = indexOf(hubRow, hubCol - 1);
+  const tLeft = indexOf(hubRow - 1, hubCol - 1);
+  const tRight = indexOf(hubRow - 1, hubCol + 1);
+
+  const solvedMasks = Array.from({ length: total }, () => 0);
+  const required = new Set<number>([hub, north, east, south, west, tLeft, tRight]);
+  connect(hub, north, solvedMasks);
+  connect(hub, east, solvedMasks);
+  connect(hub, south, solvedMasks);
+  connect(hub, west, solvedMasks);
+  connect(north, tLeft, solvedMasks);
+  connect(north, tRight, solvedMasks);
+
+  const desiredRequired =
+    normalized === "easy"
+      ? Math.max(9, Math.round(total * 0.58))
+      : normalized === "medium"
+        ? Math.max(10, Math.round(total * 0.65))
+        : normalized === "hard"
+          ? Math.round(total * 0.68)
+          : Math.round(total * 0.72);
+
+  while (required.size < Math.min(total - 3, desiredRequired)) {
+    const frontier = [...required].flatMap((from) =>
+      neighbors(from)
+        .filter((to) => !required.has(to))
+        .map((to) => ({ from, to })),
+    );
+    if (frontier.length === 0) break;
+    const edge = frontier[Math.floor(Math.random() * frontier.length)];
+    required.add(edge.to);
+    connect(edge.from, edge.to, solvedMasks);
   }
 
-  // A full solved path is constructed first, so every generated circuit has a
-  // known valid solution. Public masks are then independently rotated so the
-  // solution cannot be inferred by looking for rotation zero.
-  const baseRotations = masks.map(() => Math.floor(Math.random() * 4));
-  const publicMasks = masks.map((mask, index) => rotateCircuitMask(mask, baseRotations[index]));
-  const sourceIndex = path[0];
-  const targetIndices = [path[path.length - 1]];
-  const lockedIndices = [sourceIndex, ...targetIndices];
-  const lockedSet = new Set(lockedIndices);
-  const solutionRotations = publicMasks.map((mask, index) =>
-    findCircuitRotation(mask, masks[index]),
+  const degree = (mask: number) =>
+    [1, 2, 4, 8].reduce((count, bit) => count + (mask & bit ? 1 : 0), 0);
+  const leaves = [...required].filter((index) => degree(solvedMasks[index]) === 1);
+  const sourceIndex = leaves[Math.floor(Math.random() * leaves.length)] ?? hub;
+  const targetCount =
+    normalized === "easy" ? 1 : normalized === "medium" ? 2 : normalized === "hard" ? 3 : 4;
+  const targetIndices = shuffle(leaves.filter((index) => index !== sourceIndex))
+    .slice(0, Math.min(targetCount, Math.max(1, leaves.length - 1)));
+
+  // Spare tiles intentionally look useful. Some are crosses/Ts, some are bends
+  // and straights. They are not part of the canonical solution and do not need
+  // to be powered for the puzzle to succeed.
+  const decoyShapes = [1, 3, 5, 7, 9, 11, 13, 14, 15];
+  const canonicalMasks = solvedMasks.map((mask, index) =>
+    required.has(index)
+      ? mask
+      : decoyShapes[Math.floor(Math.random() * decoyShapes.length)],
   );
 
+  const baseRotations = canonicalMasks.map(() => Math.floor(Math.random() * 4));
+  const publicMasks = canonicalMasks.map((mask, index) =>
+    rotateCircuitMask(mask, baseRotations[index]),
+  );
+  const solutionRotations = publicMasks.map((mask, index) =>
+    findCircuitRotation(mask, canonicalMasks[index]),
+  );
+
+  // Crosses are rotationally symmetric, so making the central cross clickable
+  // would only burn moves without changing the board.
+  const lockedIndices = [...new Set([sourceIndex, ...targetIndices, hub])];
+  const lockedSet = new Set(lockedIndices);
   let initialRotations = publicMasks.map((_, index) =>
     lockedSet.has(index)
       ? solutionRotations[index]
@@ -168,14 +239,8 @@ function buildCircuitConfig(difficulty: string) {
 
   for (
     let attempt = 0;
-    attempt < 24 &&
-    circuitReachesTargets(
-      publicMasks,
-      initialRotations,
-      size,
-      sourceIndex,
-      targetIndices,
-    );
+    attempt < 40 &&
+    circuitReachesTargets(publicMasks, initialRotations, size, sourceIndex, targetIndices);
     attempt += 1
   ) {
     initialRotations = initialRotations.map((rotation, index) =>
@@ -183,40 +248,40 @@ function buildCircuitConfig(difficulty: string) {
     );
   }
 
-  if (
-    circuitReachesTargets(
-      publicMasks,
-      initialRotations,
-      size,
-      sourceIndex,
-      targetIndices,
-    )
-  ) {
-    const adjustableIndex = publicMasks.findIndex(
-      (mask, index) =>
+  // Extremely unlikely fallback: deliberately misorient a required,
+  // non-symmetric conduit if the random board accidentally starts solved.
+  if (circuitReachesTargets(publicMasks, initialRotations, size, sourceIndex, targetIndices)) {
+    const adjustableRequired = [...required].find(
+      (index) =>
         !lockedSet.has(index) &&
-        rotateCircuitMask(mask, initialRotations[index] + 1) !==
-          rotateCircuitMask(mask, initialRotations[index]),
+        rotateCircuitMask(publicMasks[index], initialRotations[index] + 1) !==
+          rotateCircuitMask(publicMasks[index], initialRotations[index]),
     );
-    if (adjustableIndex >= 0) {
-      initialRotations[adjustableIndex] =
-        (initialRotations[adjustableIndex] + 1) % 4;
+    if (adjustableRequired != null) {
+      initialRotations[adjustableRequired] = (initialRotations[adjustableRequired] + 1) % 4;
     }
   }
 
-  const clockwiseDistance = publicMasks.reduce((sum, mask, index) => {
+  const canonicalClockwiseDistance = [...required].reduce((sum, index) => {
     if (lockedSet.has(index)) return sum;
-
+    const mask = publicMasks[index];
     for (let steps = 0; steps < 4; steps += 1) {
       if (
-        rotateCircuitMask(mask, initialRotations[index] + steps) === masks[index]
+        rotateCircuitMask(mask, initialRotations[index] + steps) === canonicalMasks[index]
       ) {
         return sum + steps;
       }
     }
-
-    return sum + 3;
+    return sum;
   }, 0);
+
+  const variantId = freshPublicVariantId("circuit-tree", difficulty, [
+    size,
+    hub,
+    sourceIndex,
+    ...targetIndices,
+    ...canonicalMasks,
+  ]);
 
   return {
     publicConfig: {
@@ -227,15 +292,20 @@ function buildCircuitConfig(difficulty: string) {
       source_index: sourceIndex,
       target_indices: targetIndices,
       locked_indices: lockedIndices,
-      variant_id: `${variantId}-${makeVariantId("rot", initialRotations)}`,
-      generation_rule: "known-solved-path-then-rotation-scramble",
+      variant_id: variantId,
+      required_tile_count: required.size,
+      decoy_tile_count: total - required.size,
+      generation_rule: "branched-required-network-with-optional-decoys",
       legend:
-        "Rotate the free conduits until the live current reaches every anchored destination.",
+        "Power every anchored destination. Dark spare conduits may be decoys; the whole board does not need to light up.",
     } satisfies JsonRecord,
     secretConfig: {
-      target_masks: masks,
+      target_masks: canonicalMasks,
+      solution_rotations: solutionRotations,
+      required_indices: [...required],
+      hub_index: hub,
     } satisfies JsonRecord,
-    scrambleMoves: clockwiseDistance,
+    scrambleMoves: canonicalClockwiseDistance,
   };
 }
 
