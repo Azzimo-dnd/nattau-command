@@ -3,7 +3,9 @@ export type PuzzleType =
   | "sliding_lock"
   | "shattered_sigil"
   | "arcane_circuit"
-  | "rune_sequence";
+  | "rune_sequence"
+  | "runic_resonance"
+  | "astral_weave";
 
 export type PuzzleLifecycleStatus =
   | "draft"
@@ -101,4 +103,6 @@ export const PUZZLE_TYPE_LABELS: Record<PuzzleType, string> = {
   shattered_sigil: "Shattered Sigil",
   arcane_circuit: "Arcane Circuit",
   rune_sequence: "Rune Sequence",
+  runic_resonance: "Runic Resonance",
+  astral_weave: "Astral Weave",
 };
