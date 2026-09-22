@@ -51,6 +51,7 @@ export type CampaignPuzzleRunRow = {
   state: JsonRecord;
   move_count: number;
   attempt_count: number;
+  move_limit_override?: number | null;
   started_at: string;
   deadline_at: string | null;
   solved_at: string | null;
