@@ -86,15 +86,31 @@ function isSlidingSolved(blocks: SlidingBlock[]) {
   return Boolean(target && target.y === EXIT_ROW && target.x + target.w === WIDTH);
 }
 
+export type SlidingSolutionMove = {
+  block_id: string;
+  direction: "left" | "right" | "up" | "down";
+  distance: number;
+};
+
 function legalSlidingStates(blocks: SlidingBlock[]) {
-  const states: SlidingBlock[][] = [];
+  const states: Array<{ blocks: SlidingBlock[]; move: SlidingSolutionMove }> = [];
   for (let index = 0; index < blocks.length; index += 1) {
     const block = blocks[index];
-    const directions: Array<[number, number]> = block.axis === "h"
-      ? [[-1, 0], [1, 0]]
-      : [[0, -1], [0, 1]];
+    const directions: Array<{
+      dx: number;
+      dy: number;
+      direction: SlidingSolutionMove["direction"];
+    }> = block.axis === "h"
+      ? [
+          { dx: -1, dy: 0, direction: "left" },
+          { dx: 1, dy: 0, direction: "right" },
+        ]
+      : [
+          { dx: 0, dy: -1, direction: "up" },
+          { dx: 0, dy: 1, direction: "down" },
+        ];
 
-    for (const [dx, dy] of directions) {
+    for (const { dx, dy, direction } of directions) {
       for (let distance = 1; distance <= Math.max(WIDTH, HEIGHT); distance += 1) {
         const x = block.x + dx * distance;
         const y = block.y + dy * distance;
@@ -102,32 +118,50 @@ function legalSlidingStates(blocks: SlidingBlock[]) {
         const next = blocks.map((item) => ({ ...item }));
         next[index].x = x;
         next[index].y = y;
-        states.push(next);
+        states.push({
+          blocks: next,
+          move: { block_id: block.id, direction, distance },
+        });
       }
     }
   }
   return states;
 }
 
-export function solveSlidingLockMinimumMoves(initial: SlidingBlock[], maxDepth = 10) {
-  const queue: Array<{ blocks: SlidingBlock[]; depth: number }> = [{ blocks: initial, depth: 0 }];
+export function solveSlidingLock(initial: SlidingBlock[], maxDepth = 10) {
+  const queue: Array<{
+    blocks: SlidingBlock[];
+    path: SlidingSolutionMove[];
+  }> = [{ blocks: initial, path: [] }];
   const seen = new Set([stateKey(initial)]);
   let cursor = 0;
 
   while (cursor < queue.length) {
     const current = queue[cursor++];
-    if (isSlidingSolved(current.blocks)) return current.depth;
-    if (current.depth >= maxDepth) continue;
+    if (isSlidingSolved(current.blocks)) {
+      return {
+        minimumMoves: current.path.length,
+        moves: current.path,
+      };
+    }
+    if (current.path.length >= maxDepth) continue;
 
     for (const next of legalSlidingStates(current.blocks)) {
-      const key = stateKey(next);
+      const key = stateKey(next.blocks);
       if (seen.has(key)) continue;
       seen.add(key);
-      queue.push({ blocks: next, depth: current.depth + 1 });
+      queue.push({
+        blocks: next.blocks,
+        path: [...current.path, next.move],
+      });
     }
   }
 
   return null;
+}
+
+export function solveSlidingLockMinimumMoves(initial: SlidingBlock[], maxDepth = 10) {
+  return solveSlidingLock(initial, maxDepth)?.minimumMoves ?? null;
 }
 
 function materializeVariant(variant: SlidingVariant) {
@@ -154,7 +188,8 @@ export function buildVerifiedSlidingVariant(difficulty: string) {
   lastSlidingVariantByBucket.set(bucket, variant.id);
 
   const blocks = materializeVariant(variant);
-  const verifiedMinimum = solveSlidingLockMinimumMoves(blocks, 10);
+  const verifiedSolution = solveSlidingLock(blocks, 10);
+  const verifiedMinimum = verifiedSolution?.minimumMoves ?? null;
 
   if (verifiedMinimum !== variant.minimumMoves) {
     throw new Error(
@@ -175,6 +210,7 @@ export function buildVerifiedSlidingVariant(difficulty: string) {
       blocks,
     } satisfies JsonRecord,
     minimumMoves: verifiedMinimum,
+    solutionMoves: verifiedSolution?.moves ?? [],
     variantId: variant.id,
   };
 }
