@@ -70,12 +70,13 @@ export function PuzzleEngine({
       );
   }
 
+  const effectiveMoveLimit = run.move_limit_override ?? puzzle.move_limit;
   const movesLabel =
     run.status === "solved" || run.status === "failed"
       ? `${run.move_count} used`
-      : puzzle.move_limit == null
+      : effectiveMoveLimit == null
         ? `${run.move_count} used · ∞`
-        : `${Math.max(0, puzzle.move_limit - run.move_count)} moves left`;
+        : `${Math.max(0, effectiveMoveLimit - run.move_count)} moves left`;
 
   return (
     <PuzzleFocusFrame theme={String(puzzle.public_config.campaign_theme ?? "nattau")} title={puzzle.title} status={run.status} movesLabel={movesLabel}>
