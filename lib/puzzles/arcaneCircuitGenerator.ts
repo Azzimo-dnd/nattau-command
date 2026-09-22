@@ -14,6 +14,7 @@ const DIRECTIONS = [
 ] as const;
 
 type Edge = [number, number];
+type DirectionBit = 1 | 2 | 4 | 8;
 
 type CircuitDifficulty = {
   size: number;
@@ -205,15 +206,15 @@ function selectSpreadTerminals(
 
     // Keeping a little randomness among equally good remote leaves avoids
     // producing the same visual skeleton over and over.
-    const bestDistance = candidates[0]?.minDistance;
+    if (candidates.length === 0) return null;
+    const bestDistance = candidates[0].minDistance;
     const remotePool = candidates
       .filter((candidate) => candidate.minDistance >= bestDistance - 1)
       .slice(0, 4);
 
     if (remotePool.length === 0) return null;
-    selected.push(
-      remotePool[Math.floor(Math.random() * remotePool.length)].leaf,
-    );
+    const chosen = remotePool[Math.floor(Math.random() * remotePool.length)];
+    selected.push(chosen.leaf);
   }
 
   return selected;
@@ -302,7 +303,7 @@ function chooseDecoyMask(index: number, size: number) {
         ? Math.random() < 0.74 ? 2 : 3
         : Math.random() < 0.58 ? 2 : Math.random() < 0.82 ? 3 : 4;
 
-  let choices = shuffle(availableBits).slice(0, degree);
+  let choices: number[] = shuffle(availableBits).slice(0, degree);
 
   if (degree === 2 && maxDegree === 4) {
     const oppositePairs = [[1, 4], [2, 8]];
