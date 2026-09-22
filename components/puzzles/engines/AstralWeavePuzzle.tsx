@@ -57,7 +57,6 @@ export function AstralWeavePuzzle({
   disabled: boolean;
   onAction: (action: JsonRecord) => Promise<unknown>;
 }) {
-  const grid = Math.max(2, Number(puzzle.public_config.grid_size ?? 7));
   const nodes = useMemo(
     () => parseNodes(puzzle.public_config.nodes),
     [puzzle.public_config.nodes],
@@ -101,7 +100,7 @@ export function AstralWeavePuzzle({
   }, [bridges, edges]);
 
   const position = (value: number) =>
-    8 + (Math.max(0, Math.min(grid - 1, value)) / (grid - 1)) * 84;
+    8 + Math.max(0, Math.min(1, value)) * 84;
 
   const setCount = (edge: AstralEdge, delta: 1 | -1) => {
     if (disabled) return;
@@ -239,13 +238,15 @@ export function AstralWeavePuzzle({
             const current = degreeByNode.get(node.id) ?? 0;
             const complete = current === node.required;
             const over = current > node.required;
+            const brightness = Math.max(0.6, Math.min(1.5, Number(node.brightness ?? 1)));
+            const starRadius = 4 + (brightness - 0.6) * 1.2;
 
             return (
               <g key={node.id} pointerEvents="none">
                 <circle
                   cx={x}
                   cy={y}
-                  r="4.5"
+                  r={starRadius}
                   fill={
                     over
                       ? "rgba(76,5,25,0.96)"
@@ -266,8 +267,9 @@ export function AstralWeavePuzzle({
                 <circle
                   cx={x}
                   cy={y}
-                  r="1.15"
-                  fill="rgba(255,255,255,0.94)"
+                  r={0.75 + brightness * 0.42}
+                  fill="rgba(255,255,255,0.96)"
+                  filter="url(#astral-glow)"
                 />
                 <text
                   x={x}
