@@ -32,6 +32,7 @@ export function usePuzzleRoom({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastPreview, setLastPreview] = useState<JsonRecord | null>(null);
+  const [gmSolution, setGmSolution] = useState<JsonRecord | null>(null);
   const roomChannelRef = useRef<RealtimeChannel | null>(null);
 
   const load = useCallback(async (quiet = false) => {
@@ -72,7 +73,7 @@ export function usePuzzleRoom({
     const { data: runData, error: runError } = await supabase
       .from("campaign_puzzle_runs")
       .select(
-        "id,puzzle_id,campaign_id,status,state,move_count,attempt_count,started_at,deadline_at,solved_at,failed_at,solved_by_user_id,solved_by_name,controller_user_id,controller_name,control_expires_at,version,updated_at"
+        "id,puzzle_id,campaign_id,status,state,move_count,attempt_count,move_limit_override,started_at,deadline_at,solved_at,failed_at,solved_by_user_id,solved_by_name,controller_user_id,controller_name,control_expires_at,version,updated_at"
       )
       .eq("id", nextPuzzle.current_run_id)
       .maybeSingle();
@@ -235,13 +236,42 @@ export function usePuzzleRoom({
   }, [load, run]);
 
   useEffect(() => {
-    if (!run || run.controller_user_id !== currentUserId || run.status !== "active") return;
-    const interval = window.setInterval(async () => {
+    if (!run?.id || run.controller_user_id !== currentUserId || run.status !== "active") return;
+
+    let cancelled = false;
+    const runId = run.id;
+
+    const renewControl = async () => {
       const supabase = createClient();
-      await supabase.rpc("heartbeat_campaign_puzzle_control", { p_run_id: run.id });
-    }, 15000);
-    return () => window.clearInterval(interval);
-  }, [currentUserId, run]);
+      const { data, error: heartbeatError } = await supabase.rpc(
+        "heartbeat_campaign_puzzle_control",
+        { p_run_id: runId },
+      );
+
+      if (cancelled) return;
+      if (heartbeatError || data !== true) {
+        await load(true);
+      }
+    };
+
+    // Renew immediately. The previous implementation waited 15 seconds, while
+    // the 12-second fallback refresh replaced the run object and restarted this
+    // effect before the heartbeat could ever fire.
+    void renewControl();
+    const interval = window.setInterval(() => void renewControl(), 15000);
+    const onWake = () => {
+      if (document.visibilityState === "visible") void renewControl();
+    };
+    window.addEventListener("focus", onWake);
+    document.addEventListener("visibilitychange", onWake);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onWake);
+      document.removeEventListener("visibilitychange", onWake);
+    };
+  }, [currentUserId, load, run?.controller_user_id, run?.id, run?.status]);
 
   useEffect(() => {
     if (!run?.deadline_at || run.status !== "active") return;
@@ -256,6 +286,44 @@ export function usePuzzleRoom({
     return () => window.clearInterval(timeout);
   }, [load, run?.deadline_at, run?.id, run?.status]);
 
+  const adjustMoveLimit = useCallback(async (delta: number) => {
+    if (!run || role !== "dm" || !Number.isInteger(delta) || delta === 0) return false;
+    setBusy(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: rpcError } = await supabase.rpc("adjust_campaign_puzzle_move_limit", {
+      p_run_id: run.id,
+      p_delta: delta,
+    });
+    setBusy(false);
+    if (rpcError) {
+      setError(rpcError.message);
+      return false;
+    }
+    await load(true);
+    return true;
+  }, [load, role, run]);
+
+  const revealSolution = useCallback(async () => {
+    if (!run || role !== "dm") return null;
+    setBusy(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: rpcError } = await supabase.rpc("get_campaign_puzzle_solution", {
+      p_run_id: run.id,
+    });
+    setBusy(false);
+    if (rpcError) {
+      setError(rpcError.message);
+      return null;
+    }
+    const solution = (data ?? null) as JsonRecord | null;
+    setGmSolution(solution);
+    return solution;
+  }, [role, run]);
+
+  const hideSolution = useCallback(() => setGmSolution(null), []);
+
   const hasControl = useMemo(
     () => Boolean(run && run.status === "active" && run.controller_user_id === currentUserId),
     [currentUserId, run]
@@ -269,12 +337,16 @@ export function usePuzzleRoom({
     busy,
     error,
     lastPreview,
+    gmSolution,
     hasControl,
     refresh: load,
     takeControl,
     releaseControl,
     applyAction,
     revealSequence,
+    adjustMoveLimit,
+    revealSolution,
+    hideSolution,
     sendPreview,
   };
 }

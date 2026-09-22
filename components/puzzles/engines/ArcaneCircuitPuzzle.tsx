@@ -216,8 +216,9 @@ export function ArcaneCircuitPuzzle({
           <i className="inline-block h-[4px] w-8 rounded-full bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.85)]" />
           live current
         </span>
-        <span>Source and target are fixed.</span>
+        <span>Source and anchored targets are fixed.</span>
         <span>Tap a free tile to rotate clockwise.</span>
+        <span>Spare conduits may remain dark — only the targets matter.</span>
       </div>
 
       <style jsx global>{`

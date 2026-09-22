@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PUZZLE_TYPE_LABELS, type PuzzleTheme } from "@/lib/puzzles/puzzleTypes";
+import { GmPuzzleSolution } from "./GmPuzzleSolution";
 import { PuzzleEngine } from "./PuzzleEngine";
 import { usePuzzleRoom } from "./usePuzzleRoom";
 
@@ -115,7 +116,10 @@ export function PuzzleRoom({
         role === "dm")
   );
   const deadlineMs = run?.deadline_at ? new Date(run.deadline_at).getTime() - now : null;
-  const movesRemaining = puzzle.move_limit == null || !run ? null : Math.max(0, puzzle.move_limit - run.move_count);
+  const effectiveMoveLimit = run?.move_limit_override ?? puzzle.move_limit;
+  const movesRemaining = effectiveMoveLimit == null || !run
+    ? null
+    : Math.max(0, effectiveMoveLimit - run.move_count);
   const attemptsRemaining = puzzle.attempt_limit == null || !run ? null : Math.max(0, puzzle.attempt_limit - run.attempt_count);
   const preview = previewLabel(room.lastPreview);
 
@@ -175,9 +179,9 @@ export function PuzzleRoom({
               <p className="mt-1 text-xl font-black text-slate-100">
                 {run.status === "solved" || run.status === "failed"
                   ? `${run.move_count} ${run.move_count === 1 ? "move" : "moves"} used`
-                  : puzzle.move_limit == null
+                  : effectiveMoveLimit == null
                     ? `${run.move_count} used · ∞`
-                    : `${movesRemaining} / ${puzzle.move_limit} left`}
+                    : `${movesRemaining} / ${effectiveMoveLimit} left`}
               </p>
             </div>
             <div className={`rounded-2xl border px-4 py-3 ${barovia ? "border-[#3e252e] bg-[#130d11]" : "border-slate-800 bg-slate-900/70"}`}>
@@ -258,6 +262,74 @@ export function PuzzleRoom({
                 ) : null}
               </div>
             </div>
+
+            {role === "dm" && run.status === "active" ? (
+              <div className="mb-5 rounded-2xl border border-fuchsia-400/20 bg-fuchsia-950/10 p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-fuchsia-300/70">
+                      GM live controls
+                    </p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Adjust this run without changing the reusable puzzle template or falsifying its move history.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {effectiveMoveLimit != null ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={room.busy || effectiveMoveLimit <= run.move_count + 1}
+                          onClick={() => void room.adjustMoveLimit(-1)}
+                          className="min-h-10 rounded-xl border border-slate-700 px-3 text-xs font-black text-slate-300 disabled:opacity-30"
+                        >
+                          −1 move
+                        </button>
+                        <button
+                          type="button"
+                          disabled={room.busy}
+                          onClick={() => void room.adjustMoveLimit(1)}
+                          className="min-h-10 rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 text-xs font-black text-fuchsia-200 disabled:opacity-30"
+                        >
+                          +1 move
+                        </button>
+                        <button
+                          type="button"
+                          disabled={room.busy}
+                          onClick={() => void room.adjustMoveLimit(5)}
+                          className="min-h-10 rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 text-xs font-black text-fuchsia-200 disabled:opacity-30"
+                        >
+                          +5 moves
+                        </button>
+                      </>
+                    ) : (
+                      <span className="inline-flex min-h-10 items-center rounded-xl border border-slate-800 px-3 text-xs text-slate-500">
+                        Unlimited moves
+                      </span>
+                    )}
+                    {!room.gmSolution ? (
+                      <button
+                        type="button"
+                        disabled={room.busy}
+                        onClick={() => void room.revealSolution()}
+                        className="min-h-10 rounded-xl bg-fuchsia-500 px-4 text-xs font-black text-white disabled:opacity-40"
+                      >
+                        Show solution
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {role === "dm" && room.gmSolution ? (
+              <GmPuzzleSolution
+                puzzle={puzzle}
+                run={run}
+                solution={room.gmSolution}
+                onClose={room.hideSolution}
+              />
+            ) : null}
 
             <PuzzleEngine
               key={run.id}
