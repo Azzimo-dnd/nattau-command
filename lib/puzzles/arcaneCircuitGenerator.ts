@@ -54,18 +54,23 @@ function configForDifficulty(difficulty: string): CircuitDifficulty {
     case "hard":
       return {
         size: 6,
-        terminalCount: 5,
+        // SOURCE + 5 TARGETS. A tree with a four-way cross needs enough
+        // terminal leaves to support three distinct branching vertices:
+        // L = 2 + Σ(degree - 2).
+        terminalCount: 6,
         minRequired: 19,
-        maxRequired: 28,
+        maxRequired: 29,
         minBranches: 3,
         requireCross: true,
       };
     case "insane":
       return {
         size: 6,
-        terminalCount: 6,
-        minRequired: 21,
-        maxRequired: 30,
+        // SOURCE + 6 TARGETS. Seven leaves can support one degree-4 cross
+        // plus three degree-3 junctions, so four branch vertices are possible.
+        terminalCount: 7,
+        minRequired: 22,
+        maxRequired: 31,
         minBranches: 4,
         requireCross: true,
       };
