@@ -655,7 +655,11 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     [runtimeCharacter]
   );
   const actionCharacter = useMemo(
-    () => ({ ...runtimeCharacter, ...effectiveSnapshot(effectResult) }),
+    () => ({
+      ...runtimeCharacter,
+      ...effectiveSnapshot(effectResult),
+      consumable_clear_bonus: effectResult.stats.consumable_clear_bonus,
+    }),
     [runtimeCharacter, effectResult]
   );
   const actionSources = useMemo(
@@ -741,6 +745,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const runtimePayload: Record<string, unknown> = {};
     for (const key of [
       "effect_state",
+      "special_resources",
       "weapons",
       "armor",
       "inventory",
@@ -790,7 +795,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       return;
     }
 
-    const calculated = deriveDaggerheartStats(draft);
+    const calculated = deriveDaggerheartStats({
+      ...draft,
+      intrinsic_sources: selectedIntrinsicSources,
+    });
     const snapshot = effectiveSnapshot(calculated);
     if (snapshot.major_threshold > snapshot.severe_threshold) {
       setMessage("Major threshold cannot be higher than Severe threshold.");
