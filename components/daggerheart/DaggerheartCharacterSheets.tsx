@@ -69,6 +69,7 @@ type GearItem = {
   actions?: DaggerheartAction[];
   equipped?: boolean;
   quantity?: number;
+  marked_slots?: number;
 };
 type Advancement = { level: number; choice: string };
 type Resource = { name: string; current: number; max: number; notes: string };
@@ -385,6 +386,7 @@ function gearFromCompendium(
     actions: entry.actions ?? [],
     equipped,
     quantity: 1,
+    marked_slots: entry.category === "armor" ? 0 : undefined,
   };
 }
 
@@ -396,6 +398,21 @@ function addEquippedGear(
     item.category === entry.category ? { ...item, equipped: false } : item
   );
   return [...next, gearFromCompendium(entry, true)];
+}
+
+function syncEquippedArmorMarks(armor: GearItem[], markedSlots: number) {
+  return armor.map((item) =>
+    item.equipped !== false && item.category === "armor"
+      ? { ...item, marked_slots: Math.max(0, markedSlots) }
+      : item
+  );
+}
+
+function equippedArmorMarks(armor: GearItem[]) {
+  return (
+    armor.find((item) => item.category === "armor" && item.equipped !== false)
+      ?.marked_slots ?? 0
+  );
 }
 
 function characterCompendiumIds(character: CharacterRow) {
@@ -1281,6 +1298,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     }
 
     const nextPatch: Partial<CharacterRow> = { ...resolution.patch };
+    if (typeof resolution.patch.armor_slots_current === "number") {
+      nextPatch.armor = syncEquippedArmorMarks(
+        draftRef.current.armor,
+        resolution.patch.armor_slots_current
+      );
+    }
     const consume = resolution.consume_quantity ?? 0;
 
     if (
@@ -1691,7 +1714,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                   min={0}
                   max={effectResult.stats.armor_slots_max}
                   value={draft.armor_slots_current}
-                  onChange={(armor_slots_current) => patch({ armor_slots_current })}
+                  onChange={(armor_slots_current) =>
+                    patch({
+                      armor_slots_current,
+                      armor: syncEquippedArmorMarks(
+                        draft.armor,
+                        armor_slots_current
+                      ),
+                    })
+                  }
                 />
               </div>
             </div>
@@ -1909,7 +1940,17 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     }
                   />
                 </div>
-                <GearEditor value={draft.armor} onChange={(armor) => patch({ armor })} addLabel="Custom armor" equipMode="exclusive-category" />
+                <GearEditor
+                  value={draft.armor}
+                  onChange={(armor) =>
+                    patch({
+                      armor,
+                      armor_slots_current: equippedArmorMarks(armor),
+                    })
+                  }
+                  addLabel="Custom armor"
+                  equipMode="exclusive-category"
+                />
               </div>
               <div>
                 <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Inventory / Loot</p>
