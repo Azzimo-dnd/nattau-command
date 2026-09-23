@@ -66,8 +66,6 @@ export type DaggerheartBaseStats = {
   hp_max: number;
   stress_max: number;
   armor_score: number;
-  armor_slots_current: number;
-  armor_slots_max: number;
   major_threshold: number;
   severe_threshold: number;
   domain_loadout_max: number;
@@ -138,6 +136,8 @@ export type DaggerheartEffectCharacter = {
   hope_max: number;
   hp_max: number;
   armor_score: number;
+  armor_slots_current: number;
+  armor_slots_max: number;
   major_threshold: number;
   severe_threshold: number;
 };
