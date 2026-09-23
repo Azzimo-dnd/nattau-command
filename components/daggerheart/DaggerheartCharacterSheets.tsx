@@ -900,15 +900,20 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     });
   }
 
-  function toggleEffect(effectKey: string) {
+  function toggleEffects(effectKeys: string[]) {
     const active = new Set(draft.effect_state?.active_effect_ids ?? []);
     const values = { ...(draft.effect_state?.active_effect_values ?? {}) };
-    if (active.has(effectKey)) {
-      active.delete(effectKey);
-      delete values[effectKey];
-    } else {
-      active.add(effectKey);
+    const allActive = effectKeys.every((effectKey) => active.has(effectKey));
+
+    for (const effectKey of effectKeys) {
+      if (allActive) {
+        active.delete(effectKey);
+        delete values[effectKey];
+      } else {
+        active.add(effectKey);
+      }
     }
+
     void persistRuntimePatch({
       effect_state: {
         ...draft.effect_state,
@@ -1172,7 +1177,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               manualModifiers={draft.manual_stat_modifiers}
               effectState={draft.effect_state}
               onManualModifierChange={setManualModifier}
-              onToggleEffect={toggleEffect}
+              onToggleEffects={toggleEffects}
             />
           </Section>
 
