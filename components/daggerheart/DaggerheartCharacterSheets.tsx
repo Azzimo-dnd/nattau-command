@@ -233,6 +233,62 @@ function addEquippedGear(
   return [...next, gearFromCompendium(entry, true)];
 }
 
+function characterCompendiumIds(character: CharacterRow) {
+  return [
+    ...character.weapons.map((item) => item.compendium_id),
+    ...character.armor.map((item) => item.compendium_id),
+    ...character.inventory.map((item) => item.compendium_id),
+    ...character.domain_cards.map((card) => card.compendium_id),
+  ].filter((id): id is string => Boolean(id));
+}
+
+function hydrateCharacterCompendium(
+  character: CharacterRow,
+  entries: Map<string, DaggerheartCompendiumEntry>
+): CharacterRow {
+  const hydrateGear = (item: GearItem): GearItem => {
+    if (!item.compendium_id) return item;
+    const entry = entries.get(item.compendium_id);
+    if (!entry) return item;
+    return {
+      ...item,
+      name: entry.name,
+      details: compendiumEntryDetails(entry),
+      category: entry.category,
+      slug: entry.slug,
+      source_key: entry.source_key,
+      tier: entry.tier,
+      metadata: compendiumEffectiveMetadata(entry),
+      effects: entry.effects ?? [],
+      actions: entry.actions ?? [],
+    };
+  };
+
+  const hydrateCard = (card: DomainCard): DomainCard => {
+    if (!card.compendium_id) return card;
+    const entry = entries.get(card.compendium_id);
+    if (!entry) return card;
+    return {
+      ...card,
+      name: entry.name,
+      domain: entry.domain ?? card.domain,
+      level: entry.level ?? card.level,
+      slug: entry.slug,
+      source_key: entry.source_key,
+      effects: entry.effects ?? [],
+      actions: entry.actions ?? [],
+    };
+  };
+
+  return {
+    ...character,
+    weapons: character.weapons.map(hydrateGear),
+    armor: character.armor.map(hydrateGear),
+    inventory: character.inventory.map(hydrateGear),
+    domain_cards: character.domain_cards.map(hydrateCard),
+  };
+}
+
 function Section({
   title,
   subtitle,
@@ -479,7 +535,29 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     }
 
     const nextRoster = (rosterResult.data ?? []) as RosterRow[];
-    const nextCharacters = (characterResult.data ?? []) as CharacterRow[];
+    let nextCharacters = (characterResult.data ?? []) as CharacterRow[];
+
+    const compendiumIds = [
+      ...new Set(nextCharacters.flatMap(characterCompendiumIds)),
+    ];
+    if (compendiumIds.length > 0) {
+      const compendiumResult = await supabase
+        .from("daggerheart_compendium_entries")
+        .select("*")
+        .in("id", compendiumIds);
+
+      if (!compendiumResult.error) {
+        const byId = new Map(
+          ((compendiumResult.data ?? []) as DaggerheartCompendiumEntry[]).map(
+            (entry) => [entry.id, entry]
+          )
+        );
+        nextCharacters = nextCharacters.map((character) =>
+          hydrateCharacterCompendium(character, byId)
+        );
+      }
+    }
+
     setRoster(nextRoster);
     setCharacters(nextCharacters);
 
