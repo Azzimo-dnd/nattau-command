@@ -30,6 +30,7 @@ import { DaggerheartCharacterCreationWizard } from "@/components/daggerheart/Dag
 import type { HeritageState } from "@/components/daggerheart/DaggerheartHeritageBuilder";
 import {
   classOption,
+  subclassCompendiumSlug,
   daggerheartAncestries,
   daggerheartClasses,
   daggerheartCommunities,
@@ -718,7 +719,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     return intrinsicCatalog
       .filter((entry) => {
         if (entry.category === "class") return entry.slug === draft.class_key;
-        if (entry.category === "subclass") return entry.slug === draft.subclass_key;
+        if (entry.category === "subclass") {
+          return entry.slug === subclassCompendiumSlug(draft.subclass_key);
+        }
         if (entry.category === "community") return entry.name === draft.community_key;
         if (entry.category === "transformation") return draft.transformations.includes(entry.name);
         if (entry.category === "ancestry") return ancestryNames.includes(entry.name);
