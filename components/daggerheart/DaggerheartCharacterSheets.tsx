@@ -507,6 +507,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const supabase = useMemo(() => createClient(), []);
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [characters, setCharacters] = useState<CharacterRow[]>([]);
+  const [intrinsicCatalog, setIntrinsicCatalog] = useState<DaggerheartCompendiumEntry[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState(currentUserId);
   const [draft, setDraft] = useState<CharacterRow>(() => emptyCharacter(campaignId, currentUserId));
   const [loading, setLoading] = useState(true);
@@ -518,7 +519,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const load = useCallback(async () => {
     setLoading(true);
     setMessage(null);
-    const [rosterResult, characterResult] = await Promise.all([
+    const [rosterResult, characterResult, intrinsicResult] = await Promise.all([
       supabase.rpc("list_daggerheart_character_roster", { p_campaign_id: campaignId }),
       supabase
         .from("daggerheart_characters")
@@ -526,6 +527,11 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         .eq("campaign_id", campaignId)
         .eq("is_active", true)
         .order("created_at", { ascending: true }),
+      supabase
+        .from("daggerheart_compendium_entries")
+        .select("*")
+        .eq("is_active", true)
+        .in("category", ["class", "subclass", "ancestry", "community", "transformation"]),
     ]);
 
     if (rosterResult.error) {
@@ -538,6 +544,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       setLoading(false);
       return;
     }
+    if (intrinsicResult.error) {
+      setMessage(intrinsicResult.error.message);
+      setLoading(false);
+      return;
+    }
+
+    setIntrinsicCatalog((intrinsicResult.data ?? []) as DaggerheartCompendiumEntry[]);
 
     const nextRoster = (rosterResult.data ?? []) as RosterRow[];
     let nextCharacters = (characterResult.data ?? []) as CharacterRow[];
@@ -592,10 +605,55 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     setDraft((current) => ({ ...current, ...patchValue }));
   }, []);
 
-  const effectResult = useMemo(() => deriveDaggerheartStats(draft), [draft]);
+  const selectedIntrinsicSources = useMemo(() => {
+    const ancestryFeatures = draft.heritage_state?.mixed
+      ? [draft.heritage_state.feature_one, draft.heritage_state.feature_two]
+          .filter(Boolean)
+          .map((item) => ({ ancestry: item?.ancestry ?? "", feature: item?.name ?? "" }))
+      : [];
+    const ancestryNames = draft.heritage_state?.mixed
+      ? [...new Set(ancestryFeatures.map((item) => item.ancestry).filter(Boolean))]
+      : draft.ancestry_key
+        ? [draft.ancestry_key]
+        : [];
+
+    return intrinsicCatalog
+      .filter((entry) => {
+        if (entry.category === "class") return entry.slug === draft.class_key;
+        if (entry.category === "subclass") return entry.slug === draft.subclass_key;
+        if (entry.category === "community") return entry.name === draft.community_key;
+        if (entry.category === "transformation") return draft.transformations.includes(entry.name);
+        if (entry.category === "ancestry") return ancestryNames.includes(entry.name);
+        return false;
+      })
+      .map((entry) => {
+        const filterForHeritage = <T extends { feature?: string }>(items: T[]) => {
+          if (entry.category !== "ancestry" || !draft.heritage_state?.mixed) return items;
+          const selected = ancestryFeatures
+            .filter((item) => item.ancestry === entry.name)
+            .map((item) => item.feature);
+          return items.filter((item) => Boolean(item.feature) && selected.includes(item.feature ?? ""));
+        };
+        return {
+          id: `intrinsic:${entry.category}:${entry.slug}`,
+          name: entry.name,
+          effects: filterForHeritage(entry.effects ?? []),
+          actions: filterForHeritage(entry.actions ?? []),
+        };
+      });
+  }, [draft.ancestry_key, draft.class_key, draft.community_key, draft.heritage_state, draft.subclass_key, draft.transformations, intrinsicCatalog]);
+
+  const runtimeCharacter = useMemo(
+    () => ({ ...draft, intrinsic_sources: selectedIntrinsicSources }),
+    [draft, selectedIntrinsicSources]
+  );
+  const effectResult = useMemo(
+    () => deriveDaggerheartStats(runtimeCharacter),
+    [runtimeCharacter]
+  );
   const actionCharacter = useMemo(
-    () => ({ ...draft, ...effectiveSnapshot(effectResult) }),
-    [draft, effectResult]
+    () => ({ ...runtimeCharacter, ...effectiveSnapshot(effectResult) }),
+    [runtimeCharacter, effectResult]
   );
   const actionSources = useMemo(
     () => collectDaggerheartActions(actionCharacter),
@@ -641,7 +699,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     patchValue: Partial<CharacterRow>
   ): Partial<CharacterRow> {
     const nextDraft = { ...draft, ...patchValue };
-    const calculated = deriveDaggerheartStats(nextDraft);
+    const calculated = deriveDaggerheartStats({
+      ...nextDraft,
+      intrinsic_sources: selectedIntrinsicSources,
+    });
     const snapshot = effectiveSnapshot(calculated);
 
     return {
@@ -830,12 +891,18 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
   function toggleEffect(effectKey: string) {
     const active = new Set(draft.effect_state?.active_effect_ids ?? []);
-    if (active.has(effectKey)) active.delete(effectKey);
-    else active.add(effectKey);
+    const values = { ...(draft.effect_state?.active_effect_values ?? {}) };
+    if (active.has(effectKey)) {
+      active.delete(effectKey);
+      delete values[effectKey];
+    } else {
+      active.add(effectKey);
+    }
     void persistRuntimePatch({
       effect_state: {
         ...draft.effect_state,
         active_effect_ids: [...active],
+        active_effect_values: values,
       },
     });
   }
@@ -850,8 +917,11 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const nextPatch: Partial<CharacterRow> = { ...resolution.patch };
     const consume = resolution.consume_quantity ?? 0;
 
-    if (consume > 0 && source.collection !== "domain_cards") {
-      const collection = source.collection;
+    if (
+      consume > 0 &&
+      ["weapons", "armor", "inventory"].includes(source.collection)
+    ) {
+      const collection = source.collection as "weapons" | "armor" | "inventory";
       const current = draft[collection] as GearItem[];
       nextPatch[collection] = current
         .map((item, index) => {
@@ -1269,6 +1339,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
           <Section title="Domain Cards" subtitle="Track cards from all ten domains, including Dread. Move cards between Loadout and Vault.">
             <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#38242c] bg-black/15 px-3 py-2 text-xs text-[#a18a92]">
+                <span>Active Loadout</span>
+                <span className="font-black text-[#dfc5cd]">
+                  {draft.domain_cards.filter((card) => card.state === "loadout").length} / {effectResult.stats.domain_loadout_max}
+                </span>
+              </div>
               <DaggerheartCompendiumPicker
                 categories={["domain_card"]}
                 label={selectedClass ? `Choose a ${selectedClass.domains.join(" / ")} card…` : "Choose a domain card…"}
@@ -1282,7 +1358,11 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         name: entry.name,
                         domain: entry.domain ?? "",
                         level: entry.level ?? 1,
-                        state: "loadout",
+                        state:
+                          draft.domain_cards.filter((card) => card.state === "loadout").length <
+                          effectResult.stats.domain_loadout_max
+                            ? "loadout"
+                            : "vault",
                         compendium_id: entry.id,
                         slug: entry.slug,
                         source_key: entry.source_key,
@@ -1308,7 +1388,17 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     const next = [...draft.domain_cards]; next[index] = { ...card, level: toNumber(e.target.value, 1) }; patch({ domain_cards: next });
                   }} />
                   <select className={inputClass} value={card.state} onChange={(e) => {
-                    const next = [...draft.domain_cards]; next[index] = { ...card, state: e.target.value as DomainCard["state"] }; patch({ domain_cards: next });
+                    const nextState = e.target.value as DomainCard["state"];
+                    const loadoutCount = draft.domain_cards.filter((item) => item.state === "loadout").length;
+                    if (
+                      nextState === "loadout" &&
+                      card.state !== "loadout" &&
+                      loadoutCount >= effectResult.stats.domain_loadout_max
+                    ) {
+                      setMessage(`Loadout is full (${effectResult.stats.domain_loadout_max} cards).`);
+                      return;
+                    }
+                    const next = [...draft.domain_cards]; next[index] = { ...card, state: nextState }; patch({ domain_cards: next });
                   }}>
                     <option value="loadout">Loadout</option>
                     <option value="vault">Vault</option>
