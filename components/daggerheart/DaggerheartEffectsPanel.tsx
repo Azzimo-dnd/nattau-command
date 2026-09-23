@@ -64,6 +64,11 @@ export function DaggerheartEffectsPanel({
             stat === "armor_score"
               ? result.stats.armor_score
               : result.stats[stat];
+          const contributionTotal = contributions.reduce(
+            (sum, item) => sum + item.value,
+            0
+          );
+          const baseline = value - contributionTotal;
 
           return (
             <details
@@ -87,6 +92,15 @@ export function DaggerheartEffectsPanel({
               </summary>
 
               <div className="border-t border-[#322129] px-4 py-3">
+                <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+                  <span className="text-[#8e7980]">
+                    {result.equippedArmor &&
+                    ["armor_score", "major_threshold", "severe_threshold"].includes(stat)
+                      ? "Armor/base value"
+                      : "Base value"}
+                  </span>
+                  <span className="font-semibold text-[#cbb7bd]">{baseline}</span>
+                </div>
                 {result.equippedArmor &&
                   ["armor_score", "major_threshold", "severe_threshold"].includes(stat) && (
                     <div className="mb-2 flex items-center justify-between gap-3 text-xs">
