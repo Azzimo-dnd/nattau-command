@@ -217,19 +217,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function validCharacterRow(value: unknown): value is CharacterRow {
   if (!isRecord(value)) return false;
-  const arrays = [
+
+  const stringArrayKeys = [
     "transformations",
+    "background_answers",
+    "connections",
+  ] as const;
+  const objectArrayKeys = [
     "experiences",
     "domain_cards",
     "weapons",
     "armor",
     "inventory",
-    "background_answers",
-    "connections",
     "advancements",
     "special_resources",
   ] as const;
-  const objects = [
+  const objectKeys = [
     "heritage_state",
     "traits",
     "gold",
@@ -239,10 +242,49 @@ function validCharacterRow(value: unknown): value is CharacterRow {
     "manual_stat_modifiers",
     "effect_state",
   ] as const;
-  if (arrays.some((key) => !Array.isArray(value[key]))) return false;
-  if (objects.some((key) => !isRecord(value[key]))) return false;
+
+  for (const key of stringArrayKeys) {
+    const array = value[key];
+    if (!Array.isArray(array) || array.some((item) => typeof item !== "string")) {
+      return false;
+    }
+  }
+  for (const key of objectArrayKeys) {
+    const array = value[key];
+    if (!Array.isArray(array) || array.some((item) => !isRecord(item))) {
+      return false;
+    }
+  }
+  if (objectKeys.some((key) => !isRecord(value[key]))) return false;
+
+  for (const key of ["weapons", "armor", "inventory", "domain_cards"] as const) {
+    const array = value[key] as Record<string, unknown>[];
+    if (
+      array.some(
+        (item) =>
+          ("effects" in item && !Array.isArray(item.effects)) ||
+          ("actions" in item && !Array.isArray(item.actions))
+      )
+    ) {
+      return false;
+    }
+  }
+
   const classState = value.class_state as Record<string, unknown>;
-  if ("options" in classState && !Array.isArray(classState.options)) return false;
+  if ("options" in classState) {
+    if (
+      !Array.isArray(classState.options) ||
+      classState.options.some(
+        (item) =>
+          !isRecord(item) ||
+          ("effects" in item && !Array.isArray(item.effects)) ||
+          ("actions" in item && !Array.isArray(item.actions))
+      )
+    ) {
+      return false;
+    }
+  }
+
   return (
     typeof value.id === "string" &&
     typeof value.campaign_id === "string" &&
