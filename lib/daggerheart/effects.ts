@@ -522,6 +522,31 @@ function applyContribution(
   breakdown[effect.stat] = [...(breakdown[effect.stat] ?? []), row];
 }
 
+function applyManualModifier(
+  stats: DaggerheartDerivedStats,
+  breakdown: DaggerheartEffectResult["breakdown"],
+  character: DaggerheartEffectCharacter,
+  stat: DaggerheartEffectStat
+) {
+  const modifier = numberValue(character.manual_stat_modifiers?.[stat], 0);
+  if (modifier === 0) return;
+  applyContribution(
+    stats,
+    breakdown,
+    {
+      id: `manual-${stat}`,
+      label: "Manual modifier",
+      stat,
+      operation: "add",
+      scope: "owned",
+      mode: "passive",
+    },
+    modifier,
+    "GM / Homebrew",
+    `manual:${stat}`
+  );
+}
+
 export function deriveDaggerheartStats(
   character: DaggerheartEffectCharacter
 ): DaggerheartEffectResult {
@@ -629,6 +654,10 @@ export function deriveDaggerheartStats(
     applyContribution(stats, breakdown, effect, value, source.name, key);
   }
 
+  for (const stat of traitKeys) {
+    applyManualModifier(stats, breakdown, character, stat);
+  }
+
   // Pass 2: resource maxima. Conditional effects such as "all Stress
   // slots marked" must evaluate against the already modified maximum.
   const resourceMaxStats = new Set<DaggerheartEffectStat>([
@@ -645,6 +674,10 @@ export function deriveDaggerheartStats(
     applyContribution(stats, breakdown, effect, value, source.name, key);
   }
 
+  for (const stat of resourceMaxStats) {
+    applyManualModifier(stats, breakdown, character, stat);
+  }
+
   // Pass 3: proficiency, because later formulas can depend on it.
   for (const { source, effect } of candidateEffects) {
     if (effect.stat !== "proficiency" || !shouldApply(source, effect)) continue;
@@ -652,6 +685,8 @@ export function deriveDaggerheartStats(
     const value = resolveEffectValue(effect, source, stats, spellcastTrait, character, key);
     applyContribution(stats, breakdown, effect, value, source.name, key);
   }
+
+  applyManualModifier(stats, breakdown, character, "proficiency");
 
   // Pass 4: Armor Score must settle before effects that scale from it
   // or inspect whether every Armor Slot is marked.
@@ -661,6 +696,7 @@ export function deriveDaggerheartStats(
     const value = resolveEffectValue(effect, source, stats, spellcastTrait, character, key);
     applyContribution(stats, breakdown, effect, value, source.name, key);
   }
+  applyManualModifier(stats, breakdown, character, "armor_score");
   stats.armor_slots_max = Math.max(0, stats.armor_score);
 
   // Pass 5: remaining derived sheet stats.
@@ -679,24 +715,15 @@ export function deriveDaggerheartStats(
     applyContribution(stats, breakdown, effect, value, source.name, key);
   }
 
+  const alreadyApplied = new Set<DaggerheartEffectStat>([
+    ...traitKeys,
+    ...resourceMaxStats,
+    "proficiency",
+    "armor_score",
+  ]);
   for (const stat of daggerheartEffectStats) {
-    const modifier = numberValue(character.manual_stat_modifiers?.[stat], 0);
-    if (modifier !== 0) {
-      applyContribution(
-        stats,
-        breakdown,
-        {
-          id: `manual-${stat}`,
-          label: "Manual modifier",
-          stat,
-          operation: "add",
-          scope: "owned",
-          mode: "passive",
-        },
-        modifier,
-        "GM / Homebrew",
-        `manual:${stat}`
-      );
+    if (!alreadyApplied.has(stat)) {
+      applyManualModifier(stats, breakdown, character, stat);
     }
   }
 
