@@ -761,9 +761,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const runtimeCharacter = useMemo(
     () => ({
       ...draft,
+      weapons: activeBeastform ? [] : draft.weapons,
       intrinsic_sources: [...selectedIntrinsicSources, ...activeClassOptions],
     }),
-    [draft, selectedIntrinsicSources, activeClassOptions]
+    [draft, selectedIntrinsicSources, activeClassOptions, activeBeastform]
   );
   const effectResult = useMemo(
     () => deriveDaggerheartStats(runtimeCharacter),
@@ -826,16 +827,18 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     patchValue: Partial<CharacterRow>
   ): Partial<CharacterRow> {
     const nextDraft = { ...draft, ...patchValue };
+    const nextClassOptions = activeClassOptionSources(
+      nextDraft.class_state,
+      nextDraft.class_key,
+      nextDraft.subclass_key
+    );
+    const nextBeastformActive = nextClassOptions.some(
+      (option) => option.category === "beastform"
+    );
     const calculated = deriveDaggerheartStats({
       ...nextDraft,
-      intrinsic_sources: [
-        ...selectedIntrinsicSources,
-        ...activeClassOptionSources(
-          nextDraft.class_state,
-          nextDraft.class_key,
-          nextDraft.subclass_key
-        ),
-      ],
+      weapons: nextBeastformActive ? [] : nextDraft.weapons,
+      intrinsic_sources: [...selectedIntrinsicSources, ...nextClassOptions],
     });
     const snapshot = effectiveSnapshot(calculated);
 
@@ -925,6 +928,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
     const calculated = deriveDaggerheartStats({
       ...draft,
+      weapons: activeBeastform ? [] : draft.weapons,
       intrinsic_sources: [...selectedIntrinsicSources, ...activeClassOptions],
     });
     const snapshot = effectiveSnapshot(calculated);
