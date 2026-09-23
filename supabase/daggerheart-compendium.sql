@@ -16,6 +16,7 @@ create table if not exists public.daggerheart_compendium_entries (
   summary text not null default '',
   rules_text text not null default '',
   metadata jsonb not null default '{}'::jsonb,
+  errata jsonb not null default '{}'::jsonb,
   source_page_start integer,
   source_page_end integer,
   sort_order integer not null default 0,
@@ -24,6 +25,16 @@ create table if not exists public.daggerheart_compendium_entries (
   updated_at timestamptz not null default now(),
   unique (source_key, category, slug)
 );
+
+alter table public.daggerheart_compendium_entries
+  add column if not exists errata jsonb not null default '{}'::jsonb;
+
+alter table public.daggerheart_compendium_entries
+  drop constraint if exists daggerheart_compendium_errata_object;
+
+alter table public.daggerheart_compendium_entries
+  add constraint daggerheart_compendium_errata_object
+  check (jsonb_typeof(errata) = 'object');
 
 create index if not exists daggerheart_compendium_category_idx
   on public.daggerheart_compendium_entries(category, is_active, sort_order);
@@ -36,9 +47,18 @@ create index if not exists daggerheart_compendium_parent_idx
   on public.daggerheart_compendium_entries(parent_slug)
   where parent_slug is not null;
 
-create index if not exists daggerheart_compendium_name_search_idx
+drop index if exists public.daggerheart_compendium_name_search_idx;
+
+create index daggerheart_compendium_name_search_idx
   on public.daggerheart_compendium_entries
-  using gin (to_tsvector('english', name || ' ' || summary || ' ' || rules_text));
+  using gin (
+    to_tsvector(
+      'english',
+      name || ' ' || summary || ' ' || rules_text || ' ' ||
+      coalesce(errata->>'summary', '') || ' ' ||
+      coalesce(errata->>'rules_text', '')
+    )
+  );
 
 alter table public.daggerheart_compendium_entries enable row level security;
 
@@ -119,9 +139,15 @@ as $$
     and (p_level is null or e.level = p_level)
     and (
       nullif(trim(coalesce(p_query, '')), '') is null
-      or to_tsvector('english', e.name || ' ' || e.summary || ' ' || e.rules_text)
-        @@ websearch_to_tsquery('english', p_query)
+      or to_tsvector(
+          'english',
+          e.name || ' ' || e.summary || ' ' || e.rules_text || ' ' ||
+          coalesce(e.errata->>'summary', '') || ' ' ||
+          coalesce(e.errata->>'rules_text', '')
+        ) @@ websearch_to_tsquery('english', p_query)
       or e.name ilike '%' || p_query || '%'
+      or coalesce(e.errata->>'summary', '') ilike '%' || p_query || '%'
+      or coalesce(e.errata->>'rules_text', '') ilike '%' || p_query || '%'
     )
   order by e.category, e.sort_order, e.name
   limit greatest(1, least(coalesce(p_limit, 100), 250));
