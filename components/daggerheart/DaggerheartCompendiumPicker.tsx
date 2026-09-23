@@ -10,6 +10,7 @@ type Props = {
   domains?: string[];
   maxLevel?: number;
   maxTier?: number;
+  allowMagicWeapons?: boolean;
   onSelect: (entry: DaggerheartCompendiumEntry) => void;
 };
 
@@ -22,6 +23,7 @@ export function DaggerheartCompendiumPicker({
   domains,
   maxLevel,
   maxTier,
+  allowMagicWeapons = true,
   onSelect,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -51,7 +53,16 @@ export function DaggerheartCompendiumPicker({
 
       const result = await request;
       if (!cancelled) {
-        setEntries((result.data ?? []) as DaggerheartCompendiumEntry[]);
+        const loaded = (result.data ?? []) as DaggerheartCompendiumEntry[];
+        setEntries(
+          allowMagicWeapons
+            ? loaded
+            : loaded.filter(
+                (entry) =>
+                  !["weapon_primary", "weapon_secondary"].includes(entry.category) ||
+                  entry.metadata?.weapon_kind !== "magic"
+              )
+        );
         setSelectedId("");
         setLoading(false);
       }
@@ -61,7 +72,7 @@ export function DaggerheartCompendiumPicker({
     return () => {
       cancelled = true;
     };
-  }, [categories.join("|"), domains?.join("|"), maxLevel, maxTier, supabase]);
+  }, [allowMagicWeapons, categories.join("|"), domains?.join("|"), maxLevel, maxTier, supabase]);
 
   const selected = entries.find((entry) => entry.id === selectedId) ?? null;
 
