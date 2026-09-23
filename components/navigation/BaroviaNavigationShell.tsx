@@ -53,17 +53,6 @@ const primaryItems: NavigationItem[] = [
 const desktopItems: NavigationItem[] = [
   ...primaryItems,
   {
-    label: "Daggerheart Archive",
-    href: "/campaigns/barovia/compendium",
-    icon: "spark",
-  },
-  {
-    label: "Compendium",
-    href: "/campaigns/barovia/compendium",
-    icon: "spark",
-    description: "Search the private Daggerheart Core and Hope & Fear rules archive.",
-  },
-  {
     label: "Whispers",
     href: "/campaigns/barovia/whispers",
     icon: "chat",
