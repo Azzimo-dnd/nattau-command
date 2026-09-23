@@ -76,21 +76,30 @@ export function DaggerheartActiveRulesPanel({
       <p className="text-xs leading-5 text-[#88757c]">
         Dynamic modifiers and resource costs are handled automatically where the rule is deterministic.
         Contextual rules remain visible here so the sheet never guesses whether a narrative condition applies.
+        Subclass reference text may also show later progression features; only structured effects and actions currently unlocked by the sheet are automated.
       </p>
 
       {activeIntrinsic.length > 0 && (
         <div>
           <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#956475]">
-            Character features
+            Character rules reference
           </p>
           <div className="grid gap-2 lg:grid-cols-2">
-            {activeIntrinsic.map((item, index) => (
-              <RuleCard
-                key={`intrinsic-${item.name}-${index}`}
-                item={item}
-                badge="Active character source"
-              />
-            ))}
+            {activeIntrinsic.map((item, index) => {
+              const badge =
+                item.category === "subclass"
+                  ? "Selected subclass reference · includes progression text"
+                  : item.category
+                    ? `Selected ${item.category.replaceAll("_", " ")} reference`
+                    : "Selected character reference";
+              return (
+                <RuleCard
+                  key={`intrinsic-${item.name}-${index}`}
+                  item={item}
+                  badge={badge}
+                />
+              );
+            })}
           </div>
         </div>
       )}
