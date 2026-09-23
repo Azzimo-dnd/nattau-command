@@ -64,6 +64,7 @@ create unique index if not exists daggerheart_one_active_character_per_player
   on public.daggerheart_characters(campaign_id, player_id) where is_active;
 create index if not exists daggerheart_characters_campaign_idx on public.daggerheart_characters(campaign_id);
 create index if not exists daggerheart_characters_player_idx on public.daggerheart_characters(player_id);
+create index if not exists daggerheart_characters_created_by_idx on public.daggerheart_characters(created_by);
 
 alter table public.daggerheart_characters enable row level security;
 
