@@ -467,6 +467,11 @@ function GearEditor({
                 {item.effects?.length} dynamic effect{item.effects?.length === 1 ? "" : "s"}
               </span>
             )}
+            {(item.actions?.length ?? 0) > 0 && (
+              <span className="rounded-lg border border-sky-900/40 bg-sky-950/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-sky-200/80">
+                {item.actions?.length} quick action{item.actions?.length === 1 ? "" : "s"}
+              </span>
+            )}
             {item.compendium_id && (
               <span className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63]">
                 Compendium-linked
