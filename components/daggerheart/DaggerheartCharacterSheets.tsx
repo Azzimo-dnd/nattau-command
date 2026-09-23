@@ -640,6 +640,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         return {
           id: `intrinsic:${entry.category}:${entry.slug}`,
           name: entry.name,
+          details: compendiumEntryDetails(entry),
           effects: filterForHeritage(entry.effects ?? []),
           actions: filterForHeritage(entry.actions ?? []),
         };
@@ -1210,6 +1211,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             subtitle="Full linked rules for your current Loadout, equipped gear and carried compendium items."
           >
             <DaggerheartActiveRulesPanel
+              intrinsicRules={selectedIntrinsicSources}
               domainCards={draft.domain_cards}
               weapons={draft.weapons}
               armor={draft.armor}
