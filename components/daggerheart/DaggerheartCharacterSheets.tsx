@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { DaggerheartCompendiumPicker, compendiumEntryDetails } from "@/components/daggerheart/DaggerheartCompendiumPicker";
 import {
   classOption,
   daggerheartAncestries,
@@ -631,6 +632,25 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
           <Section title="Domain Cards" subtitle="Track cards from all ten domains, including Dread. Move cards between Loadout and Vault.">
             <div className="space-y-3">
+              <DaggerheartCompendiumPicker
+                categories={["domain_card"]}
+                label={selectedClass ? `Choose a ${selectedClass.domains.join(" / ")} card…` : "Choose a domain card…"}
+                domains={selectedClass?.domains}
+                maxLevel={draft.level}
+                onSelect={(entry) =>
+                  patch({
+                    domain_cards: [
+                      ...draft.domain_cards,
+                      {
+                        name: entry.name,
+                        domain: entry.domain ?? "",
+                        level: entry.level ?? 1,
+                        state: "loadout",
+                      },
+                    ],
+                  })
+                }
+              />
               {draft.domain_cards.map((card, index) => (
                 <div key={index} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1.5fr_1fr_90px_120px_auto]">
                   <input className={inputClass} placeholder="Card name" value={card.name} onChange={(e) => {
@@ -662,15 +682,72 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             <div className="space-y-6">
               <div>
                 <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Weapons</p>
-                <GearEditor value={draft.weapons} onChange={(weapons) => patch({ weapons })} addLabel="Weapon" />
+                <div className="mb-3">
+                  <DaggerheartCompendiumPicker
+                    categories={["weapon_primary", "weapon_secondary"]}
+                    label="Choose an eligible weapon…"
+                    maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
+                    onSelect={(entry) =>
+                      patch({
+                        weapons: [
+                          ...draft.weapons,
+                          { name: entry.name, details: compendiumEntryDetails(entry) },
+                        ],
+                      })
+                    }
+                  />
+                </div>
+                <GearEditor value={draft.weapons} onChange={(weapons) => patch({ weapons })} addLabel="Custom weapon" />
               </div>
               <div>
                 <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Armor</p>
-                <GearEditor value={draft.armor} onChange={(armor) => patch({ armor })} addLabel="Armor" />
+                <div className="mb-3">
+                  <DaggerheartCompendiumPicker
+                    categories={["armor"]}
+                    label="Choose eligible armor…"
+                    maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
+                    onSelect={(entry) => {
+                      const metadata = entry.metadata ?? {};
+                      patch({
+                        armor: [
+                          ...draft.armor,
+                          { name: entry.name, details: compendiumEntryDetails(entry) },
+                        ],
+                        armor_score:
+                          typeof metadata.base_score === "number"
+                            ? metadata.base_score
+                            : draft.armor_score,
+                        major_threshold:
+                          typeof metadata.base_major === "number"
+                            ? metadata.base_major + draft.level
+                            : draft.major_threshold,
+                        severe_threshold:
+                          typeof metadata.base_severe === "number"
+                            ? metadata.base_severe + draft.level
+                            : draft.severe_threshold,
+                      });
+                    }}
+                  />
+                </div>
+                <GearEditor value={draft.armor} onChange={(armor) => patch({ armor })} addLabel="Custom armor" />
               </div>
               <div>
                 <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Inventory / Loot</p>
-                <GearEditor value={draft.inventory} onChange={(inventory) => patch({ inventory })} addLabel="Item" />
+                <div className="mb-3">
+                  <DaggerheartCompendiumPicker
+                    categories={["loot_item", "consumable"]}
+                    label="Choose loot or a consumable…"
+                    onSelect={(entry) =>
+                      patch({
+                        inventory: [
+                          ...draft.inventory,
+                          { name: entry.name, details: compendiumEntryDetails(entry) },
+                        ],
+                      })
+                    }
+                  />
+                </div>
+                <GearEditor value={draft.inventory} onChange={(inventory) => patch({ inventory })} addLabel="Custom item" />
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 <NumberField label="Gold handfuls" min={0} value={draft.gold.handfuls} onChange={(handfuls) => patch({ gold: { ...draft.gold, handfuls } })} />
