@@ -1346,6 +1346,29 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const active = new Set(draft.effect_state?.active_effect_ids ?? []);
     const values = { ...(draft.effect_state?.active_effect_values ?? {}) };
     const allActive = effectKeys.every((effectKey) => active.has(effectKey));
+    const toggleDefinitions = effectResult.toggles.filter((toggle) =>
+      effectKeys.includes(toggle.key)
+    );
+    const permanentChoice = toggleDefinitions.some((toggle) =>
+      (toggle.duration ?? "").toLowerCase().includes("permanent once selected")
+    );
+
+    if (allActive && permanentChoice) {
+      setActionMessage(
+        "This is a permanent character choice and cannot be deactivated from normal play."
+      );
+      return;
+    }
+    if (
+      !allActive &&
+      permanentChoice &&
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "This choice becomes permanent once selected. Activate it permanently?"
+      )
+    ) {
+      return;
+    }
 
     for (const effectKey of effectKeys) {
       if (allActive) {
@@ -1543,10 +1566,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         reset,
         actionSources
       ),
-      class_state: {
-        ...draft.class_state,
-        active_stance_id: null,
-      },
+      class_state:
+        reset === "session"
+          ? draft.class_state
+          : {
+              ...draft.class_state,
+              active_stance_id: null,
+            },
     });
     setActionMessage(
       `${reset.replaceAll("_", " ")} uses reset.`
