@@ -378,11 +378,8 @@ export function DaggerheartCharacterCreationWizard({
         if (primaryBurden.includes("two") && secondary) {
           return "A two-handed primary weapon can’t be paired with a secondary weapon.";
         }
-        if (primaryBurden.includes("one") && !secondary) {
-          return "A one-handed primary weapon must be paired with a one-handed secondary weapon.";
-        }
       }
-      if (draft.armor.length !== 1) return "Choose exactly one starting armor.";
+      if (draft.armor.length > 1) return "Choose at most one starting armor.";
       const hasPotion = draft.inventory.some((item) =>
         ["Minor Health Potion", "Minor Stamina Potion"].includes(item.name)
       );
@@ -437,6 +434,12 @@ export function DaggerheartCharacterCreationWizard({
         )
       ) {
         return "Starting Domain Cards must be level 1 and come from your class domains.";
+      }
+      if (
+        draft.armor.length === 0 &&
+        !cards.some((card) => card.slug === "valor-bare-bones" || card.name === "Bare Bones")
+      ) {
+        return "Starting without armor requires Bare Bones. Choose starting armor or select Bare Bones.";
       }
     }
 
@@ -812,7 +815,11 @@ export function DaggerheartCharacterCreationWizard({
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={() => patch({ transformations: checked ? draft.transformations.filter((value) => value !== item) : [...draft.transformations, item] })}
+                        onChange={() =>
+                          patch({
+                            transformations: checked ? [] : [item],
+                          })
+                        }
                       />
                       {item}
                     </label>
@@ -880,7 +887,7 @@ export function DaggerheartCharacterCreationWizard({
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9c6172]">Step 5</p>
               <h3 className="mt-2 font-serif text-2xl font-black text-[#ead7dc]">Choose starting equipment</h3>
-              <p className="mt-2 text-sm text-[#97848b]">Tier 1 only. Choose a two-handed primary, or a one-handed primary plus a one-handed secondary, then one armor.</p>
+              <p className="mt-2 text-sm text-[#97848b]">Tier 1 only. A two-handed primary excludes a secondary; a one-handed secondary is optional. You may leave armor empty if your final build takes Bare Bones.</p>
             </div>
 
             <div>
