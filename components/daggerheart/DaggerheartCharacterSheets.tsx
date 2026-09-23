@@ -3,7 +3,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DaggerheartCompendiumPicker, compendiumEntryDetails } from "@/components/daggerheart/DaggerheartCompendiumPicker";
-import { compendiumEffectiveMetadata } from "@/lib/daggerheart/compendium";
+import {
+  compendiumEffectiveMetadata,
+  type DaggerheartCompendiumEntry,
+} from "@/lib/daggerheart/compendium";
+import { DaggerheartEffectsPanel } from "@/components/daggerheart/DaggerheartEffectsPanel";
+import {
+  baseStatsForClass,
+  deriveDaggerheartStats,
+  effectiveSnapshot,
+  type DaggerheartBaseStats,
+  type DaggerheartEffect,
+  type DaggerheartEffectState,
+  type DaggerheartManualStatModifiers,
+} from "@/lib/daggerheart/effects";
 import { DaggerheartCharacterCreationWizard } from "@/components/daggerheart/DaggerheartCharacterCreationWizard";
 import type { HeritageState } from "@/components/daggerheart/DaggerheartHeritageBuilder";
 import {
@@ -19,8 +32,29 @@ import {
 type TraitKey = (typeof daggerheartTraits)[number];
 type Traits = Record<TraitKey, number>;
 type Experience = { name: string; modifier: number };
-type DomainCard = { name: string; domain: string; level: number; state: "loadout" | "vault"; compendium_id?: string; slug?: string; source_key?: string };
-type GearItem = { name: string; details: string; compendium_id?: string; category?: string; slug?: string; source_key?: string; metadata?: Record<string, unknown> };
+type DomainCard = {
+  name: string;
+  domain: string;
+  level: number;
+  state: "loadout" | "vault";
+  compendium_id?: string;
+  slug?: string;
+  source_key?: string;
+  effects?: DaggerheartEffect[];
+};
+type GearItem = {
+  instance_id?: string;
+  name: string;
+  details: string;
+  compendium_id?: string;
+  category?: string;
+  slug?: string;
+  source_key?: string;
+  metadata?: Record<string, unknown>;
+  effects?: DaggerheartEffect[];
+  equipped?: boolean;
+  quantity?: number;
+};
 type Advancement = { level: number; choice: string };
 type Resource = { name: string; current: number; max: number; notes: string };
 type Gold = { handfuls: number; bags: number; chests: number };
@@ -76,6 +110,9 @@ type CharacterRow = {
   transformation_notes: string;
   description: string;
   notes: string;
+  base_stats: DaggerheartBaseStats;
+  manual_stat_modifiers: DaggerheartManualStatModifiers;
+  effect_state: DaggerheartEffectState;
 };
 
 type RosterRow = {
@@ -143,12 +180,44 @@ function emptyCharacter(campaignId: string, playerId: string): CharacterRow {
     transformation_notes: "",
     description: "",
     notes: "",
+    base_stats: baseStatsForClass(null, 1),
+    manual_stat_modifiers: {},
+    effect_state: { active_effect_ids: [] },
   };
 }
 
 function toNumber(value: string, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function gearFromCompendium(
+  entry: DaggerheartCompendiumEntry,
+  equipped: boolean
+): GearItem {
+  return {
+    instance_id: crypto.randomUUID(),
+    name: entry.name,
+    details: compendiumEntryDetails(entry),
+    compendium_id: entry.id,
+    category: entry.category,
+    slug: entry.slug,
+    source_key: entry.source_key,
+    metadata: compendiumEffectiveMetadata(entry),
+    effects: entry.effects ?? [],
+    equipped,
+    quantity: 1,
+  };
+}
+
+function addEquippedGear(
+  current: GearItem[],
+  entry: DaggerheartCompendiumEntry
+) {
+  const next = current.map((item) =>
+    item.category === entry.category ? { ...item, equipped: false } : item
+  );
+  return [...next, gearFromCompendium(entry, true)];
 }
 
 function Section({
