@@ -9,6 +9,8 @@ export const daggerheartEffectStats = [
   "knowledge",
   "evasion",
   "proficiency",
+  "damage_proficiency_bonus",
+  "primary_damage_proficiency_bonus",
   "hope_max",
   "hp_max",
   "stress_max",
@@ -66,6 +68,8 @@ export type DaggerheartEffect = {
 export type DaggerheartBaseStats = {
   evasion: number;
   proficiency: number;
+  damage_proficiency_bonus: number;
+  primary_damage_proficiency_bonus: number;
   hope_max: number;
   hp_max: number;
   stress_max: number;
@@ -207,6 +211,8 @@ export function baseStatsForClass(
   return {
     evasion: option?.startingEvasion ?? 10,
     proficiency,
+    damage_proficiency_bonus: 0,
+    primary_damage_proficiency_bonus: 0,
     hope_max: 6,
     hp_max: option?.startingHitPoints ?? 0,
     stress_max: 6,
@@ -534,6 +540,11 @@ export function deriveDaggerheartStats(
     knowledge: numberValue(character.traits.knowledge),
     evasion: numberValue(base.evasion, fallback.evasion),
     proficiency: numberValue(base.proficiency, fallback.proficiency),
+    damage_proficiency_bonus: numberValue(base.damage_proficiency_bonus, 0),
+    primary_damage_proficiency_bonus: numberValue(
+      base.primary_damage_proficiency_bonus,
+      0
+    ),
     hope_max: numberValue(base.hope_max, fallback.hope_max),
     hp_max: numberValue(base.hp_max, fallback.hp_max),
     stress_max: numberValue(base.stress_max, fallback.stress_max),
