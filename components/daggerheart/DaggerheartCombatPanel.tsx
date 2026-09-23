@@ -99,6 +99,12 @@ export function DaggerheartCombatPanel({
         const burden = text(weapon.metadata?.burden);
         const modifier = traitValue(stats, trait);
         const damageBonus = damageBonusFromMetadata(weapon.metadata, stats, level);
+        const damageProficiency =
+          stats.proficiency +
+          stats.damage_proficiency_bonus +
+          (weapon.category === "weapon_primary"
+            ? stats.primary_damage_proficiency_bonus
+            : 0);
 
         return (
           <div
@@ -142,10 +148,10 @@ export function DaggerheartCombatPanel({
               </div>
               <div className="rounded-lg border border-[#35242b] bg-black/20 p-2.5 sm:col-span-2">
                 <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#78666c]">
-                  Current damage · Proficiency {stats.proficiency}
+                  Current damage · Proficiency {damageProficiency}
                 </p>
                 <p className="mt-1 text-sm font-black text-[#e3cbd2]">
-                  {effectiveDamage(damage, stats.proficiency, damageBonus)}
+                  {effectiveDamage(damage, damageProficiency, damageBonus)}
                 </p>
               </div>
             </div>
