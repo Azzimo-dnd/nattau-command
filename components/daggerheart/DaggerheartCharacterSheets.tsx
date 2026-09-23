@@ -202,7 +202,11 @@ function emptyCharacter(campaignId: string, playerId: string): CharacterRow {
   };
 }
 
-function activeClassOptionSources(state: NotesState) {
+function activeClassOptionSources(
+  state: NotesState,
+  classKey: string | null,
+  subclassKey: string | null
+) {
   const options = state.options ?? [];
   const activeBeastformId =
     typeof state.active_beastform_id === "string" ? state.active_beastform_id : null;
@@ -212,8 +216,13 @@ function activeClassOptionSources(state: NotesState) {
   return options
     .filter(
       (option) =>
-        (option.category === "beastform" && option.id === activeBeastformId) ||
-        (option.category === "martial_stance" && option.id === activeStanceId)
+        (classKey === "druid" &&
+          option.category === "beastform" &&
+          option.id === activeBeastformId) ||
+        (classKey === "brawler" &&
+          subclassKey === "martial-artist" &&
+          option.category === "martial_stance" &&
+          option.id === activeStanceId)
     )
     .map((option) => ({
       id: `class-option:${option.id}`,
@@ -224,6 +233,43 @@ function activeClassOptionSources(state: NotesState) {
       actions: option.actions ?? [],
       metadata: option.metadata ?? {},
     }));
+}
+
+function managedSpecialResources(
+  resources: Resource[],
+  classKey: string | null,
+  subclassKey: string | null
+) {
+  const unmanaged = resources.filter(
+    (resource) => !["favor", "focus"].includes(resource.name.toLowerCase())
+  );
+  if (classKey === "warlock") {
+    const existing = resources.find(
+      (resource) => resource.name.toLowerCase() === "favor"
+    );
+    unmanaged.push(
+      existing ?? {
+        name: "Favor",
+        current: 3,
+        max: 0,
+        notes: "Patron Die d6 (d8 at level 5)",
+      }
+    );
+  }
+  if (classKey === "brawler" && subclassKey === "martial-artist") {
+    const existing = resources.find(
+      (resource) => resource.name.toLowerCase() === "focus"
+    );
+    unmanaged.push(
+      existing ?? {
+        name: "Focus",
+        current: 0,
+        max: 6,
+        notes: "Spend 1 Focus to shift into a known martial stance.",
+      }
+    );
+  }
+  return unmanaged;
 }
 
 function toNumber(value: string, fallback = 0) {
@@ -696,8 +742,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }, [draft.ancestry_key, draft.class_key, draft.community_key, draft.heritage_state, draft.subclass_key, draft.transformations, intrinsicCatalog]);
 
   const activeClassOptions = useMemo(
-    () => activeClassOptionSources(draft.class_state),
-    [draft.class_state]
+    () =>
+      activeClassOptionSources(
+        draft.class_state,
+        draft.class_key,
+        draft.subclass_key
+      ),
+    [draft.class_key, draft.class_state, draft.subclass_key]
   );
 
   const activeBeastform = useMemo(
@@ -776,7 +827,11 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       ...nextDraft,
       intrinsic_sources: [
         ...selectedIntrinsicSources,
-        ...activeClassOptionSources(nextDraft.class_state),
+        ...activeClassOptionSources(
+          nextDraft.class_state,
+          nextDraft.class_key,
+          nextDraft.subclass_key
+        ),
       ],
     });
     const snapshot = effectiveSnapshot(calculated);
@@ -1213,6 +1268,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                       ),
                       manual_stat_modifiers: {},
                       effect_state: { active_effect_ids: [] },
+                      class_state: {},
+                      subclass_state: {},
+                      special_resources: managedSpecialResources(
+                        draft.special_resources,
+                        classKey,
+                        null
+                      ),
                     });
                   }}
                 >
@@ -1231,7 +1293,29 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               </label>
               <label>
                 <span className="mb-1.5 block text-xs text-[#a48d95]">Subclass</span>
-                <select className={inputClass} value={draft.subclass_key ?? ""} onChange={(e) => patch({ subclass_key: e.target.value || null })}>
+                <select
+                  className={inputClass}
+                  value={draft.subclass_key ?? ""}
+                  onChange={(e) => {
+                    const subclassKey = e.target.value || null;
+                    patch({
+                      subclass_key: subclassKey,
+                      subclass_state: {},
+                      special_resources: managedSpecialResources(
+                        draft.special_resources,
+                        draft.class_key,
+                        subclassKey
+                      ),
+                      class_state:
+                        draft.class_key === "brawler"
+                          ? {
+                              ...draft.class_state,
+                              active_stance_id: null,
+                            }
+                          : draft.class_state,
+                    });
+                  }}
+                >
                   <option value="">Choose subclass</option>
                   {(selectedClass?.subclasses ?? []).map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
                 </select>
