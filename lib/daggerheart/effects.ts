@@ -30,7 +30,12 @@ export type DaggerheartEffect = {
   stat: DaggerheartEffectStat;
   operation: "add";
   value?: number;
-  value_from?: "proficiency" | "presence" | "spellcast_trait" | "tier";
+  value_from?:
+    | "proficiency"
+    | "presence"
+    | "spellcast_trait"
+    | "tier"
+    | "half_agility_rounded_up";
   scope: "equipped" | "loadout" | "owned";
   mode: "passive" | "toggle";
   condition?: DaggerheartEffectCondition;
@@ -419,6 +424,9 @@ function resolveEffectValue(
     return spellcastTrait ? numberValue(stats[spellcastTrait as keyof DaggerheartDerivedStats], 0) : 0;
   }
   if (effect.value_from === "tier") return source.tier ?? 0;
+  if (effect.value_from === "half_agility_rounded_up") {
+    return Math.ceil(stats.agility / 2);
+  }
   return 0;
 }
 
