@@ -314,39 +314,115 @@ function GearEditor({
   value,
   onChange,
   addLabel,
+  equipMode = "none",
 }: {
   value: GearItem[];
   onChange: (next: GearItem[]) => void;
   addLabel: string;
+  equipMode?: "exclusive-category" | "independent" | "none";
 }) {
+  function toggleEquipped(index: number) {
+    const current = value[index];
+    const nextEquipped = !(current.equipped ?? false);
+    const next = value.map((item, itemIndex) => {
+      if (itemIndex === index) return { ...item, equipped: nextEquipped };
+      if (
+        nextEquipped &&
+        equipMode === "exclusive-category" &&
+        item.category === current.category
+      ) {
+        return { ...item, equipped: false };
+      }
+      return item;
+    });
+    onChange(next);
+  }
+
   return (
     <div className="space-y-3">
       {value.map((item, index) => (
-        <div key={index} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1fr_2fr_auto]">
-          <input
-            className={inputClass}
-            placeholder="Name"
-            value={item.name}
-            onChange={(event) => {
-              const next = [...value];
-              next[index] = { ...item, name: event.target.value };
-              onChange(next);
-            }}
-          />
-          <input
-            className={inputClass}
-            placeholder="Traits, range, damage, feature, burden, notes..."
-            value={item.details}
-            onChange={(event) => {
-              const next = [...value];
-              next[index] = { ...item, details: event.target.value };
-              onChange(next);
-            }}
-          />
-          <button type="button" className={smallButton} onClick={() => onChange(value.filter((_, i) => i !== index))}>×</button>
+        <div
+          key={item.instance_id ?? `${item.name}-${index}`}
+          className={`rounded-xl border p-3 transition ${
+            item.equipped
+              ? "border-[#744052] bg-[#28121b]/70"
+              : "border-[#342029] bg-black/15"
+          }`}
+        >
+          <div className="grid gap-2 md:grid-cols-[1fr_2fr_auto]">
+            <input
+              className={inputClass}
+              placeholder="Name"
+              value={item.name}
+              onChange={(event) => {
+                const next = [...value];
+                next[index] = { ...item, name: event.target.value };
+                onChange(next);
+              }}
+            />
+            <input
+              className={inputClass}
+              placeholder="Traits, range, damage, feature, burden, notes..."
+              value={item.details}
+              onChange={(event) => {
+                const next = [...value];
+                next[index] = { ...item, details: event.target.value };
+                onChange(next);
+              }}
+            />
+            <button
+              type="button"
+              className={smallButton}
+              onClick={() => onChange(value.filter((_, i) => i !== index))}
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {equipMode !== "none" && (
+              <button
+                type="button"
+                className={`min-h-8 rounded-lg border px-3 text-xs font-bold transition ${
+                  item.equipped
+                    ? "border-emerald-800/60 bg-emerald-950/25 text-emerald-200"
+                    : "border-[#49303a] bg-black/20 text-[#9b858c] hover:border-[#704052]"
+                }`}
+                onClick={() => toggleEquipped(index)}
+              >
+                {item.equipped ? "Equipped" : "Stored"}
+              </button>
+            )}
+            {(item.effects?.length ?? 0) > 0 && (
+              <span className="rounded-lg border border-[#49303a] bg-black/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#b78896]">
+                {item.effects?.length} dynamic effect{item.effects?.length === 1 ? "" : "s"}
+              </span>
+            )}
+            {item.compendium_id && (
+              <span className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63]">
+                Compendium-linked
+              </span>
+            )}
+          </div>
         </div>
       ))}
-      <button type="button" className={smallButton} onClick={() => onChange([...value, { name: "", details: "" }])}>
+      <button
+        type="button"
+        className={smallButton}
+        onClick={() =>
+          onChange([
+            ...value,
+            {
+              instance_id: crypto.randomUUID(),
+              name: "",
+              details: "",
+              equipped: false,
+              quantity: 1,
+              effects: [],
+            },
+          ])
+        }
+      >
         + {addLabel}
       </button>
     </div>
