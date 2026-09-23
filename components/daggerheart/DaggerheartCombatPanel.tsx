@@ -67,11 +67,20 @@ export function DaggerheartCombatPanel({
   stats: DaggerheartDerivedStats;
   level: number;
 }) {
-  const equipped = weapons.filter(
-    (weapon) =>
-      weapon.equipped !== false &&
-      ["weapon_primary", "weapon_secondary", "beastform"].includes(weapon.category ?? "")
-  );
+  const equipped = weapons.filter((weapon) => {
+    if (
+      weapon.equipped === false ||
+      !["weapon_primary", "weapon_secondary", "beastform"].includes(
+        weapon.category ?? ""
+      )
+    ) {
+      return false;
+    }
+    if (weapon.category === "beastform") {
+      return Boolean(text(weapon.metadata?.trait) && text(weapon.metadata?.damage));
+    }
+    return true;
+  });
 
   if (equipped.length === 0) {
     return (
