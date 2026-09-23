@@ -23,6 +23,7 @@ const statLabels: Record<DaggerheartEffectStat, string> = {
   major_threshold: "Major Threshold",
   severe_threshold: "Severe Threshold",
   domain_loadout_max: "Domain Loadout",
+  consumable_clear_bonus: "Consumable Recovery",
 };
 
 const primaryStats: DaggerheartEffectStat[] = [
