@@ -202,6 +202,30 @@ function emptyCharacter(campaignId: string, playerId: string): CharacterRow {
   };
 }
 
+function activeClassOptionSources(state: NotesState) {
+  const options = state.options ?? [];
+  const activeBeastformId =
+    typeof state.active_beastform_id === "string" ? state.active_beastform_id : null;
+  const activeStanceId =
+    typeof state.active_stance_id === "string" ? state.active_stance_id : null;
+
+  return options
+    .filter(
+      (option) =>
+        (option.category === "beastform" && option.id === activeBeastformId) ||
+        (option.category === "martial_stance" && option.id === activeStanceId)
+    )
+    .map((option) => ({
+      id: `class-option:${option.id}`,
+      name: option.name,
+      category: option.category,
+      details: option.details,
+      effects: option.effects ?? [],
+      actions: option.actions ?? [],
+      metadata: option.metadata ?? {},
+    }));
+}
+
 function toNumber(value: string, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -671,33 +695,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       });
   }, [draft.ancestry_key, draft.class_key, draft.community_key, draft.heritage_state, draft.subclass_key, draft.transformations, intrinsicCatalog]);
 
-  const activeClassOptions = useMemo(() => {
-    const options = draft.class_state.options ?? [];
-    const activeBeastformId =
-      typeof draft.class_state.active_beastform_id === "string"
-        ? draft.class_state.active_beastform_id
-        : null;
-    const activeStanceId =
-      typeof draft.class_state.active_stance_id === "string"
-        ? draft.class_state.active_stance_id
-        : null;
-
-    return options
-      .filter(
-        (option) =>
-          (option.category === "beastform" && option.id === activeBeastformId) ||
-          (option.category === "martial_stance" && option.id === activeStanceId)
-      )
-      .map((option) => ({
-        id: `class-option:${option.id}`,
-        name: option.name,
-        category: option.category,
-        details: option.details,
-        effects: option.effects ?? [],
-        actions: option.actions ?? [],
-        metadata: option.metadata ?? {},
-      }));
-  }, [draft.class_state]);
+  const activeClassOptions = useMemo(
+    () => activeClassOptionSources(draft.class_state),
+    [draft.class_state]
+  );
 
   const activeBeastform = useMemo(
     () => activeClassOptions.find((option) => option.category === "beastform") ?? null,
@@ -773,7 +774,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const nextDraft = { ...draft, ...patchValue };
     const calculated = deriveDaggerheartStats({
       ...nextDraft,
-      intrinsic_sources: [...selectedIntrinsicSources, ...activeClassOptions],
+      intrinsic_sources: [
+        ...selectedIntrinsicSources,
+        ...activeClassOptionSources(nextDraft.class_state),
+      ],
     });
     const snapshot = effectiveSnapshot(calculated);
 
