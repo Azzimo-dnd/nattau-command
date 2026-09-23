@@ -1373,6 +1373,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       return;
     }
     if (option.category === "beastform") {
+      if (
+        !String(option.metadata?.trait ?? "").trim() ||
+        !String(option.metadata?.damage ?? "").trim()
+      ) {
+        setActionMessage(
+          `${option.name} inherits a lower-tier Beastform and needs an explicit base-form configuration before it can be activated.`
+        );
+        return;
+      }
       const current =
         typeof draft.class_state.active_beastform_id === "string"
           ? draft.class_state.active_beastform_id
@@ -1543,6 +1552,29 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       `${reset.replaceAll("_", " ")} uses reset.`
     );
   }
+
+  const equippedActiveWeapons = draft.weapons.filter(
+    (item) =>
+      ["weapon_primary", "weapon_secondary"].includes(item.category ?? "") &&
+      item.equipped !== false
+  );
+  const brawlerStrike =
+    draft.class_key === "brawler" &&
+    !activeBeastform &&
+    equippedActiveWeapons.length === 0
+      ? {
+          instance_id: "virtual:brawler-strike",
+          name: "Brawler's Strike",
+          category: "brawler_strike",
+          equipped: true,
+          metadata: {
+            trait: String(draft.class_state.brawler_strike_trait ?? ""),
+            range: "Melee",
+            damage: "d8+d6 phy",
+            burden: "I Am the Weapon",
+          },
+        }
+      : null;
 
   if (loading) {
     return <div className="rounded-2xl border border-[#402630] bg-[#120c10]/80 p-6 text-sm text-[#a9969d]">Reading the names written in the Mists…</div>;
@@ -1800,7 +1832,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         metadata: activeBeastform.metadata,
                       },
                     ]
-                  : draft.weapons
+                  : brawlerStrike
+                    ? [...draft.weapons, brawlerStrike]
+                    : draft.weapons
               }
               stats={effectResult.stats}
               level={draft.level}
