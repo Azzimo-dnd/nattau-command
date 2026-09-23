@@ -1,6 +1,7 @@
 import {
   daggerheartSourceId,
   type DaggerheartEffect,
+  type DaggerheartEffectCondition,
   type DaggerheartEffectState,
 } from "@/lib/daggerheart/effects";
 
@@ -50,6 +51,7 @@ export type DaggerheartAction = {
   deactivate_effect_ids?: string[];
   clear_effect_on?: DaggerheartActionReset;
   feature?: string;
+  condition?: DaggerheartEffectCondition;
 };
 
 export type DaggerheartActionGearItem = {
@@ -232,12 +234,53 @@ export function actionUses(
   return effectState?.action_uses?.[actionKey] ?? 0;
 }
 
+function actionConditionActive(
+  condition: DaggerheartEffectCondition | undefined,
+  character: DaggerheartActionCharacter
+) {
+  if (!condition) return true;
+  if (condition.type === "domain_count") {
+    return (
+      character.domain_cards.filter(
+        (card) =>
+          card.state === "loadout" &&
+          card.domain.toLowerCase() === condition.domain.toLowerCase()
+      ).length >= condition.minimum
+    );
+  }
+  if (condition.type === "stress_full") {
+    return character.stress_current >= character.stress_max;
+  }
+  if (condition.type === "stress_empty") {
+    return character.stress_current <= 0;
+  }
+  if (condition.type === "stress_marked") {
+    return character.stress_current > 0;
+  }
+  const wearingArmor = character.armor.some(
+    (item) => item.category === "armor" && item.equipped !== false
+  );
+  if (condition.type === "wearing_armor") return wearingArmor;
+  if (condition.type === "not_wearing_armor") return !wearingArmor;
+  if (condition.type === "armor_fully_marked") {
+    return (
+      wearingArmor &&
+      character.armor_slots_max > 0 &&
+      character.armor_slots_current >= character.armor_slots_max
+    );
+  }
+  return true;
+}
+
 export function actionAvailable(
   character: DaggerheartActionCharacter,
   source: DaggerheartActionSource
 ) {
   if (!source.active) {
     return { ok: false, reason: "Source is not active." };
+  }
+  if (!actionConditionActive(source.action.condition, character)) {
+    return { ok: false, reason: "Rule condition is not currently met." };
   }
 
   if (
