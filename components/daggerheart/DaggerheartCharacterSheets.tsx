@@ -1233,7 +1233,6 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
           .insert({
             campaign_id: campaignId,
             player_id: requestPlayerId,
-            is_active: true,
             ...mutablePayload,
           })
           .select("*")
