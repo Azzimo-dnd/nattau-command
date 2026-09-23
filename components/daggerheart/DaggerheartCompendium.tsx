@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   compendiumCategoryLabel,
+  compendiumHasErrata,
   compendiumSourceLabel,
   daggerheartCompendiumCategories,
   metadataLabels,
@@ -11,6 +12,10 @@ import {
   type DaggerheartCompendiumEntry,
 } from "@/lib/daggerheart/compendium";
 import { daggerheartDomains } from "@/lib/daggerheart/catalog";
+import {
+  DaggerheartCategoryIcon,
+  DaggerheartDomainIcon,
+} from "@/components/daggerheart/DaggerheartCompendiumIcons";
 
 type SourceFilter = "all" | "core" | "hope-fear";
 
@@ -22,6 +27,94 @@ function metadataValue(value: unknown) {
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (value === null || value === undefined || value === "") return null;
   return String(value);
+}
+
+function trustedErrataUrl(value: unknown) {
+  if (typeof value !== "string") return null;
+  return value.startsWith("https://www.daggerheart.com/") ? value : null;
+}
+
+function ErrataPanel({ entry }: { entry: DaggerheartCompendiumEntry }) {
+  if (!compendiumHasErrata(entry)) return null;
+
+  const updatedMetadata = Object.entries(entry.errata.metadata ?? {})
+    .map(([key, value]) => [key, metadataValue(value)] as const)
+    .filter(([, value]) => value !== null);
+  const sourceUrl = trustedErrataUrl(entry.errata.source_url);
+
+  return (
+    <section className="mt-5 overflow-hidden rounded-2xl border border-amber-800/35 bg-gradient-to-br from-amber-950/20 via-[#17100c] to-[#100a0e]">
+      <div className="border-b border-amber-900/30 px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-amber-700/45 bg-amber-950/45 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-200">
+              Official errata
+            </span>
+            {entry.errata.kind && (
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200/55">
+                {entry.errata.kind}
+              </span>
+            )}
+          </div>
+          <div className="text-right text-[10px] uppercase tracking-[0.12em] text-amber-100/45">
+            {entry.errata.revision && <span>{entry.errata.revision}</span>}
+            {entry.errata.published_at && <span> · {entry.errata.published_at}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 px-4 py-4 sm:px-5">
+        {entry.errata.summary && (
+          <p className="text-sm font-semibold leading-6 text-amber-100/90">
+            {entry.errata.summary}
+          </p>
+        )}
+
+        {updatedMetadata.length > 0 && (
+          <div>
+            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/65">
+              Updated fields
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {updatedMetadata.map(([key, value]) => (
+                <span
+                  key={key}
+                  className="rounded-lg border border-amber-900/35 bg-black/20 px-2.5 py-1.5 text-xs text-amber-100/75"
+                >
+                  <b className="text-amber-100/95">
+                    {metadataLabels[key] ?? key.replaceAll("_", " ")}:
+                  </b>{" "}
+                  {value}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {entry.errata.rules_text && (
+          <div>
+            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-amber-300/65">
+              Current official wording
+            </p>
+            <div className="whitespace-pre-wrap text-sm leading-7 text-amber-50/80">
+              {entry.errata.rules_text}
+            </div>
+          </div>
+        )}
+
+        {sourceUrl && (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-9 items-center rounded-lg border border-amber-800/35 bg-black/20 px-3 text-xs font-bold text-amber-200/80 transition hover:border-amber-600/55 hover:text-amber-100"
+          >
+            Open official source ↗
+          </a>
+        )}
+      </div>
+    </section>
+  );
 }
 
 export function DaggerheartCompendium() {
@@ -82,7 +175,7 @@ export function DaggerheartCompendium() {
             className={fieldClass}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search names or rules…"
+            placeholder="Search names, original rules or errata…"
             aria-label="Search compendium"
           />
           <select
@@ -138,15 +231,20 @@ export function DaggerheartCompendium() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#322029] pt-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#9b5b6e]">
-              {compendiumCategoryLabel(category)}
-            </p>
-            <p className="mt-1 text-sm text-[#958289]">
-              {loading
-                ? "Searching the archive…"
-                : `${visibleEntries.length} entries available`}
-            </p>
+          <div className="flex items-center gap-3">
+            <span className="rounded-xl border border-[#482b36] bg-black/20 p-2 text-[#bc788c]">
+              <DaggerheartCategoryIcon category={category} className="size-5" />
+            </span>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#9b5b6e]">
+                {compendiumCategoryLabel(category)}
+              </p>
+              <p className="mt-1 text-sm text-[#958289]">
+                {loading
+                  ? "Searching the archive…"
+                  : `${visibleEntries.length} entries available`}
+              </p>
+            </div>
           </div>
           <div className="rounded-full border border-[#4a2a35] bg-black/20 px-3 py-1.5 text-xs text-[#b79ba4]">
             Private campaign library
@@ -171,6 +269,7 @@ export function DaggerheartCompendium() {
           const metadata = Object.entries(entry.metadata ?? {})
             .map(([key, value]) => [key, metadataValue(value)] as const)
             .filter(([, value]) => value !== null);
+          const hasErrata = compendiumHasErrata(entry);
 
           return (
             <details
@@ -179,34 +278,52 @@ export function DaggerheartCompendium() {
             >
               <summary className="cursor-pointer list-none p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-[#684052] bg-[#32151f] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#d29dac]">
-                        {compendiumSourceLabel(entry.source_key)}
-                      </span>
-                      {entry.domain && (
-                        <span className="rounded-full border border-[#49303a] bg-black/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#aa9099]">
-                          {entry.domain}
-                        </span>
+                  <div className="flex min-w-0 gap-3">
+                    <span className="mt-0.5 rounded-xl border border-[#412832] bg-black/25 p-2 text-[#bd7d90]">
+                      {entry.domain ? (
+                        <DaggerheartDomainIcon domain={entry.domain} className="size-6" />
+                      ) : (
+                        <DaggerheartCategoryIcon category={entry.category} className="size-6" />
                       )}
-                      {entry.level && (
-                        <span className="text-xs font-semibold text-[#8f777f]">
-                          Lv. {entry.level}
+                    </span>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-[#684052] bg-[#32151f] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#d29dac]">
+                          {compendiumSourceLabel(entry.source_key)}
                         </span>
-                      )}
-                      {entry.tier && (
-                        <span className="text-xs font-semibold text-[#8f777f]">
-                          Tier {entry.tier}
-                        </span>
+                        {entry.domain && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#49303a] bg-black/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#aa9099]">
+                            <DaggerheartDomainIcon domain={entry.domain} className="size-3.5" />
+                            {entry.domain}
+                          </span>
+                        )}
+                        {entry.level && (
+                          <span className="text-xs font-semibold text-[#8f777f]">
+                            Lv. {entry.level}
+                          </span>
+                        )}
+                        {entry.tier && (
+                          <span className="text-xs font-semibold text-[#8f777f]">
+                            Tier {entry.tier}
+                          </span>
+                        )}
+                        {hasErrata && (
+                          <span className="rounded-full border border-amber-800/50 bg-amber-950/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-200">
+                            Errata
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="mt-3 font-serif text-xl font-black text-[#ead7dc]">
+                        {entry.name}
+                      </h3>
+                      {entry.summary && (
+                        <p className="mt-1 text-sm text-[#a38e95]">{entry.summary}</p>
                       )}
                     </div>
-                    <h3 className="mt-3 font-serif text-xl font-black text-[#ead7dc]">
-                      {entry.name}
-                    </h3>
-                    {entry.summary && (
-                      <p className="mt-1 text-sm text-[#a38e95]">{entry.summary}</p>
-                    )}
                   </div>
+
                   <span className="mt-1 text-[#a45b70] transition group-open:rotate-180">
                     ⌄
                   </span>
@@ -230,9 +347,17 @@ export function DaggerheartCompendium() {
               </summary>
 
               <div className="border-t border-[#38232c] px-4 py-5 sm:px-5">
-                <div className="whitespace-pre-wrap text-sm leading-7 text-[#d2c2c7]">
-                  {entry.rules_text}
-                </div>
+                <section>
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#806b72]">
+                    Original book entry
+                  </p>
+                  <div className="whitespace-pre-wrap text-sm leading-7 text-[#d2c2c7]">
+                    {entry.rules_text}
+                  </div>
+                </section>
+
+                <ErrataPanel entry={entry} />
+
                 <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1 border-t border-[#2f1e25] pt-4 text-[11px] uppercase tracking-[0.14em] text-[#715d64]">
                   <span>{compendiumCategoryLabel(entry.category)}</span>
                   {entry.source_page_start && (
@@ -244,6 +369,7 @@ export function DaggerheartCompendium() {
                         : ""}
                     </span>
                   )}
+                  {hasErrata && <span>Original preserved · errata layered</span>}
                 </div>
               </div>
             </details>
