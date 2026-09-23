@@ -17,6 +17,7 @@ create table if not exists public.daggerheart_compendium_entries (
   rules_text text not null default '',
   metadata jsonb not null default '{}'::jsonb,
   effects jsonb not null default '[]'::jsonb,
+  actions jsonb not null default '[]'::jsonb,
   errata jsonb not null default '{}'::jsonb,
   source_page_start integer,
   source_page_end integer,
@@ -29,6 +30,7 @@ create table if not exists public.daggerheart_compendium_entries (
 
 alter table public.daggerheart_compendium_entries
   add column if not exists effects jsonb not null default '[]'::jsonb,
+  add column if not exists actions jsonb not null default '[]'::jsonb,
   add column if not exists errata jsonb not null default '{}'::jsonb;
 
 alter table public.daggerheart_compendium_entries
@@ -44,6 +46,13 @@ alter table public.daggerheart_compendium_entries
 alter table public.daggerheart_compendium_entries
   add constraint daggerheart_compendium_effects_array
   check (jsonb_typeof(effects) = 'array');
+
+alter table public.daggerheart_compendium_entries
+  drop constraint if exists daggerheart_compendium_actions_array;
+
+alter table public.daggerheart_compendium_entries
+  add constraint daggerheart_compendium_actions_array
+  check (jsonb_typeof(actions) = 'array');
 
 create index if not exists daggerheart_compendium_category_idx
   on public.daggerheart_compendium_entries(category, is_active, sort_order);
