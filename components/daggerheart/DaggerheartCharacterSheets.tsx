@@ -9,6 +9,7 @@ import {
 } from "@/lib/daggerheart/compendium";
 import { DaggerheartEffectsPanel } from "@/components/daggerheart/DaggerheartEffectsPanel";
 import { DaggerheartActionsPanel } from "@/components/daggerheart/DaggerheartActionsPanel";
+import { DaggerheartCombatPanel } from "@/components/daggerheart/DaggerheartCombatPanel";
 import {
   type DaggerheartAction,
   collectDaggerheartActions,
@@ -1008,6 +1009,16 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               effectState={draft.effect_state}
               onManualModifierChange={setManualModifier}
               onToggleEffect={toggleEffect}
+            />
+          </Section>
+
+          <Section
+            title="Active Weapons"
+            subtitle="Equipped weapons use the current trait modifiers, Proficiency and errata-aware weapon data."
+          >
+            <DaggerheartCombatPanel
+              weapons={draft.weapons}
+              stats={effectResult.stats}
             />
           </Section>
 
