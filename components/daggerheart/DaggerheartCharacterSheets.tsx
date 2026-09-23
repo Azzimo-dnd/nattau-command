@@ -20,6 +20,7 @@ import {
 import {
   baseStatsForClass,
   deriveDaggerheartStats,
+  spellcastTraitKey,
   effectiveSnapshot,
   type DaggerheartBaseStats,
   type DaggerheartEffect,
@@ -368,6 +369,56 @@ function toNumber(value: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+const relicNames = new Set([
+  "Stride Relic",
+  "Bolster Relic",
+  "Control Relic",
+  "Attune Relic",
+  "Charm Relic",
+  "Enlighten Relic",
+]);
+
+function gearBurden(item: Pick<GearItem, "metadata">) {
+  return String(item.metadata?.burden ?? "").toLowerCase();
+}
+
+function isTwoHanded(item: Pick<GearItem, "metadata">) {
+  return gearBurden(item).includes("two");
+}
+
+function isMagicWeapon(item: Pick<GearItem, "metadata">) {
+  return String(item.metadata?.weapon_kind ?? "").toLowerCase() === "magic";
+}
+
+function equipmentConfigurationError(character: CharacterRow) {
+  const equippedPrimary = character.weapons.find(
+    (item) => item.category === "weapon_primary" && item.equipped !== false
+  );
+  const equippedSecondary = character.weapons.find(
+    (item) => item.category === "weapon_secondary" && item.equipped !== false
+  );
+  if (equippedPrimary && isTwoHanded(equippedPrimary) && equippedSecondary) {
+    return "A two-handed primary weapon cannot be used with an equipped secondary weapon.";
+  }
+  const equippedRelics = character.inventory.filter(
+    (item) => relicNames.has(item.name) && item.equipped === true
+  );
+  if (equippedRelics.length > 1) {
+    return "Only one Relic can be equipped at a time.";
+  }
+  const spellcast = spellcastTraitKey(character);
+  const illegalMagic = character.weapons.find(
+    (item) =>
+      item.equipped !== false &&
+      isMagicWeapon(item) &&
+      !spellcast
+  );
+  if (illegalMagic) {
+    return `${illegalMagic.name} is a magic weapon and requires a Spellcast trait.`;
+  }
+  return null;
+}
+
 function gearFromCompendium(
   entry: DaggerheartCompendiumEntry,
   equipped: boolean
@@ -394,10 +445,26 @@ function addEquippedGear(
   current: GearItem[],
   entry: DaggerheartCompendiumEntry
 ) {
-  const next = current.map((item) =>
-    item.category === entry.category ? { ...item, equipped: false } : item
-  );
-  return [...next, gearFromCompendium(entry, true)];
+  const added = gearFromCompendium(entry, true);
+  const addedTwoHanded =
+    entry.category === "weapon_primary" && isTwoHanded(added);
+  const blockedSecondary =
+    entry.category === "weapon_secondary" &&
+    current.some(
+      (item) =>
+        item.category === "weapon_primary" &&
+        item.equipped !== false &&
+        isTwoHanded(item)
+    );
+
+  const next = current.map((item) => {
+    if (item.category === entry.category) return { ...item, equipped: false };
+    if (addedTwoHanded && item.category === "weapon_secondary") {
+      return { ...item, equipped: false };
+    }
+    return item;
+  });
+  return [...next, { ...added, equipped: blockedSecondary ? false : true }];
 }
 
 function syncEquippedArmorMarks(armor: GearItem[], markedSlots: number) {
@@ -603,6 +670,13 @@ function GearEditor({
         nextEquipped &&
         equipMode === "exclusive-category" &&
         item.category === current.category
+      ) {
+        return { ...item, equipped: false };
+      }
+      if (
+        nextEquipped &&
+        relicNames.has(current.name) &&
+        relicNames.has(item.name)
       ) {
         return { ...item, equipped: false };
       }
@@ -940,6 +1014,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     () => draft.domain_cards.filter((card) => card.state === "loadout").length,
     [draft.domain_cards]
   );
+  const equipmentError = useMemo(
+    () => equipmentConfigurationError(draft),
+    [draft]
+  );
 
   useEffect(() => {
     const snapshot = effectiveSnapshot(effectResult);
@@ -1020,6 +1098,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   function persistRuntimePatch(
     patchValue: Partial<CharacterRow>
   ) {
+    const preview = { ...draftRef.current, ...patchValue };
+    const previewEquipmentError = equipmentConfigurationError(preview);
+    if (previewEquipmentError) {
+      setActionMessage(previewEquipmentError);
+      return;
+    }
     const normalized = normalizeRuntimePatch(patchValue);
     const base = draftRef.current;
     const optimistic: CharacterRow = { ...base, ...normalized };
@@ -1089,6 +1173,11 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const currentDraft = draftRef.current;
     if (!currentDraft.name.trim()) {
       setMessage("Give the character a name before saving.");
+      return;
+    }
+    const currentEquipmentError = equipmentConfigurationError(currentDraft);
+    if (currentEquipmentError) {
+      setMessage(currentEquipmentError);
       return;
     }
 
@@ -1909,6 +1998,11 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
           <Section title="Equipment & Loot" subtitle="Weapons, armor and inventory are intentionally open enough to support Core and Hope & Fear equipment without schema changes.">
             <div className="space-y-6">
+              {equipmentError && (
+                <div className="rounded-xl border border-amber-800/55 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-100/90">
+                  {equipmentError}
+                </div>
+              )}
               <div>
                 <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Weapons</p>
                 <div className="mb-3">
@@ -1916,6 +2010,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     categories={["weapon_primary", "weapon_secondary"]}
                     label="Choose an eligible weapon…"
                     maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
+                    allowMagicWeapons={spellcastTraitKey(draft) !== null}
                     onSelect={(entry) =>
                       patch({
                         weapons: addEquippedGear(draft.weapons, entry),
