@@ -749,7 +749,19 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                 <select
                   className={inputClass}
                   value={draft.class_key ?? ""}
-                  onChange={(e) => patch({ class_key: e.target.value || null, subclass_key: null })}
+                  onChange={(e) => {
+                    const classKey = e.target.value || null;
+                    patch({
+                      class_key: classKey,
+                      subclass_key: null,
+                      base_stats: baseStatsForClass(
+                        classKey,
+                        draft.base_stats?.proficiency ?? 1
+                      ),
+                      manual_stat_modifiers: {},
+                      effect_state: { active_effect_ids: [] },
+                    });
+                  }}
                 >
                   <option value="">Choose class</option>
                   <optgroup label="Core Rulebook">
@@ -835,32 +847,136 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             </div>
           </Section>
 
-          <Section title="Traits & Core Tracks" subtitle="The live state used during play: traits, Hope, HP, Stress, Evasion, Armor and damage thresholds." open>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-              {daggerheartTraits.map((trait) => (
+          <Section
+            title="Calculated Stats & Effects"
+            subtitle="Live totals from class, heritage, equipped gear, Loadout cards, situational effects and GM/homebrew modifiers."
+            open
+          >
+            <DaggerheartEffectsPanel
+              result={effectResult}
+              manualModifiers={draft.manual_stat_modifiers}
+              effectState={draft.effect_state}
+              onManualModifierChange={setManualModifier}
+              onToggleEffect={toggleEffect}
+            />
+          </Section>
+
+          <Section
+            title="Traits & Core Tracks"
+            subtitle="Base character values and marked resources. Temporary and equipment modifiers are calculated above."
+            open
+          >
+            <div>
+              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#8f717a]">
+                Character traits
+              </p>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                {daggerheartTraits.map((trait) => {
+                  const effective = effectResult.stats[trait];
+                  const base = draft.traits[trait] ?? 0;
+                  return (
+                    <div key={trait}>
+                      <NumberField
+                        label={`${trait} base`}
+                        value={base}
+                        onChange={(value) =>
+                          patch({ traits: { ...draft.traits, [trait]: value } })
+                        }
+                      />
+                      {effective !== base && (
+                        <p className="mt-1 text-center text-[10px] font-bold text-[#b98191]">
+                          Current {effective > 0 ? "+" : ""}
+                          {effective}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#8f717a]">
+                Marked resources
+              </p>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <NumberField
-                  key={trait}
-                  label={trait}
-                  value={draft.traits[trait] ?? 0}
-                  onChange={(value) => patch({ traits: { ...draft.traits, [trait]: value } })}
+                  label={`Hope · max ${effectResult.stats.hope_max}`}
+                  min={0}
+                  max={effectResult.stats.hope_max}
+                  value={draft.hope_current}
+                  onChange={(hope_current) => patch({ hope_current })}
                 />
-              ))}
+                <NumberField
+                  label={`HP marked · max ${effectResult.stats.hp_max}`}
+                  min={0}
+                  max={effectResult.stats.hp_max}
+                  value={draft.hp_current}
+                  onChange={(hp_current) => patch({ hp_current })}
+                />
+                <NumberField
+                  label={`Stress marked · max ${effectResult.stats.stress_max}`}
+                  min={0}
+                  max={effectResult.stats.stress_max}
+                  value={draft.stress_current}
+                  onChange={(stress_current) => patch({ stress_current })}
+                />
+                <NumberField
+                  label={`Armor marked · max ${effectResult.stats.armor_slots_max}`}
+                  min={0}
+                  max={effectResult.stats.armor_slots_max}
+                  value={draft.armor_slots_current}
+                  onChange={(armor_slots_current) => patch({ armor_slots_current })}
+                />
+              </div>
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-              <NumberField label="Evasion" value={draft.evasion} onChange={(evasion) => patch({ evasion })} />
-              <NumberField label="Proficiency" min={0} value={draft.proficiency} onChange={(proficiency) => patch({ proficiency })} />
-              <NumberField label="Hope" min={0} value={draft.hope_current} onChange={(hope_current) => patch({ hope_current })} />
-              <NumberField label="Hope max" min={0} value={draft.hope_max} onChange={(hope_max) => patch({ hope_max })} />
-              <NumberField label="HP" min={0} value={draft.hp_current} onChange={(hp_current) => patch({ hp_current })} />
-              <NumberField label="HP max" min={0} value={draft.hp_max} onChange={(hp_max) => patch({ hp_max })} />
-              <NumberField label="Stress" min={0} value={draft.stress_current} onChange={(stress_current) => patch({ stress_current })} />
-              <NumberField label="Stress max" min={0} value={draft.stress_max} onChange={(stress_max) => patch({ stress_max })} />
-              <NumberField label="Armor score" min={0} value={draft.armor_score} onChange={(armor_score) => patch({ armor_score })} />
-              <NumberField label="Armor slots" min={0} value={draft.armor_slots_current} onChange={(armor_slots_current) => patch({ armor_slots_current })} />
-              <NumberField label="Armor slots max" min={0} value={draft.armor_slots_max} onChange={(armor_slots_max) => patch({ armor_slots_max })} />
-              <NumberField label="Major threshold" min={0} value={draft.major_threshold} onChange={(major_threshold) => patch({ major_threshold })} />
-              <NumberField label="Severe threshold" min={0} value={draft.severe_threshold} onChange={(severe_threshold) => patch({ severe_threshold })} />
-            </div>
+
+            <details className="group mt-6 rounded-xl border border-[#38242c] bg-black/15">
+              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-[#977985]">
+                Base progression values · advanced
+              </summary>
+              <div className="grid gap-3 border-t border-[#302028] p-4 md:grid-cols-3 xl:grid-cols-5">
+                <NumberField
+                  label="Base Evasion"
+                  value={draft.base_stats?.evasion ?? 10}
+                  onChange={(evasion) =>
+                    patch({ base_stats: { ...draft.base_stats, evasion } })
+                  }
+                />
+                <NumberField
+                  label="Base Proficiency"
+                  min={0}
+                  value={draft.base_stats?.proficiency ?? 1}
+                  onChange={(proficiency) =>
+                    patch({ base_stats: { ...draft.base_stats, proficiency } })
+                  }
+                />
+                <NumberField
+                  label="Base HP max"
+                  min={0}
+                  value={draft.base_stats?.hp_max ?? 0}
+                  onChange={(hp_max) =>
+                    patch({ base_stats: { ...draft.base_stats, hp_max } })
+                  }
+                />
+                <NumberField
+                  label="Base Stress max"
+                  min={0}
+                  value={draft.base_stats?.stress_max ?? 6}
+                  onChange={(stress_max) =>
+                    patch({ base_stats: { ...draft.base_stats, stress_max } })
+                  }
+                />
+                <NumberField
+                  label="Base Hope max"
+                  min={0}
+                  value={draft.base_stats?.hope_max ?? 6}
+                  onChange={(hope_max) =>
+                    patch({ base_stats: { ...draft.base_stats, hope_max } })
+                  }
+                />
+              </div>
+            </details>
           </Section>
 
           <Section title="Experiences" subtitle="Create any Experiences and track their current modifiers.">
@@ -913,6 +1029,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         compendium_id: entry.id,
                         slug: entry.slug,
                         source_key: entry.source_key,
+                        effects: entry.effects ?? [],
                       },
                     ],
                   })
@@ -941,7 +1058,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                   <button type="button" className={smallButton} onClick={() => patch({ domain_cards: draft.domain_cards.filter((_, i) => i !== index) })}>×</button>
                 </div>
               ))}
-              <button type="button" className={smallButton} onClick={() => patch({ domain_cards: [...draft.domain_cards, { name: "", domain: selectedClass?.domains[0] ?? "", level: 1, state: "loadout" }] })}>+ Domain card</button>
+              <button type="button" className={smallButton} onClick={() => patch({ domain_cards: [...draft.domain_cards, { name: "", domain: selectedClass?.domains[0] ?? "", level: 1, state: "loadout", effects: [] }] })}>+ Domain card</button>
             </div>
           </Section>
 
@@ -956,23 +1073,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
                     onSelect={(entry) =>
                       patch({
-                        weapons: [
-                          ...draft.weapons,
-                          {
-                            name: entry.name,
-                            details: compendiumEntryDetails(entry),
-                            compendium_id: entry.id,
-                            category: entry.category,
-                            slug: entry.slug,
-                            source_key: entry.source_key,
-                            metadata: compendiumEffectiveMetadata(entry),
-                          },
-                        ],
+                        weapons: addEquippedGear(draft.weapons, entry),
                       })
                     }
                   />
                 </div>
-                <GearEditor value={draft.weapons} onChange={(weapons) => patch({ weapons })} addLabel="Custom weapon" />
+                <GearEditor value={draft.weapons} onChange={(weapons) => patch({ weapons })} addLabel="Custom weapon" equipMode="exclusive-category" />
               </div>
               <div>
                 <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Armor</p>
@@ -981,42 +1087,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     categories={["armor"]}
                     label="Choose eligible armor…"
                     maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
-                    onSelect={(entry) => {
-                      const metadata = compendiumEffectiveMetadata(entry);
+                    onSelect={(entry) =>
                       patch({
-                        armor: [
-                          ...draft.armor,
-                          {
-                            name: entry.name,
-                            details: compendiumEntryDetails(entry),
-                            compendium_id: entry.id,
-                            category: entry.category,
-                            slug: entry.slug,
-                            source_key: entry.source_key,
-                            metadata: compendiumEffectiveMetadata(entry),
-                          },
-                        ],
-                        armor_score:
-                          typeof metadata.base_score === "number"
-                            ? metadata.base_score
-                            : draft.armor_score,
-                        armor_slots_max:
-                          typeof metadata.base_score === "number"
-                            ? metadata.base_score
-                            : draft.armor_slots_max,
-                        major_threshold:
-                          typeof metadata.base_major === "number"
-                            ? metadata.base_major + draft.level
-                            : draft.major_threshold,
-                        severe_threshold:
-                          typeof metadata.base_severe === "number"
-                            ? metadata.base_severe + draft.level
-                            : draft.severe_threshold,
-                      });
-                    }}
+                        armor: addEquippedGear(draft.armor, entry),
+                        armor_slots_current: 0,
+                      })
+                    }
                   />
                 </div>
-                <GearEditor value={draft.armor} onChange={(armor) => patch({ armor })} addLabel="Custom armor" />
+                <GearEditor value={draft.armor} onChange={(armor) => patch({ armor })} addLabel="Custom armor" equipMode="exclusive-category" />
               </div>
               <div>
                 <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Inventory / Loot</p>
@@ -1028,21 +1107,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                       patch({
                         inventory: [
                           ...draft.inventory,
-                          {
-                            name: entry.name,
-                            details: compendiumEntryDetails(entry),
-                            compendium_id: entry.id,
-                            category: entry.category,
-                            slug: entry.slug,
-                            source_key: entry.source_key,
-                            metadata: compendiumEffectiveMetadata(entry),
-                          },
+                          gearFromCompendium(entry, false),
                         ],
                       })
                     }
                   />
                 </div>
-                <GearEditor value={draft.inventory} onChange={(inventory) => patch({ inventory })} addLabel="Custom item" />
+                <GearEditor value={draft.inventory} onChange={(inventory) => patch({ inventory })} addLabel="Custom item" equipMode="independent" />
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 <NumberField label="Gold handfuls" min={0} value={draft.gold.handfuls} onChange={(handfuls) => patch({ gold: { ...draft.gold, handfuls } })} />
