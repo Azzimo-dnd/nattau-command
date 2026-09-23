@@ -44,6 +44,7 @@ export type DaggerheartAction = {
   };
   results?: DaggerheartActionResult[];
   consume_quantity?: number;
+  preserve_rule_after_use?: boolean;
   activate_effect_id?: string;
   activate_effect_ids?: string[];
   activate_effect_roll?: DaggerheartActionRoll;
