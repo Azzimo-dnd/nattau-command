@@ -15,8 +15,8 @@ export type DaggerheartActionRoll = {
 };
 
 export type DaggerheartActionResult = {
-  type: "clear";
-  resource: "hp" | "stress" | "armor";
+  type: "clear" | "gain";
+  resource: "hope" | "hp" | "stress" | "armor";
   amount?: number;
   roll?: DaggerheartActionRoll;
 };
@@ -39,6 +39,9 @@ export type DaggerheartAction = {
   results?: DaggerheartActionResult[];
   consume_quantity?: number;
   activate_effect_id?: string;
+  activate_effect_roll?: DaggerheartActionRoll;
+  deactivate_effect_id?: string;
+  feature?: string;
 };
 
 export type DaggerheartActionGearItem = {
@@ -63,11 +66,19 @@ export type DaggerheartActionDomainCard = {
   actions?: DaggerheartAction[];
 };
 
+export type DaggerheartActionIntrinsicSource = {
+  id: string;
+  name: string;
+  actions?: DaggerheartAction[];
+  effects?: DaggerheartEffect[];
+};
+
 export type DaggerheartActionCharacter = {
   weapons: DaggerheartActionGearItem[];
   armor: DaggerheartActionGearItem[];
   inventory: DaggerheartActionGearItem[];
   domain_cards: DaggerheartActionDomainCard[];
+  intrinsic_sources?: DaggerheartActionIntrinsicSource[];
   hope_current: number;
   hope_max: number;
   hp_current: number;
@@ -82,7 +93,7 @@ export type DaggerheartActionCharacter = {
 export type DaggerheartActionSource = {
   source_key: string;
   source_name: string;
-  collection: "weapons" | "armor" | "inventory" | "domain_cards";
+  collection: "weapons" | "armor" | "inventory" | "domain_cards" | "intrinsic";
   index: number;
   action: DaggerheartAction;
   action_key: string;
@@ -151,6 +162,23 @@ export function collectDaggerheartActions(
   collectGear("weapons", character.weapons, "weapon");
   collectGear("armor", character.armor, "armor");
   collectGear("inventory", character.inventory, "inventory");
+
+  character.intrinsic_sources?.forEach((item, index) => {
+    const sourceKey = item.id;
+    for (const action of item.actions ?? []) {
+      sources.push({
+        source_key: sourceKey,
+        source_name: item.name,
+        collection: "intrinsic",
+        index,
+        action,
+        action_key: `${sourceKey}:action:${action.id}`,
+        active: true,
+        quantity: null,
+        effects: item.effects ?? [],
+      });
+    }
+  });
 
   character.domain_cards.forEach((card, index) => {
     const sourceKey = daggerheartSourceId(card, "card");
@@ -259,28 +287,50 @@ export function resolveDaggerheartAction(
 
   for (const result of source.action.results ?? []) {
     const amount = result.roll ? rollAmount(result.roll) : result.amount ?? 0;
-    if (result.resource === "hp") hp = Math.max(0, hp - amount);
-    if (result.resource === "stress") stress = Math.max(0, stress - amount);
-    if (result.resource === "armor") armor = Math.max(0, armor - amount);
+    if (result.type === "clear") {
+      if (result.resource === "hp") hp = Math.max(0, hp - amount);
+      if (result.resource === "stress") stress = Math.max(0, stress - amount);
+      if (result.resource === "armor") armor = Math.max(0, armor - amount);
+      if (result.resource === "hope") hope = Math.max(0, hope - amount);
+    } else {
+      if (result.resource === "hope") hope = Math.min(character.hope_max, hope + amount);
+      if (result.resource === "hp") hp = Math.min(character.hp_max, hp + amount);
+      if (result.resource === "stress") stress = Math.min(character.stress_max, stress + amount);
+      if (result.resource === "armor") armor = Math.min(character.armor_slots_max, armor + amount);
+    }
 
     const expression = result.roll
       ? `${result.roll.count}d${result.roll.die}${(result.roll.bonus ?? 0) > 0 ? `+${result.roll.bonus}` : ""}`
       : String(amount);
     rollMessages.push(
-      `${source.action.label}: ${expression} → ${amount} ${result.resource} cleared`
+      `${source.action.label}: ${expression} → ${amount} ${result.resource} ${result.type === "clear" ? "cleared" : "gained"}`
     );
   }
 
   const currentState = character.effect_state ?? {};
   const activeIds = new Set(currentState.active_effect_ids ?? []);
+  const activeValues = { ...(currentState.active_effect_values ?? {}) };
 
   if (source.action.activate_effect_id) {
     const matchingEffect = source.effects.find(
       (effect) => effect.id === source.action.activate_effect_id
     );
     if (matchingEffect) {
-      activeIds.add(`${source.source_key}:${matchingEffect.id}`);
+      const effectKey = `${source.source_key}:${matchingEffect.id}`;
+      activeIds.add(effectKey);
+      if (source.action.activate_effect_roll) {
+        const rolled = rollAmount(source.action.activate_effect_roll);
+        activeValues[effectKey] = rolled;
+        const expression = `${source.action.activate_effect_roll.count}d${source.action.activate_effect_roll.die}${(source.action.activate_effect_roll.bonus ?? 0) > 0 ? `+${source.action.activate_effect_roll.bonus}` : ""}`;
+        rollMessages.push(`${source.action.label}: ${expression} → temporary effect +${rolled}`);
+      }
     }
+  }
+
+  if (source.action.deactivate_effect_id) {
+    const effectKey = `${source.source_key}:${source.action.deactivate_effect_id}`;
+    activeIds.delete(effectKey);
+    delete activeValues[effectKey];
   }
 
   const uses = { ...(currentState.action_uses ?? {}) };
@@ -298,6 +348,7 @@ export function resolveDaggerheartAction(
       effect_state: {
         ...currentState,
         active_effect_ids: [...activeIds],
+        active_effect_values: activeValues,
         action_uses: uses,
       },
     },
@@ -322,14 +373,15 @@ export function resetDaggerheartActionUses(
           : ["scene"];
 
   const activeIds = new Set(effectState.active_effect_ids ?? []);
+  const activeValues = { ...(effectState.active_effect_values ?? {}) };
 
   for (const source of sources) {
     if (source.action.limit && resets.includes(source.action.limit.reset)) {
       delete uses[source.action_key];
       if (source.action.activate_effect_id) {
-        activeIds.delete(
-          `${source.source_key}:${source.action.activate_effect_id}`
-        );
+        const effectKey = `${source.source_key}:${source.action.activate_effect_id}`;
+        activeIds.delete(effectKey);
+        delete activeValues[effectKey];
       }
     }
   }
@@ -337,6 +389,7 @@ export function resetDaggerheartActionUses(
   return {
     ...effectState,
     active_effect_ids: [...activeIds],
+    active_effect_values: activeValues,
     action_uses: uses,
   };
 }
