@@ -321,11 +321,22 @@ export function resetDaggerheartActionUses(
           ? ["scene", "rest", "long_rest", "session"]
           : ["scene"];
 
+  const activeIds = new Set(effectState.active_effect_ids ?? []);
+
   for (const source of sources) {
     if (source.action.limit && resets.includes(source.action.limit.reset)) {
       delete uses[source.action_key];
+      if (source.action.activate_effect_id) {
+        activeIds.delete(
+          `${source.source_key}:${source.action.activate_effect_id}`
+        );
+      }
     }
   }
 
-  return { ...effectState, action_uses: uses };
+  return {
+    ...effectState,
+    active_effect_ids: [...activeIds],
+    action_uses: uses,
+  };
 }
