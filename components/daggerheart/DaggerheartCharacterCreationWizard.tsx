@@ -46,6 +46,7 @@ type DomainCard = {
   slug?: string;
   source_key?: string;
   details?: string;
+  metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
 };
@@ -1144,6 +1145,7 @@ export function DaggerheartCharacterCreationWizard({
                       slug: entry.slug,
                       source_key: entry.source_key,
                       details: compendiumEntryDetails(entry),
+                      metadata: compendiumEffectiveMetadata(entry),
                       effects: entry.effects ?? [],
                       actions: entry.actions ?? [],
                     },
