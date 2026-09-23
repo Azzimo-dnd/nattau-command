@@ -53,6 +53,12 @@ const primaryItems: NavigationItem[] = [
 const desktopItems: NavigationItem[] = [
   ...primaryItems,
   {
+    label: "Compendium",
+    href: "/campaigns/barovia/compendium",
+    icon: "spark",
+    description: "Search the private Daggerheart Core and Hope & Fear rules archive.",
+  },
+  {
     label: "Whispers",
     href: "/campaigns/barovia/whispers",
     icon: "chat",
@@ -366,6 +372,14 @@ function MobileMoreSheet({
               <span className="mt-3 text-sm font-semibold">{item.label}</span>
             </Link>
           ))}
+          <Link
+            href="/campaigns/barovia/compendium"
+            className="flex min-h-20 flex-col justify-between rounded-2xl border border-[#432832] bg-black/20 p-3 text-[#d1b6be]"
+          >
+            <NavIcon name="spark" className="h-5 w-5" />
+            <span className="mt-3 text-sm font-semibold">Compendium</span>
+          </Link>
+
           <Link
             href="/campaigns/barovia/whispers"
             className="relative flex min-h-20 flex-col justify-between rounded-2xl border border-[#432832] bg-black/20 p-3 text-[#d1b6be]"
