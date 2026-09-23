@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   classOption,
-  daggerheartAncestries,
   daggerheartClasses,
   daggerheartCommunities,
   daggerheartTraits,
@@ -14,6 +13,10 @@ import {
   compendiumEntryDetails,
 } from "@/components/daggerheart/DaggerheartCompendiumPicker";
 import type { DaggerheartCompendiumEntry } from "@/lib/daggerheart/compendium";
+import {
+  DaggerheartHeritageBuilder,
+  type HeritageState,
+} from "@/components/daggerheart/DaggerheartHeritageBuilder";
 
 type TraitKey = (typeof daggerheartTraits)[number];
 type Traits = Record<TraitKey, number>;
@@ -49,6 +52,7 @@ export type WizardCharacter = {
   subclass_key: string | null;
   ancestry_key: string | null;
   community_key: string | null;
+  heritage_state: HeritageState;
   transformations: string[];
   traits: Traits;
   evasion: number;
@@ -131,6 +135,73 @@ function classManagedResources(resources: Resource[]) {
   return resources.filter((resource) => !["Favor", "Focus"].includes(resource.name));
 }
 
+function hasAncestryFeature(
+  character: WizardCharacter,
+  ancestry: string,
+  feature: string
+) {
+  if (character.heritage_state?.mixed) {
+    return [character.heritage_state.feature_one, character.heritage_state.feature_two]
+      .some((item) => item?.ancestry === ancestry && item?.name === feature);
+  }
+  return character.ancestry_key === ancestry;
+}
+
+function hasSpellcastTrait(character: WizardCharacter) {
+  return !["guardian", "warrior", "brawler"].includes(character.class_key ?? "");
+}
+
+function deriveStartingStats(character: WizardCharacter) {
+  const option = classOption(character.class_key);
+  if (!option) return null;
+
+  const activePrimary = character.weapons.find(
+    (item) => item.category === "weapon_primary"
+  );
+  const armor = character.armor[0];
+  const armorMeta = armor?.metadata ?? {};
+
+  let evasion = option.startingEvasion;
+  let hpMax = option.startingHitPoints;
+  let stressMax = 6;
+  let armorScore =
+    typeof armorMeta.base_score === "number" ? armorMeta.base_score : 0;
+  let majorThreshold =
+    typeof armorMeta.base_major === "number"
+      ? armorMeta.base_major + character.level
+      : 0;
+  let severeThreshold =
+    typeof armorMeta.base_severe === "number"
+      ? armorMeta.base_severe + character.level
+      : 0;
+
+  if (character.class_key === "brawler" && !activePrimary) evasion += 1;
+  if (hasAncestryFeature(character, "Giant", "Endurance")) hpMax += 1;
+  if (hasAncestryFeature(character, "Human", "High Stamina")) stressMax += 1;
+  if (hasAncestryFeature(character, "Simiah", "Nimble")) evasion += 1;
+
+  if (hasAncestryFeature(character, "Earthkin", "Stoneskin")) {
+    armorScore += 1;
+    if (majorThreshold) majorThreshold += 1;
+    if (severeThreshold) severeThreshold += 1;
+  }
+
+  if (hasAncestryFeature(character, "Galapa", "Shell")) {
+    if (majorThreshold) majorThreshold += character.proficiency;
+    if (severeThreshold) severeThreshold += character.proficiency;
+  }
+
+  return {
+    evasion,
+    hp_max: hpMax,
+    stress_max: stressMax,
+    armor_score: armorScore,
+    armor_slots_max: armorScore,
+    major_threshold: majorThreshold,
+    severe_threshold: severeThreshold,
+  };
+}
+
 export function DaggerheartCharacterCreationWizard({
   draft,
   patch,
@@ -143,6 +214,40 @@ export function DaggerheartCharacterCreationWizard({
   const selectedClass = classOption(draft.class_key);
   const expectedDomainCards =
     draft.class_key === "wizard" && draft.subclass_key === "school-knowledge" ? 3 : 2;
+  const purposefulDesign = hasAncestryFeature(draft, "Clank", "Purposeful Design");
+  const spellcastAvailable = hasSpellcastTrait(draft);
+
+  useEffect(() => {
+    const derived = deriveStartingStats(draft);
+    if (!derived) return;
+    if (
+      draft.evasion !== derived.evasion ||
+      draft.hp_max !== derived.hp_max ||
+      draft.stress_max !== derived.stress_max ||
+      draft.armor_score !== derived.armor_score ||
+      draft.armor_slots_max !== derived.armor_slots_max ||
+      draft.major_threshold !== derived.major_threshold ||
+      draft.severe_threshold !== derived.severe_threshold
+    ) {
+      patch(derived);
+    }
+  }, [
+    draft.ancestry_key,
+    draft.armor,
+    draft.class_key,
+    draft.heritage_state,
+    draft.level,
+    draft.proficiency,
+    draft.weapons,
+    draft.evasion,
+    draft.hp_max,
+    draft.stress_max,
+    draft.armor_score,
+    draft.armor_slots_max,
+    draft.major_threshold,
+    draft.severe_threshold,
+    patch,
+  ]);
 
   useEffect(() => {
     if (step !== 4) return;
@@ -236,8 +341,21 @@ export function DaggerheartCharacterCreationWizard({
       }
     }
 
-    if (step === 1 && (!draft.ancestry_key || !draft.community_key)) {
-      return "Choose both an ancestry and a community.";
+    if (step === 1) {
+      if (!draft.ancestry_key || !draft.community_key) {
+        return "Choose both an ancestry and a community.";
+      }
+      if (
+        draft.heritage_state?.mixed &&
+        (
+          !draft.heritage_state.ancestry_one ||
+          !draft.heritage_state.ancestry_two ||
+          !draft.heritage_state.feature_one ||
+          !draft.heritage_state.feature_two
+        )
+      ) {
+        return "Mixed ancestry requires two different lineages and one feature from each.";
+      }
     }
 
     if (step === 2 && !isStartingTraitSpread(draft.traits)) {
@@ -267,7 +385,21 @@ export function DaggerheartCharacterCreationWizard({
 
     if (step === 6) {
       const experiences = draft.experiences.filter((item) => item.name.trim());
-      if (experiences.length !== 2 || experiences.some((item) => item.modifier !== 2)) {
+      if (experiences.length !== 2) {
+        return "A level 1 character starts with exactly two Experiences.";
+      }
+      if (purposefulDesign) {
+        const chosen = draft.heritage_state?.purposeful_experience_index;
+        if (chosen !== 0 && chosen !== 1) {
+          return "Purposeful Design must improve one of your two starting Experiences.";
+        }
+        if (
+          experiences[chosen].modifier !== 3 ||
+          experiences[chosen === 0 ? 1 : 0].modifier !== 2
+        ) {
+          return "Purposeful Design gives one starting Experience +3 and the other remains +2.";
+        }
+      } else if (experiences.some((item) => item.modifier !== 2)) {
         return "A level 1 character starts with exactly two Experiences at +2.";
       }
     }
@@ -594,14 +726,21 @@ export function DaggerheartCharacterCreationWizard({
               <h3 className="mt-2 font-serif text-2xl font-black text-[#ead7dc]">Choose heritage</h3>
               <p className="mt-2 text-sm text-[#97848b]">Heritage combines ancestry and community. Hope & Fear options are included.</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <label>
-                <span className="mb-1.5 block text-xs text-[#a48d95]">Ancestry</span>
-                <select className={fieldClass} value={draft.ancestry_key ?? ""} onChange={(e) => patch({ ancestry_key: e.target.value || null })}>
-                  <option value="">Choose ancestry</option>
-                  {daggerheartAncestries.map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
-              </label>
+            <div className="grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
+              <DaggerheartHeritageBuilder
+                ancestryKey={draft.ancestry_key}
+                value={draft.heritage_state ?? {}}
+                onChange={(ancestryKey, heritageState) =>
+                  patch({
+                    ancestry_key: ancestryKey,
+                    heritage_state: heritageState,
+                    experiences: draft.experiences.map((item) => ({
+                      ...item,
+                      modifier: 2,
+                    })),
+                  })
+                }
+              />
               <label>
                 <span className="mb-1.5 block text-xs text-[#a48d95]">Community</span>
                 <select className={fieldClass} value={draft.community_key ?? ""} onChange={(e) => patch({ community_key: e.target.value || null })}>
@@ -703,6 +842,7 @@ export function DaggerheartCharacterCreationWizard({
                 categories={["weapon_primary"]}
                 label="Choose Tier 1 primary weapon…"
                 maxTier={1}
+                allowMagicWeapons={spellcastAvailable}
                 onSelect={(entry) => replaceWeapon("weapon_primary", entry)}
               />
               {draft.weapons.filter((item) => item.category === "weapon_primary").map((item) => (
@@ -719,6 +859,7 @@ export function DaggerheartCharacterCreationWizard({
                 categories={["weapon_secondary"]}
                 label="Choose Tier 1 secondary weapon…"
                 maxTier={1}
+                allowMagicWeapons={spellcastAvailable}
                 onSelect={(entry) => replaceWeapon("weapon_secondary", entry)}
               />
               {draft.weapons.filter((item) => item.category === "weapon_secondary").map((item) => (
@@ -817,7 +958,10 @@ export function DaggerheartCharacterCreationWizard({
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9c6172]">Step 7</p>
               <h3 className="mt-2 font-serif text-2xl font-black text-[#ead7dc]">Create Experiences</h3>
-              <p className="mt-2 text-sm text-[#97848b]">Create exactly two specific Experiences. Both start at +2.</p>
+              <p className="mt-2 text-sm text-[#97848b]">
+                Create exactly two specific Experiences. Both start at +2
+                {purposefulDesign ? ", then Purposeful Design raises one of them to +3." : "."}
+              </p>
             </div>
             {[0, 1].map((index) => {
               const item = draft.experiences[index] ?? { name: "", modifier: 2 };
@@ -833,13 +977,65 @@ export function DaggerheartCharacterCreationWizard({
                         draft.experiences[0] ?? { name: "", modifier: 2 },
                         draft.experiences[1] ?? { name: "", modifier: 2 },
                       ];
-                      next[index] = { name: e.target.value, modifier: 2 };
+                      const purposefulIndex = draft.heritage_state?.purposeful_experience_index;
+                      next[index] = {
+                        name: e.target.value,
+                        modifier:
+                          purposefulDesign && purposefulIndex === index ? 3 : 2,
+                      };
                       patch({ experiences: next });
                     }}
                   />
                 </label>
               );
             })}
+            {purposefulDesign && (
+              <div className="rounded-2xl border border-[#4c3039] bg-black/15 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#aa7382]">
+                  Clank · Purposeful Design
+                </p>
+                <p className="mt-2 text-xs leading-5 text-[#8f7b82]">
+                  Choose which Experience best reflects what your Clank was built for. It gains a permanent +1 bonus.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {[0, 1].map((index) => {
+                    const experience = draft.experiences[index] ?? { name: "", modifier: 2 };
+                    const selected = draft.heritage_state?.purposeful_experience_index === index;
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        disabled={!experience.name.trim()}
+                        onClick={() => {
+                          const next = [
+                            draft.experiences[0] ?? { name: "", modifier: 2 },
+                            draft.experiences[1] ?? { name: "", modifier: 2 },
+                          ].map((item, itemIndex) => ({
+                            ...item,
+                            modifier: itemIndex === index ? 3 : 2,
+                          }));
+                          patch({
+                            experiences: next,
+                            heritage_state: {
+                              ...draft.heritage_state,
+                              purposeful_experience_index: index,
+                            },
+                          });
+                        }}
+                        className={`rounded-xl border p-3 text-left text-sm transition disabled:opacity-40 ${
+                          selected
+                            ? "border-[#9a5064] bg-[#401823] text-[#f0d5dc]"
+                            : "border-[#3a252d] bg-black/15 text-[#ad979e]"
+                        }`}
+                      >
+                        {experience.name || `Experience ${index + 1}`}
+                        <span className="ml-2 font-black">{selected ? "+3" : "+2"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
