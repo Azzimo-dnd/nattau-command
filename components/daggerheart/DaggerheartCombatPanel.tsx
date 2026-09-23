@@ -70,13 +70,13 @@ export function DaggerheartCombatPanel({
   const equipped = weapons.filter(
     (weapon) =>
       weapon.equipped !== false &&
-      ["weapon_primary", "weapon_secondary"].includes(weapon.category ?? "")
+      ["weapon_primary", "weapon_secondary", "beastform"].includes(weapon.category ?? "")
   );
 
   if (equipped.length === 0) {
     return (
       <p className="rounded-xl border border-[#34242b] bg-black/15 p-4 text-sm text-[#806f75]">
-        No weapon is equipped. Equip a weapon below to create its live attack profile.
+        No weapon or active Beastform attack is available. Equip a weapon or enter a Beastform to create its live attack profile.
       </p>
     );
   }
@@ -101,7 +101,9 @@ export function DaggerheartCombatPanel({
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#936675]">
                   {weapon.category === "weapon_secondary"
                     ? "Secondary weapon"
-                    : "Primary weapon"}
+                    : weapon.category === "beastform"
+                      ? "Beastform attack"
+                      : "Primary weapon"}
                 </p>
                 <h4 className="mt-1 font-serif text-xl font-black text-[#ead8dd]">
                   {weapon.name}
