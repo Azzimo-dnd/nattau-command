@@ -16,6 +16,8 @@ const statLabels: Record<DaggerheartEffectStat, string> = {
   knowledge: "Knowledge",
   evasion: "Evasion",
   proficiency: "Proficiency",
+  damage_proficiency_bonus: "Damage Proficiency bonus",
+  primary_damage_proficiency_bonus: "Primary damage Proficiency bonus",
   hope_max: "Hope max",
   hp_max: "HP max",
   stress_max: "Stress max",
