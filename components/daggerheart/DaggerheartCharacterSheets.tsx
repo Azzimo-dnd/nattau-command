@@ -9,6 +9,12 @@ import {
 } from "@/lib/daggerheart/compendium";
 import { DaggerheartEffectsPanel } from "@/components/daggerheart/DaggerheartEffectsPanel";
 import {
+  type DaggerheartAction,
+  collectDaggerheartActions,
+  resetDaggerheartActionUses,
+  resolveDaggerheartAction,
+} from "@/lib/daggerheart/actions";
+import {
   baseStatsForClass,
   deriveDaggerheartStats,
   effectiveSnapshot,
@@ -41,6 +47,7 @@ type DomainCard = {
   slug?: string;
   source_key?: string;
   effects?: DaggerheartEffect[];
+  actions?: DaggerheartAction[];
 };
 type GearItem = {
   instance_id?: string;
@@ -53,6 +60,7 @@ type GearItem = {
   tier?: number | null;
   metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
+  actions?: DaggerheartAction[];
   equipped?: boolean;
   quantity?: number;
 };
@@ -207,6 +215,7 @@ function gearFromCompendium(
     tier: entry.tier,
     metadata: compendiumEffectiveMetadata(entry),
     effects: entry.effects ?? [],
+    actions: entry.actions ?? [],
     equipped,
     quantity: 1,
   };
