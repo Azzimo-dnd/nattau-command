@@ -84,6 +84,8 @@ export type DaggerheartEffectState = {
   active_effect_ids?: string[];
   active_effect_values?: Record<string, number>;
   action_uses?: Record<string, number>;
+  action_resets?: Record<string, "scene" | "rest" | "long_rest" | "session">;
+  effect_resets?: Record<string, "scene" | "rest" | "long_rest" | "session">;
 };
 
 export type DaggerheartEffectGearItem = {
@@ -553,6 +555,13 @@ export function deriveDaggerheartStats(
     const severe = numberValue(metadata.base_severe);
     stats.major_threshold = major > 0 ? major + character.level : stats.major_threshold;
     stats.severe_threshold = severe > 0 ? severe + character.level : stats.severe_threshold;
+  } else {
+    // Core unarmored thresholds: level / 2 × level before other modifiers.
+    // Bare Bones and other explicit "set" effects can replace these later.
+    stats.major_threshold =
+      stats.major_threshold > 0 ? stats.major_threshold : character.level;
+    stats.severe_threshold =
+      stats.severe_threshold > 0 ? stats.severe_threshold : character.level * 2;
   }
 
   stats.armor_slots_max = Math.max(0, stats.armor_score);
