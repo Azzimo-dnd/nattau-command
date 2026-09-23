@@ -50,12 +50,14 @@ export function DaggerheartEffectsPanel({
   effectState,
   onManualModifierChange,
   onToggleEffects,
+  actionControlledEffectKeys,
 }: {
   result: DaggerheartEffectResult;
   manualModifiers: DaggerheartManualStatModifiers;
   effectState: DaggerheartEffectState;
   onManualModifierChange: (stat: DaggerheartEffectStat, value: number) => void;
   onToggleEffects: (effectKeys: string[]) => void;
+  actionControlledEffectKeys: Set<string>;
 }) {
   const activeIds = new Set(effectState.active_effect_ids ?? []);
   const toggleGroups = Object.values(
@@ -224,16 +226,17 @@ export function DaggerheartEffectsPanel({
                 )
                 .join(" · ");
 
+              const actionControlled = keys.some((key) =>
+                actionControlledEffectKeys.has(key)
+              );
+
               return (
-                <button
+                <div
                   key={first.bundle_id ?? first.key}
-                  type="button"
-                  disabled={limitReached}
-                  onClick={() => onToggleEffects(keys)}
-                  className={`rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                  className={`rounded-xl border p-3 transition ${
                     active
                       ? "border-[#9c5065] bg-[#421824]/70"
-                      : "border-[#39252d] bg-[#120b0f] hover:border-[#654052]"
+                      : "border-[#39252d] bg-[#120b0f]"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -269,7 +272,33 @@ export function DaggerheartEffectsPanel({
                       {first.duration}
                     </p>
                   )}
-                </button>
+
+                  {actionControlled ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#2d1d23] pt-3">
+                      <span className="rounded-lg border border-sky-900/40 bg-sky-950/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-200/85">
+                        Activate from Actions
+                      </span>
+                      <button
+                        type="button"
+                        disabled={limitReached}
+                        onClick={() => onToggleEffects(keys)}
+                        className="min-h-8 rounded-lg border border-[#54343f] bg-black/20 px-2.5 text-[10px] font-bold uppercase tracking-[0.11em] text-[#9b858c] transition hover:border-[#76505c] hover:text-[#ceb5bd] disabled:opacity-40"
+                        title="Only use this to correct state after the cost/effect was resolved outside the app."
+                      >
+                        Manual correction
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={limitReached}
+                      onClick={() => onToggleEffects(keys)}
+                      className="mt-3 min-h-9 rounded-lg border border-[#5e3744] bg-[#241219] px-3 text-xs font-bold text-[#c9adb6] transition hover:border-[#865064] hover:bg-[#321721] disabled:opacity-40"
+                    >
+                      {active ? "Deactivate" : "Activate"}
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
