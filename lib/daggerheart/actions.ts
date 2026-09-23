@@ -39,8 +39,10 @@ export type DaggerheartAction = {
   results?: DaggerheartActionResult[];
   consume_quantity?: number;
   activate_effect_id?: string;
+  activate_effect_ids?: string[];
   activate_effect_roll?: DaggerheartActionRoll;
   deactivate_effect_id?: string;
+  deactivate_effect_ids?: string[];
   feature?: string;
 };
 
@@ -311,24 +313,30 @@ export function resolveDaggerheartAction(
   const activeIds = new Set(currentState.active_effect_ids ?? []);
   const activeValues = { ...(currentState.active_effect_values ?? {}) };
 
-  if (source.action.activate_effect_id) {
-    const matchingEffect = source.effects.find(
-      (effect) => effect.id === source.action.activate_effect_id
-    );
-    if (matchingEffect) {
-      const effectKey = `${source.source_key}:${matchingEffect.id}`;
-      activeIds.add(effectKey);
-      if (source.action.activate_effect_roll) {
-        const rolled = rollAmount(source.action.activate_effect_roll);
-        activeValues[effectKey] = rolled;
-        const expression = `${source.action.activate_effect_roll.count}d${source.action.activate_effect_roll.die}${(source.action.activate_effect_roll.bonus ?? 0) > 0 ? `+${source.action.activate_effect_roll.bonus}` : ""}`;
-        rollMessages.push(`${source.action.label}: ${expression} → temporary effect +${rolled}`);
-      }
-    }
+  const activateIds = [
+    ...(source.action.activate_effect_id ? [source.action.activate_effect_id] : []),
+    ...(source.action.activate_effect_ids ?? []),
+  ];
+  let rolledActivation: number | null = null;
+  if (source.action.activate_effect_roll && activateIds.length > 0) {
+    rolledActivation = rollAmount(source.action.activate_effect_roll);
+    const expression = `${source.action.activate_effect_roll.count}d${source.action.activate_effect_roll.die}${(source.action.activate_effect_roll.bonus ?? 0) > 0 ? `+${source.action.activate_effect_roll.bonus}` : ""}`;
+    rollMessages.push(`${source.action.label}: ${expression} → temporary effect +${rolledActivation}`);
+  }
+  for (const id of activateIds) {
+    const matchingEffect = source.effects.find((effect) => effect.id === id);
+    if (!matchingEffect) continue;
+    const effectKey = `${source.source_key}:${matchingEffect.id}`;
+    activeIds.add(effectKey);
+    if (rolledActivation !== null) activeValues[effectKey] = rolledActivation;
   }
 
-  if (source.action.deactivate_effect_id) {
-    const effectKey = `${source.source_key}:${source.action.deactivate_effect_id}`;
+  const deactivateIds = [
+    ...(source.action.deactivate_effect_id ? [source.action.deactivate_effect_id] : []),
+    ...(source.action.deactivate_effect_ids ?? []),
+  ];
+  for (const id of deactivateIds) {
+    const effectKey = `${source.source_key}:${id}`;
     activeIds.delete(effectKey);
     delete activeValues[effectKey];
   }
@@ -378,8 +386,11 @@ export function resetDaggerheartActionUses(
   for (const source of sources) {
     if (source.action.limit && resets.includes(source.action.limit.reset)) {
       delete uses[source.action_key];
-      if (source.action.activate_effect_id) {
-        const effectKey = `${source.source_key}:${source.action.activate_effect_id}`;
+      for (const id of [
+        ...(source.action.activate_effect_id ? [source.action.activate_effect_id] : []),
+        ...(source.action.activate_effect_ids ?? []),
+      ]) {
+        const effectKey = `${source.source_key}:${id}`;
         activeIds.delete(effectKey);
         delete activeValues[effectKey];
       }
