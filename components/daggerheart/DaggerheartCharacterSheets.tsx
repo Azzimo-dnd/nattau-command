@@ -1010,6 +1010,20 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     () => collectDaggerheartActions(actionCharacter),
     [actionCharacter]
   );
+  const actionControlledEffectKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const source of actionSources) {
+      for (const effectId of [
+        ...(source.action.activate_effect_id
+          ? [source.action.activate_effect_id]
+          : []),
+        ...(source.action.activate_effect_ids ?? []),
+      ]) {
+        keys.add(`${source.source_key}:${effectId}`);
+      }
+    }
+    return keys;
+  }, [actionSources]);
   const domainLoadoutCount = useMemo(
     () => draft.domain_cards.filter((card) => card.state === "loadout").length,
     [draft.domain_cards]
@@ -1672,6 +1686,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               effectState={draft.effect_state}
               onManualModifierChange={setManualModifier}
               onToggleEffects={toggleEffects}
+              actionControlledEffectKeys={actionControlledEffectKeys}
             />
           </Section>
 
