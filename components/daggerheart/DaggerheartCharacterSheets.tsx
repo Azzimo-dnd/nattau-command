@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DaggerheartCompendiumPicker, compendiumEntryDetails } from "@/components/daggerheart/DaggerheartCompendiumPicker";
 import {
@@ -131,6 +131,7 @@ type CharacterRow = {
   base_stats: DaggerheartBaseStats;
   manual_stat_modifiers: DaggerheartManualStatModifiers;
   effect_state: DaggerheartEffectState;
+  state_revision: number;
 };
 
 type RosterRow = {
@@ -201,6 +202,93 @@ function emptyCharacter(campaignId: string, playerId: string): CharacterRow {
     base_stats: baseStatsForClass(null, 1),
     manual_stat_modifiers: {},
     effect_state: { active_effect_ids: [] },
+    state_revision: 0,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function validCharacterRow(value: unknown): value is CharacterRow {
+  if (!isRecord(value)) return false;
+  const arrays = [
+    "transformations",
+    "experiences",
+    "domain_cards",
+    "weapons",
+    "armor",
+    "inventory",
+    "background_answers",
+    "connections",
+    "advancements",
+    "special_resources",
+  ] as const;
+  const objects = [
+    "heritage_state",
+    "traits",
+    "gold",
+    "class_state",
+    "subclass_state",
+    "base_stats",
+    "manual_stat_modifiers",
+    "effect_state",
+  ] as const;
+  if (arrays.some((key) => !Array.isArray(value[key]))) return false;
+  if (objects.some((key) => !isRecord(value[key]))) return false;
+  const classState = value.class_state as Record<string, unknown>;
+  if ("options" in classState && !Array.isArray(classState.options)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.campaign_id === "string" &&
+    typeof value.player_id === "string"
+  );
+}
+
+function mutableCharacterPayload(character: CharacterRow) {
+  return {
+    is_active: character.is_active,
+    name: character.name.trim(),
+    pronouns: character.pronouns.trim(),
+    level: character.level,
+    class_key: character.class_key,
+    subclass_key: character.subclass_key,
+    ancestry_key: character.ancestry_key,
+    community_key: character.community_key,
+    heritage_state: character.heritage_state,
+    transformations: character.transformations,
+    traits: character.traits,
+    base_stats: character.base_stats,
+    manual_stat_modifiers: character.manual_stat_modifiers,
+    effect_state: character.effect_state,
+    evasion: character.evasion,
+    proficiency: character.proficiency,
+    hope_current: character.hope_current,
+    hope_max: character.hope_max,
+    hp_current: character.hp_current,
+    hp_max: character.hp_max,
+    stress_current: character.stress_current,
+    stress_max: character.stress_max,
+    armor_score: character.armor_score,
+    armor_slots_current: character.armor_slots_current,
+    armor_slots_max: character.armor_slots_max,
+    major_threshold: character.major_threshold,
+    severe_threshold: character.severe_threshold,
+    experiences: character.experiences,
+    domain_cards: character.domain_cards,
+    weapons: character.weapons,
+    armor: character.armor,
+    inventory: character.inventory,
+    gold: character.gold,
+    background_answers: character.background_answers,
+    connections: character.connections,
+    advancements: character.advancements,
+    special_resources: character.special_resources,
+    class_state: character.class_state,
+    subclass_state: character.subclass_state,
+    transformation_notes: character.transformation_notes,
+    description: character.description,
+    notes: character.notes,
   };
 }
 
@@ -609,6 +697,11 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const [intrinsicCatalog, setIntrinsicCatalog] = useState<DaggerheartCompendiumEntry[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState(currentUserId);
   const [draft, setDraft] = useState<CharacterRow>(() => emptyCharacter(campaignId, currentUserId));
+  const draftRef = useRef(draft);
+  const revisionRef = useRef<Map<string, number>>(new Map());
+  const runtimeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const runtimeConflictRef = useRef<Set<string>>(new Set());
+  const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -652,7 +745,20 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     setIntrinsicCatalog((intrinsicResult.data ?? []) as DaggerheartCompendiumEntry[]);
 
     const nextRoster = (rosterResult.data ?? []) as RosterRow[];
-    let nextCharacters = (characterResult.data ?? []) as CharacterRow[];
+    const rawCharacters = characterResult.data ?? [];
+    const invalidCharacterCount = rawCharacters.filter(
+      (row) => !validCharacterRow(row)
+    ).length;
+    let nextCharacters = rawCharacters.filter(validCharacterRow).map((row) => ({
+      ...row,
+      state_revision: Number(row.state_revision ?? 0),
+    }));
+
+    if (invalidCharacterCount > 0) {
+      setMessage(
+        `Skipped ${invalidCharacterCount} malformed character record${invalidCharacterCount === 1 ? "" : "s"}. The bad record was not overwritten.`
+      );
+    }
 
     const compendiumIds = [
       ...new Set(nextCharacters.flatMap(characterCompendiumIds)),
@@ -677,12 +783,22 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
     setRoster(nextRoster);
     setCharacters(nextCharacters);
+    revisionRef.current = new Map(
+      nextCharacters
+        .filter((row) => Boolean(row.id))
+        .map((row) => [row.id, row.state_revision ?? 0])
+    );
 
     const preferred = isDm
       ? (nextRoster.find((row) => row.player_id === selectedPlayerId)?.player_id ?? nextRoster[0]?.player_id ?? currentUserId)
       : currentUserId;
     setSelectedPlayerId(preferred);
-    setDraft(nextCharacters.find((row) => row.player_id === preferred) ?? emptyCharacter(campaignId, preferred));
+    const preferredDraft =
+      nextCharacters.find((row) => row.player_id === preferred) ??
+      emptyCharacter(campaignId, preferred);
+    draftRef.current = preferredDraft;
+    setDraft(preferredDraft);
+    setDirty(false);
     setLoading(false);
   }, [campaignId, currentUserId, isDm, selectedPlayerId, supabase]);
 
@@ -693,15 +809,32 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }, [campaignId, currentUserId]);
 
   function choosePlayer(playerId: string) {
+    if (
+      dirty &&
+      typeof window !== "undefined" &&
+      !window.confirm("Discard unsaved character-sheet changes and switch players?")
+    ) {
+      return;
+    }
     setSelectedPlayerId(playerId);
     setMessage(null);
     setAdvancedCreation(false);
     setActionMessage(null);
-    setDraft(characters.find((row) => row.player_id === playerId) ?? emptyCharacter(campaignId, playerId));
+    const next =
+      characters.find((row) => row.player_id === playerId) ??
+      emptyCharacter(campaignId, playerId);
+    draftRef.current = next;
+    setDraft(next);
+    setDirty(false);
   }
 
   const patch = useCallback((patchValue: Partial<CharacterRow>) => {
-    setDraft((current) => ({ ...current, ...patchValue }));
+    setDraft((current) => {
+      const next = { ...current, ...patchValue };
+      draftRef.current = next;
+      return next;
+    });
+    setDirty(true);
   }, []);
 
   const selectedIntrinsicSources = useMemo(() => {
@@ -829,7 +962,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   function normalizeRuntimePatch(
     patchValue: Partial<CharacterRow>
   ): Partial<CharacterRow> {
-    const nextDraft = { ...draft, ...patchValue };
+    const nextDraft = { ...draftRef.current, ...patchValue };
     const nextClassOptions = activeClassOptionSources(
       nextDraft.class_state,
       nextDraft.class_key,
@@ -867,71 +1000,84 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     };
   }
 
-  async function persistRuntimePatch(
+  function persistRuntimePatch(
     patchValue: Partial<CharacterRow>
   ) {
     const normalized = normalizeRuntimePatch(patchValue);
-    patch(normalized);
-
-    if (!draft.id) return;
-
-    const runtimePayload: Record<string, unknown> = {};
-    for (const key of [
-      "effect_state",
-      "special_resources",
-      "class_state",
-      "weapons",
-      "armor",
-      "inventory",
-      "domain_cards",
-      "hope_current",
-      "hope_max",
-      "hp_current",
-      "hp_max",
-      "stress_current",
-      "stress_max",
-      "armor_score",
-      "armor_slots_current",
-      "armor_slots_max",
-      "evasion",
-      "proficiency",
-      "major_threshold",
-      "severe_threshold",
-    ] as const) {
-      if (key in normalized) runtimePayload[key] = normalized[key];
-    }
-
-    const result = await supabase
-      .from("daggerheart_characters")
-      .update(runtimePayload)
-      .eq("id", draft.id)
-      .select("*")
-      .single();
-
-    if (result.error) {
-      setActionMessage(
-        `Local state changed, but runtime save failed: ${result.error.message}`
-      );
-      return;
-    }
-
-    const saved = result.data as CharacterRow;
-    setCharacters((current) =>
-      current.map((row) =>
-        row.id === saved.id ? { ...row, ...normalized } : row
-      )
+    const base = draftRef.current;
+    const optimistic: CharacterRow = { ...base, ...normalized };
+    draftRef.current = optimistic;
+    setDraft((current) =>
+      current.id === base.id && current.player_id === base.player_id
+        ? optimistic
+        : current
     );
+    setDirty(true);
+
+    if (!base.id) return;
+
+    const characterId = base.id;
+    const playerId = base.player_id;
+    const payload = mutableCharacterPayload(optimistic);
+
+    runtimeQueueRef.current = runtimeQueueRef.current.then(async () => {
+      if (runtimeConflictRef.current.has(characterId)) return;
+
+      const expectedRevision =
+        revisionRef.current.get(characterId) ?? base.state_revision ?? 0;
+      const result = await supabase
+        .from("daggerheart_characters")
+        .update(payload)
+        .eq("id", characterId)
+        .eq("state_revision", expectedRevision)
+        .select("*")
+        .maybeSingle();
+
+      if (result.error) {
+        setActionMessage(
+          `Runtime save failed; local changes were not confirmed: ${result.error.message}`
+        );
+        return;
+      }
+      if (!result.data) {
+        runtimeConflictRef.current.add(characterId);
+        setActionMessage(
+          "Character changed in another tab/session. Runtime save stopped to avoid overwriting newer data. Reload the sheet before using more actions."
+        );
+        return;
+      }
+
+      const savedRevision = Number(result.data.state_revision ?? expectedRevision + 1);
+      revisionRef.current.set(characterId, savedRevision);
+      setCharacters((current) =>
+        current.map((row) =>
+          row.id === characterId
+            ? { ...optimistic, state_revision: savedRevision }
+            : row
+        )
+      );
+      setDraft((current) => {
+        if (current.id !== characterId || current.player_id !== playerId) {
+          return current;
+        }
+        const next = { ...current, state_revision: savedRevision };
+        draftRef.current = next;
+        return next;
+      });
+      setDirty(false);
+    });
   }
 
   async function save() {
-    if (!draft.name.trim()) {
+    const currentDraft = draftRef.current;
+    if (!currentDraft.name.trim()) {
       setMessage("Give the character a name before saving.");
       return;
     }
 
     const calculated = deriveDaggerheartStats({
-      ...draft,
-      weapons: activeBeastform ? [] : draft.weapons,
+      ...currentDraft,
+      weapons: activeBeastform ? [] : currentDraft.weapons,
       intrinsic_sources: [...selectedIntrinsicSources, ...activeClassOptions],
     });
     const snapshot = effectiveSnapshot(calculated);
@@ -950,69 +1096,78 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     setSaving(true);
     setMessage(null);
 
-    const payload = {
-      campaign_id: campaignId,
-      player_id: selectedPlayerId,
-      is_active: true,
-      name: draft.name.trim(),
-      pronouns: draft.pronouns.trim(),
-      level: draft.level,
-      class_key: draft.class_key,
-      subclass_key: draft.subclass_key,
-      ancestry_key: draft.ancestry_key,
-      community_key: draft.community_key,
-      heritage_state: draft.heritage_state,
-      transformations: draft.transformations,
-      traits: draft.traits,
-      base_stats: draft.base_stats,
-      manual_stat_modifiers: draft.manual_stat_modifiers,
-      effect_state: draft.effect_state,
-      evasion: snapshot.evasion,
-      proficiency: snapshot.proficiency,
-      hope_current: Math.min(draft.hope_current, snapshot.hope_max),
-      hope_max: snapshot.hope_max,
-      hp_current: Math.min(draft.hp_current, snapshot.hp_max),
-      hp_max: snapshot.hp_max,
-      stress_current: Math.min(draft.stress_current, snapshot.stress_max),
-      stress_max: snapshot.stress_max,
-      armor_score: snapshot.armor_score,
+    const normalized: CharacterRow = {
+      ...currentDraft,
+      ...snapshot,
+      hope_current: Math.min(currentDraft.hope_current, snapshot.hope_max),
+      hp_current: Math.min(currentDraft.hp_current, snapshot.hp_max),
+      stress_current: Math.min(currentDraft.stress_current, snapshot.stress_max),
       armor_slots_current: Math.min(
-        draft.armor_slots_current,
+        currentDraft.armor_slots_current,
         snapshot.armor_slots_max
       ),
-      armor_slots_max: snapshot.armor_slots_max,
-      major_threshold: snapshot.major_threshold,
-      severe_threshold: snapshot.severe_threshold,
-      experiences: draft.experiences,
-      domain_cards: draft.domain_cards,
-      weapons: draft.weapons,
-      armor: draft.armor,
-      inventory: draft.inventory,
-      gold: draft.gold,
-      background_answers: draft.background_answers,
-      connections: draft.connections,
-      advancements: draft.advancements,
-      special_resources: draft.special_resources,
-      class_state: draft.class_state,
-      subclass_state: draft.subclass_state,
-      transformation_notes: draft.transformation_notes,
-      description: draft.description,
-      notes: draft.notes,
     };
+    const mutablePayload = mutableCharacterPayload(normalized);
+    const requestId = currentDraft.id;
+    const requestPlayerId = currentDraft.player_id;
 
-    const result = draft.id
-      ? await supabase.from("daggerheart_characters").update(payload).eq("id", draft.id).select("*").single()
-      : await supabase.from("daggerheart_characters").insert(payload).select("*").single();
+    const result = requestId
+      ? await supabase
+          .from("daggerheart_characters")
+          .update(mutablePayload)
+          .eq("id", requestId)
+          .eq(
+            "state_revision",
+            revisionRef.current.get(requestId) ?? currentDraft.state_revision ?? 0
+          )
+          .select("*")
+          .maybeSingle()
+      : await supabase
+          .from("daggerheart_characters")
+          .insert({
+            campaign_id: campaignId,
+            player_id: requestPlayerId,
+            is_active: true,
+            ...mutablePayload,
+          })
+          .select("*")
+          .single();
 
     if (result.error) {
       setMessage(result.error.message);
       setSaving(false);
       return;
     }
+    if (!result.data) {
+      runtimeConflictRef.current.add(requestId);
+      setMessage(
+        "Save conflict: this character changed in another tab/session. Reload before saving again so newer data is not overwritten."
+      );
+      setSaving(false);
+      return;
+    }
 
-    const saved = result.data as CharacterRow;
-    setDraft(saved);
-    setCharacters((current) => [...current.filter((row) => row.player_id !== saved.player_id), saved]);
+    const saved = {
+      ...(result.data as CharacterRow),
+      state_revision: Number(result.data.state_revision ?? 0),
+    };
+    revisionRef.current.set(saved.id, saved.state_revision);
+    runtimeConflictRef.current.delete(saved.id);
+
+    setDraft((current) => {
+      const sameRequest =
+        (requestId
+          ? current.id === requestId
+          : !current.id && current.player_id === requestPlayerId) &&
+        current.player_id === requestPlayerId;
+      if (!sameRequest) return current;
+      draftRef.current = saved;
+      return saved;
+    });
+    setCharacters((current) => [
+      ...current.filter((row) => row.player_id !== saved.player_id),
+      saved,
+    ]);
     setRoster((current) =>
       current.map((row) =>
         row.player_id === saved.player_id
@@ -1027,6 +1182,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       )
     );
     setMessage("Character sheet saved.");
+    setDirty(false);
     setSaving(false);
   }
 
