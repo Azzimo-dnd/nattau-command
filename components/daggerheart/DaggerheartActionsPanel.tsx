@@ -29,7 +29,10 @@ function actionMeta(source: DaggerheartActionSource) {
     const amount = result.roll
       ? `${result.roll.count}d${result.roll.die}${(result.roll.bonus ?? 0) > 0 ? `+${result.roll.bonus}` : ""}`
       : String(result.amount ?? 0);
-    bits.push(`Clear ${amount} ${result.resource}`);
+    bits.push(`${result.type === "clear" ? "Clear" : "Gain"} ${amount} ${result.resource}`);
+  }
+  if (source.action.activate_effect_roll) {
+    bits.push(`Roll ${source.action.activate_effect_roll.count}d${source.action.activate_effect_roll.die} for effect`);
   }
   if (source.action.limit) {
     bits.push(
