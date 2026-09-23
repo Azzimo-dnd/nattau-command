@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   classOption,
   daggerheartClasses,
+  daggerheartClassCreationGuidance,
+  daggerheartAllClassStartingItems,
   daggerheartCommunities,
   daggerheartTraits,
   daggerheartTransformations,
@@ -147,8 +149,39 @@ function hasAncestryFeature(
   return character.ancestry_key === ancestry;
 }
 
+function spellcastTraitKey(character: WizardCharacter): TraitKey | null {
+  switch (character.class_key) {
+    case "bard":
+      return "presence";
+    case "druid":
+      return "instinct";
+    case "ranger":
+      return "agility";
+    case "rogue":
+      return "finesse";
+    case "seraph":
+      return "strength";
+    case "sorcerer":
+      return "instinct";
+    case "wizard":
+      return "knowledge";
+    case "assassin":
+      return character.subclass_key === "poisoners-guild" ? "knowledge" : "agility";
+    case "warlock":
+      return "presence";
+    case "witch":
+      return character.subclass_key === "moon" ? "instinct" : "knowledge";
+    default:
+      return null;
+  }
+}
+
 function hasSpellcastTrait(character: WizardCharacter) {
-  return !["guardian", "warrior", "brawler"].includes(character.class_key ?? "");
+  return spellcastTraitKey(character) !== null;
+}
+
+function containsRule(item: GearItem | undefined, text: string) {
+  return (item?.details ?? "").toLowerCase().includes(text.toLowerCase());
 }
 
 function deriveStartingStats(character: WizardCharacter) {
@@ -175,7 +208,27 @@ function deriveStartingStats(character: WizardCharacter) {
       ? armorMeta.base_severe + character.level
       : 0;
 
+  const activeSecondary = character.weapons.find(
+    (item) => item.category === "weapon_secondary"
+  );
+
   if (character.class_key === "brawler" && !activePrimary) evasion += 1;
+
+  // Foundation subclass features that permanently affect starting tracks.
+  if (character.class_key === "guardian" && character.subclass_key === "vengeance") {
+    stressMax += 1;
+  }
+  if (character.class_key === "wizard" && character.subclass_key === "school-war") {
+    hpMax += 1;
+  }
+  if (character.class_key === "guardian" && character.subclass_key === "stalwart") {
+    if (majorThreshold) majorThreshold += 1;
+    if (severeThreshold) severeThreshold += 1;
+  }
+  if (character.class_key === "brawler" && character.subclass_key === "juggernaut") {
+    if (severeThreshold) severeThreshold += 3;
+  }
+
   if (hasAncestryFeature(character, "Giant", "Endurance")) hpMax += 1;
   if (hasAncestryFeature(character, "Human", "High Stamina")) stressMax += 1;
   if (hasAncestryFeature(character, "Simiah", "Nimble")) evasion += 1;
@@ -189,6 +242,27 @@ function deriveStartingStats(character: WizardCharacter) {
   if (hasAncestryFeature(character, "Galapa", "Shell")) {
     if (majorThreshold) majorThreshold += character.proficiency;
     if (severeThreshold) severeThreshold += character.proficiency;
+  }
+
+  // Active equipment features that modify sheet-level defenses.
+  if (containsRule(armor, "+1 to Evasion")) evasion += 1;
+  if (containsRule(armor, "−1 to Evasion") || containsRule(armor, "-1 to Evasion")) evasion -= 1;
+  if (containsRule(armor, "−2 to Evasion") || containsRule(armor, "-2 to Evasion")) evasion -= 2;
+  if (containsRule(activePrimary, "−1 to Evasion") || containsRule(activePrimary, "-1 to Evasion")) evasion -= 1;
+  if (containsRule(activeSecondary, "−1 to Evasion") || containsRule(activeSecondary, "-1 to Evasion")) evasion -= 1;
+
+  if (containsRule(activeSecondary, "+1 to Armor Score")) armorScore += 1;
+  if (containsRule(activeSecondary, "+2 to Armor Score")) armorScore += 2;
+  if (containsRule(activeSecondary, "+2 to damage thresholds")) {
+    if (majorThreshold) majorThreshold += 2;
+    if (severeThreshold) severeThreshold += 2;
+  }
+
+  if (containsRule(armor, "bonus to your damage thresholds equal to your Spellcast trait")) {
+    const spellcastTrait = spellcastTraitKey(character);
+    const bonus = spellcastTrait ? Number(character.traits[spellcastTrait] ?? 0) : 0;
+    if (majorThreshold) majorThreshold += bonus;
+    if (severeThreshold) severeThreshold += bonus;
   }
 
   return {
@@ -216,6 +290,9 @@ export function DaggerheartCharacterCreationWizard({
     draft.class_key === "wizard" && draft.subclass_key === "school-knowledge" ? 3 : 2;
   const purposefulDesign = hasAncestryFeature(draft, "Clank", "Purposeful Design");
   const spellcastAvailable = hasSpellcastTrait(draft);
+  const creationGuidance = draft.class_key
+    ? daggerheartClassCreationGuidance[draft.class_key]
+    : null;
 
   useEffect(() => {
     const derived = deriveStartingStats(draft);
@@ -251,20 +328,31 @@ export function DaggerheartCharacterCreationWizard({
 
   useEffect(() => {
     if (step !== 4) return;
-    const inventory = [...draft.inventory];
+    const inventory = draft.inventory.filter(
+      (item) => item.name !== "Nomadic Pack" || draft.community_key === "Wanderborne"
+    );
     const add = (name: string, details = "") => {
       if (!inventory.some((item) => item.name === name)) inventory.push({ name, details });
     };
     add("Torch");
     add("50 feet of rope");
     add("Basic supplies", "Tent, bedroll, tinderbox, rations, and similar adventuring basics.");
-    if (inventory.length !== draft.inventory.length || draft.gold.handfuls < 1) {
+    if (draft.community_key === "Wanderborne") {
+      add(
+        "Nomadic Pack",
+        "Once per session, spend a Hope to produce a mundane item useful to the situation, with GM agreement."
+      );
+    }
+    if (
+      inventory.length !== draft.inventory.length ||
+      draft.gold.handfuls < 1
+    ) {
       patch({
         inventory,
         gold: { ...draft.gold, handfuls: Math.max(1, draft.gold.handfuls) },
       });
     }
-  }, [draft.gold, draft.inventory, patch, step]);
+  }, [draft.community_key, draft.gold, draft.inventory, patch, step]);
 
   function selectClass(key: string) {
     const nextClass = classOption(key);
@@ -289,6 +377,9 @@ export function DaggerheartCharacterCreationWizard({
       domain_cards: [],
       class_state: {},
       subclass_state: {},
+      inventory: draft.inventory.filter(
+        (item) => !daggerheartAllClassStartingItems.includes(item.name)
+      ),
       special_resources: resources,
     });
   }
@@ -381,6 +472,20 @@ export function DaggerheartCharacterCreationWizard({
         ["Minor Health Potion", "Minor Stamina Potion"].includes(item.name)
       );
       if (!hasPotion) return "Choose a Minor Health Potion or Minor Stamina Potion.";
+      if (
+        creationGuidance &&
+        !creationGuidance.startingItems.includes(
+          String(draft.class_state.starting_item_choice ?? "")
+        )
+      ) {
+        return "Choose one of your class-specific starting items.";
+      }
+      if (
+        creationGuidance?.spellContainerPrompt &&
+        !String(draft.class_state.spell_container ?? "").trim()
+      ) {
+        return "Choose what your character carries their spells in.";
+      }
     }
 
     if (step === 6) {
@@ -451,6 +556,25 @@ export function DaggerheartCharacterCreationWizard({
         },
       ],
     });
+  }
+
+  function selectClassStartingItem(name: string) {
+    const inventory = draft.inventory.filter(
+      (item) => !daggerheartAllClassStartingItems.includes(item.name)
+    );
+    patch({
+      class_state: { ...draft.class_state, starting_item_choice: name },
+      inventory: [...inventory, { name, details: "Class-specific starting item." }],
+    });
+  }
+
+  function addNarrativePrompt(
+    field: "background_answers" | "connections",
+    prompt: string
+  ) {
+    const current = draft[field];
+    if (current.some((item) => item.startsWith(prompt))) return;
+    patch({ [field]: [...current.filter(Boolean), `${prompt}\n`] } as Partial<WizardCharacter>);
   }
 
   function replaceWeapon(category: "weapon_primary" | "weapon_secondary", entry: DaggerheartCompendiumEntry) {
@@ -915,15 +1039,52 @@ export function DaggerheartCharacterCreationWizard({
               </div>
             </div>
 
-            <label className="block">
-              <span className="mb-1.5 block text-xs text-[#a48d95]">Class-specific starting item / carrying choice</span>
-              <input
-                className={fieldClass}
-                placeholder="Optional note from the character guide"
-                value={String(draft.class_state.starting_item_choice ?? "")}
-                onChange={(e) => patch({ class_state: { ...draft.class_state, starting_item_choice: e.target.value } })}
-              />
-            </label>
+            {creationGuidance && (
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#957681]">
+                  Class-specific starting item
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {creationGuidance.startingItems.map((item) => {
+                    const selected = draft.class_state.starting_item_choice === item;
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => selectClassStartingItem(item)}
+                        className={`rounded-xl border p-3 text-left text-sm transition ${
+                          selected
+                            ? "border-[#985066] bg-[#401723] text-[#f0d4dc]"
+                            : "border-[#3b262e] bg-black/15 text-[#ad979e]"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    );
+                  })}
+                </div>
+                {creationGuidance.spellContainerPrompt && (
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs text-[#a48d95]">
+                      {creationGuidance.spellContainerPrompt}
+                    </span>
+                    <input
+                      className={fieldClass}
+                      placeholder="Describe the spell-carrying medium…"
+                      value={String(draft.class_state.spell_container ?? "")}
+                      onChange={(event) =>
+                        patch({
+                          class_state: {
+                            ...draft.class_state,
+                            spell_container: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -934,6 +1095,25 @@ export function DaggerheartCharacterCreationWizard({
               <h3 className="mt-2 font-serif text-2xl font-black text-[#ead7dc]">Create background</h3>
               <p className="mt-2 text-sm text-[#97848b]">Answer the prompts that matter to this character. You can write your own questions too.</p>
             </div>
+            {creationGuidance && (
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-[#957681]">
+                  Character guide prompts
+                </p>
+                <div className="grid gap-2 lg:grid-cols-3">
+                  {creationGuidance.backgroundQuestions.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => addNarrativePrompt("background_answers", prompt)}
+                      className="rounded-xl border border-[#3b2730] bg-black/15 p-3 text-left text-xs leading-5 text-[#b39ea5] transition hover:border-[#704052] hover:bg-[#26131b]"
+                    >
+                      + {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {(draft.background_answers.length ? draft.background_answers : [""]).map((item, index) => (
               <div key={index} className="flex gap-2">
                 <textarea
@@ -1094,6 +1274,25 @@ export function DaggerheartCharacterCreationWizard({
               <h3 className="mt-2 font-serif text-2xl font-black text-[#ead7dc]">Create connections</h3>
               <p className="mt-2 text-sm leading-6 text-[#97848b]">Connections are collaborative. Add what you already know, or leave this blank until Session 0.</p>
             </div>
+            {creationGuidance && (
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-[#957681]">
+                  Character guide prompts
+                </p>
+                <div className="grid gap-2 lg:grid-cols-3">
+                  {creationGuidance.connectionQuestions.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => addNarrativePrompt("connections", prompt)}
+                      className="rounded-xl border border-[#3b2730] bg-black/15 p-3 text-left text-xs leading-5 text-[#b39ea5] transition hover:border-[#704052] hover:bg-[#26131b]"
+                    >
+                      + {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {(draft.connections.length ? draft.connections : [""]).map((item, index) => (
               <div key={index} className="flex gap-2">
                 <textarea
