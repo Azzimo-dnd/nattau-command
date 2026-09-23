@@ -302,7 +302,7 @@ function cardSources(character: DaggerheartEffectCharacter): RuntimeSource[] {
 
 function intrinsicSources(
   character: DaggerheartEffectCharacter,
-  hasEquippedPrimary: boolean
+  hasActiveWeapon: boolean
 ): RuntimeSource[] {
   const effects: Array<{
     source: string;
@@ -332,7 +332,7 @@ function intrinsicSources(
     });
   };
 
-  if (character.class_key === "brawler" && !hasEquippedPrimary) {
+  if (character.class_key === "brawler" && !hasActiveWeapon) {
     add("Brawler", "brawler-unarmed-evasion", "Unarmored Defense", "evasion", 1);
   }
 
@@ -569,8 +569,10 @@ export function deriveDaggerheartStats(
   const breakdown: DaggerheartEffectResult["breakdown"] = {};
   const gear = gearSources(character);
   const cards = cardSources(character);
-  const hasEquippedPrimary = character.weapons.some(
-    (item) => item.category === "weapon_primary" && item.equipped !== false
+  const hasActiveWeapon = character.weapons.some(
+    (item) =>
+      ["weapon_primary", "weapon_secondary"].includes(item.category ?? "") &&
+      item.equipped !== false
   );
   const externalIntrinsic: RuntimeSource[] = (character.intrinsic_sources ?? []).map((source) => ({
     id: source.id,
@@ -580,7 +582,7 @@ export function deriveDaggerheartStats(
     effects: source.effects ?? [],
   }));
   const sources = [
-    ...intrinsicSources(character, hasEquippedPrimary),
+    ...intrinsicSources(character, hasActiveWeapon),
     ...externalIntrinsic,
     ...gear,
     ...cards,
