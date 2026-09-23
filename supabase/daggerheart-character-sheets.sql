@@ -49,7 +49,8 @@ create table if not exists public.daggerheart_characters (
   notes text not null default '',
   base_stats jsonb not null default '{"evasion":10,"proficiency":1,"hope_max":6,"hp_max":0,"stress_max":6,"armor_score":0,"major_threshold":0,"severe_threshold":0,"domain_loadout_max":5,"consumable_clear_bonus":0}'::jsonb,
   manual_stat_modifiers jsonb not null default '{}'::jsonb,
-  effect_state jsonb not null default '{"active_effect_ids":[],"active_effect_values":{},"action_uses":{}}'::jsonb,
+  effect_state jsonb not null default '{"active_effect_ids":[],"active_effect_values":{},"action_uses":{},"action_resets":{},"effect_resets":{}}'::jsonb,
+  state_revision bigint not null default 0 check (state_revision >= 0),
   schema_version integer not null default 2,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -100,7 +101,11 @@ grant select, insert, update, delete on public.daggerheart_characters to authent
 
 create or replace function public.set_daggerheart_character_updated_at()
 returns trigger language plpgsql set search_path = public, pg_temp as $$
-begin new.updated_at = now(); return new; end;
+begin
+  new.updated_at = now();
+  new.state_revision = old.state_revision + 1;
+  return new;
+end;
 $$;
 
 drop trigger if exists daggerheart_characters_set_updated_at on public.daggerheart_characters;
@@ -145,17 +150,48 @@ alter table public.daggerheart_characters
   add column if not exists base_stats jsonb not null default
     '{"evasion":10,"proficiency":1,"hope_max":6,"hp_max":0,"stress_max":6,"armor_score":0,"major_threshold":0,"severe_threshold":0,"domain_loadout_max":5,"consumable_clear_bonus":0}'::jsonb,
   add column if not exists manual_stat_modifiers jsonb not null default '{}'::jsonb,
-  add column if not exists effect_state jsonb not null default '{"active_effect_ids":[],"active_effect_values":{},"action_uses":{}}'::jsonb;
+  add column if not exists effect_state jsonb not null default '{"active_effect_ids":[],"active_effect_values":{},"action_uses":{},"action_resets":{},"effect_resets":{}}'::jsonb,
+  add column if not exists state_revision bigint not null default 0;
 
 alter table public.daggerheart_characters
   drop constraint if exists daggerheart_character_base_stats_object,
   drop constraint if exists daggerheart_character_manual_modifiers_object,
-  drop constraint if exists daggerheart_character_effect_state_object;
+  drop constraint if exists daggerheart_character_effect_state_object,
+  drop constraint if exists daggerheart_character_state_revision_nonnegative,
+  drop constraint if exists daggerheart_character_heritage_object,
+  drop constraint if exists daggerheart_character_traits_object,
+  drop constraint if exists daggerheart_character_experiences_array,
+  drop constraint if exists daggerheart_character_domain_cards_array,
+  drop constraint if exists daggerheart_character_weapons_array,
+  drop constraint if exists daggerheart_character_armor_array,
+  drop constraint if exists daggerheart_character_inventory_array,
+  drop constraint if exists daggerheart_character_gold_object,
+  drop constraint if exists daggerheart_character_background_array,
+  drop constraint if exists daggerheart_character_connections_array,
+  drop constraint if exists daggerheart_character_advancements_array,
+  drop constraint if exists daggerheart_character_resources_array,
+  drop constraint if exists daggerheart_character_class_state_object,
+  drop constraint if exists daggerheart_character_subclass_state_object;
 
 alter table public.daggerheart_characters
   add constraint daggerheart_character_base_stats_object check (jsonb_typeof(base_stats) = 'object'),
   add constraint daggerheart_character_manual_modifiers_object check (jsonb_typeof(manual_stat_modifiers) = 'object'),
-  add constraint daggerheart_character_effect_state_object check (jsonb_typeof(effect_state) = 'object');
+  add constraint daggerheart_character_effect_state_object check (jsonb_typeof(effect_state) = 'object'),
+  add constraint daggerheart_character_state_revision_nonnegative check (state_revision >= 0),
+  add constraint daggerheart_character_heritage_object check (jsonb_typeof(heritage_state) = 'object'),
+  add constraint daggerheart_character_traits_object check (jsonb_typeof(traits) = 'object'),
+  add constraint daggerheart_character_experiences_array check (jsonb_typeof(experiences) = 'array'),
+  add constraint daggerheart_character_domain_cards_array check (jsonb_typeof(domain_cards) = 'array'),
+  add constraint daggerheart_character_weapons_array check (jsonb_typeof(weapons) = 'array'),
+  add constraint daggerheart_character_armor_array check (jsonb_typeof(armor) = 'array'),
+  add constraint daggerheart_character_inventory_array check (jsonb_typeof(inventory) = 'array'),
+  add constraint daggerheart_character_gold_object check (jsonb_typeof(gold) = 'object'),
+  add constraint daggerheart_character_background_array check (jsonb_typeof(background_answers) = 'array'),
+  add constraint daggerheart_character_connections_array check (jsonb_typeof(connections) = 'array'),
+  add constraint daggerheart_character_advancements_array check (jsonb_typeof(advancements) = 'array'),
+  add constraint daggerheart_character_resources_array check (jsonb_typeof(special_resources) = 'array'),
+  add constraint daggerheart_character_class_state_object check (jsonb_typeof(class_state) = 'object'),
+  add constraint daggerheart_character_subclass_state_object check (jsonb_typeof(subclass_state) = 'object');
 
 alter table public.daggerheart_characters
   alter column schema_version set default 2;
