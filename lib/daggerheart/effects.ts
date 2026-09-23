@@ -46,6 +46,7 @@ export type DaggerheartEffect = {
     | "level"
     | "armor_score"
     | "available_armor_slots"
+    | "stress_marked"
     | "half_agility_rounded_up"
     | "active_effect_value";
   value_by_tier?: Partial<Record<1 | 2 | 3 | 4, number>>;
@@ -420,8 +421,8 @@ function conditionActive(
   if (condition.type === "armor_fully_marked") {
     return (
       wearingArmor &&
-      character.armor_slots_max > 0 &&
-      character.armor_slots_current >= character.armor_slots_max
+      stats.armor_score > 0 &&
+      character.armor_slots_current >= stats.armor_score
     );
   }
   if (condition.type === "stress_full") {
@@ -481,6 +482,7 @@ function resolveEffectValue(
   } else if (from === "tier") total += tier;
   else if (from === "level") total += character.level;
   else if (from === "armor_score") total += stats.armor_score;
+  else if (from === "stress_marked") total += Math.max(0, character.stress_current);
   else if (from === "available_armor_slots") {
     total += Math.max(0, stats.armor_score - character.armor_slots_current);
   } else if (from === "half_agility_rounded_up") {
