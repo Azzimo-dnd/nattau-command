@@ -26,9 +26,11 @@ function actionMeta(source: DaggerheartActionSource) {
   }
   if (source.action.availability === "during_rest") bits.push("During rest");
   for (const result of source.action.results ?? []) {
-    const amount = result.roll
-      ? `${result.roll.count}d${result.roll.die}${(result.roll.bonus ?? 0) > 0 ? `+${result.roll.bonus}` : ""}`
-      : String(result.amount ?? 0);
+    const amount = result.all
+      ? "all"
+      : result.roll
+        ? `${result.roll.count}d${result.roll.die}${(result.roll.bonus ?? 0) > 0 ? `+${result.roll.bonus}` : ""}`
+        : String(result.amount ?? 0);
     bits.push(`${result.type === "clear" ? "Clear" : "Gain"} ${amount} ${result.resource}`);
   }
   if (source.action.activate_effect_roll) {
