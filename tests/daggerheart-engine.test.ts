@@ -14,6 +14,8 @@ import {
   type DaggerheartActionCharacter,
   type DaggerheartActionSource,
 } from "../lib/daggerheart/actions";
+import { subclassCompendiumSlug, daggerheartClasses } from "../lib/daggerheart/catalog";
+import { effectiveDamage } from "../lib/daggerheart/combat";
 
 function effectCharacter(
   overrides: Partial<DaggerheartEffectCharacter> = {}
@@ -473,4 +475,246 @@ test("scene reset clears temporary effects even when the action has no use limit
   const reset = resetDaggerheartActionUses(state, "scene", [source]);
   assert.deepEqual(reset.active_effect_ids, []);
   assert.deepEqual(reset.active_effect_values, {});
+});
+
+
+test("all 26 subclasses resolve to a canonical compendium slug", () => {
+  const subclasses = daggerheartClasses.flatMap((item) => item.subclasses);
+  assert.equal(subclasses.length, 26);
+  assert.equal(new Set(subclasses.map((item) => item.key)).size, 26);
+  assert.equal(new Set(subclasses.map((item) => item.compendiumSlug)).size, 26);
+  for (const subclass of subclasses) {
+    assert.equal(subclassCompendiumSlug(subclass.key), subclass.compendiumSlug);
+    assert.ok(subclass.compendiumSlug.length > 0);
+  }
+  assert.equal(subclassCompendiumSlug("school-war"), "school-of-war");
+  assert.equal(subclassCompendiumSlug("pact-endless"), "pact-of-the-endless");
+});
+
+test("unarmored thresholds use level and twice level", () => {
+  for (const [level, major, severe] of [
+    [1, 1, 2],
+    [5, 5, 10],
+    [10, 10, 20],
+  ] as const) {
+    const result = deriveDaggerheartStats(
+      effectCharacter({
+        level,
+        base_stats: { ...baseStatsForClass(null, 1), major_threshold: 0, severe_threshold: 0 },
+      })
+    );
+    assert.equal(result.stats.major_threshold, major);
+    assert.equal(result.stats.severe_threshold, severe);
+  }
+});
+
+test("manual Proficiency is applied before Shell consumes it", () => {
+  const shellEffects: DaggerheartEffect[] = [
+    {
+      id: "shell-major",
+      label: "Shell",
+      stat: "major_threshold",
+      operation: "add",
+      value_from: "proficiency",
+      scope: "owned",
+      mode: "passive",
+    },
+    {
+      id: "shell-severe",
+      label: "Shell",
+      stat: "severe_threshold",
+      operation: "add",
+      value_from: "proficiency",
+      scope: "owned",
+      mode: "passive",
+    },
+  ];
+  const result = deriveDaggerheartStats(
+    effectCharacter({
+      level: 1,
+      base_stats: {
+        ...baseStatsForClass(null, 1),
+        major_threshold: 6,
+        severe_threshold: 12,
+      },
+      manual_stat_modifiers: { proficiency: 1 },
+      intrinsic_sources: [{ id: "galapa", name: "Galapa", effects: shellEffects }],
+    })
+  );
+  assert.equal(result.stats.proficiency, 2);
+  assert.equal(result.stats.major_threshold, 8);
+  assert.equal(result.stats.severe_threshold, 14);
+});
+
+test("damage-only Proficiency bonus does not affect defensive formulas", () => {
+  const result = deriveDaggerheartStats(
+    effectCharacter({
+      level: 1,
+      base_stats: {
+        ...baseStatsForClass(null, 1),
+        major_threshold: 6,
+        severe_threshold: 12,
+      },
+      intrinsic_sources: [
+        {
+          id: "galapa",
+          name: "Galapa",
+          effects: [
+            {
+              id: "shell-major",
+              label: "Shell",
+              stat: "major_threshold",
+              operation: "add",
+              value_from: "proficiency",
+              scope: "owned",
+              mode: "passive",
+            },
+            {
+              id: "shell-severe",
+              label: "Shell",
+              stat: "severe_threshold",
+              operation: "add",
+              value_from: "proficiency",
+              scope: "owned",
+              mode: "passive",
+            },
+            {
+              id: "damage-only",
+              label: "Damage only",
+              stat: "damage_proficiency_bonus",
+              operation: "add",
+              value: 1,
+              scope: "owned",
+              mode: "passive",
+            },
+          ],
+        },
+      ],
+    })
+  );
+  assert.equal(result.stats.proficiency, 1);
+  assert.equal(result.stats.damage_proficiency_bonus, 1);
+  assert.equal(result.stats.major_threshold, 7);
+  assert.equal(result.stats.severe_threshold, 13);
+});
+
+test("session reset does not refresh long-rest uses or clear scene effects", () => {
+  const state = {
+    active_effect_ids: ["source:scene-effect"],
+    active_effect_values: { "source:scene-effect": 2 },
+    action_uses: {
+      "source:action:long": 1,
+      "source:action:session": 1,
+    },
+    action_resets: {
+      "source:action:long": "long_rest" as const,
+      "source:action:session": "session" as const,
+    },
+    effect_resets: {
+      "source:scene-effect": "scene" as const,
+    },
+  };
+  const reset = resetDaggerheartActionUses(state, "session", []);
+  assert.equal(reset.action_uses?.["source:action:long"], 1);
+  assert.equal(reset.action_uses?.["source:action:session"], undefined);
+  assert.deepEqual(reset.active_effect_ids, ["source:scene-effect"]);
+});
+
+test("persisted reset policies clear effects even when the source is currently hidden", () => {
+  const state = {
+    active_effect_ids: ["hidden:temporary"],
+    active_effect_values: { "hidden:temporary": 4 },
+    action_uses: { "hidden:action": 1 },
+    action_resets: { "hidden:action": "scene" as const },
+    effect_resets: { "hidden:temporary": "scene" as const },
+  };
+  const reset = resetDaggerheartActionUses(state, "scene", []);
+  assert.deepEqual(reset.active_effect_ids, []);
+  assert.deepEqual(reset.active_effect_values, {});
+  assert.equal(reset.action_uses?.["hidden:action"], undefined);
+});
+
+test("domain-count action conditions follow the current Loadout", () => {
+  const source: DaggerheartActionSource = {
+    source_key: "bone-touched",
+    source_name: "Bone-Touched",
+    collection: "domain_cards",
+    index: 0,
+    active: true,
+    quantity: null,
+    effects: [],
+    action_key: "bone-touched:action:denial",
+    action: {
+      id: "denial",
+      label: "Bone-Touched",
+      scope: "loadout",
+      condition: { type: "domain_count", domain: "Bone", minimum: 4 },
+    },
+  };
+  const three = actionCharacter({
+    domain_cards: Array.from({ length: 3 }, (_, index) => ({
+      slug: `bone-${index}`,
+      name: `Bone ${index}`,
+      domain: "Bone",
+      state: "loadout" as const,
+    })),
+  });
+  assert.equal(actionAvailable(three, source).ok, false);
+
+  const four = actionCharacter({
+    domain_cards: Array.from({ length: 4 }, (_, index) => ({
+      slug: `bone-${index}`,
+      name: `Bone ${index}`,
+      domain: "Bone",
+      state: "loadout" as const,
+    })),
+  });
+  assert.equal(actionAvailable(four, source).ok, true);
+});
+
+test("Brawler unarmed Evasion bonus is disabled by a secondary active weapon", () => {
+  const unarmed = deriveDaggerheartStats(
+    effectCharacter({ class_key: "brawler" })
+  );
+  assert.equal(unarmed.stats.evasion, 11);
+
+  const armed = deriveDaggerheartStats(
+    effectCharacter({
+      class_key: "brawler",
+      weapons: [
+        {
+          name: "Secondary",
+          category: "weapon_secondary",
+          equipped: true,
+        },
+      ],
+    })
+  );
+  assert.equal(armed.stats.evasion, 10);
+});
+
+test("derived rule bounds cap Armor, HP, Stress, Hope and Proficiency", () => {
+  const result = deriveDaggerheartStats(
+    effectCharacter({
+      base_stats: {
+        ...baseStatsForClass(null, 1),
+        hp_max: 20,
+        stress_max: 20,
+        hope_max: 20,
+        armor_score: 20,
+        proficiency: 20,
+      },
+    })
+  );
+  assert.equal(result.stats.hp_max, 12);
+  assert.equal(result.stats.stress_max, 12);
+  assert.equal(result.stats.hope_max, 6);
+  assert.equal(result.stats.armor_score, 12);
+  assert.equal(result.stats.proficiency, 6);
+});
+
+test("damage parser scales mixed types, NBSP and multi-die Brawler profiles", () => {
+  assert.equal(effectiveDamage("d8phy/mag", 3), "3d8 physical/magic");
+  assert.equal(effectiveDamage("d12+10\u00a0phy", 4), "4d12+10 physical");
+  assert.equal(effectiveDamage("d8+d6 phy", 2), "2d8+2d6 physical");
 });
