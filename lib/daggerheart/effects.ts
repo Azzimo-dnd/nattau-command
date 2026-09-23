@@ -55,6 +55,7 @@ export type DaggerheartManualStatModifiers = Partial<
 
 export type DaggerheartEffectState = {
   active_effect_ids?: string[];
+  action_uses?: Record<string, number>;
 };
 
 export type DaggerheartEffectGearItem = {
@@ -227,7 +228,7 @@ type RuntimeSource = {
   tier?: number;
 };
 
-function sourceId(
+export function daggerheartSourceId(
   item: DaggerheartEffectGearItem | DaggerheartEffectDomainCard,
   prefix: string
 ) {
@@ -249,7 +250,7 @@ function gearSources(character: DaggerheartEffectCharacter): RuntimeSource[] {
   return gear.map(({ item, kind }) => {
     const defaultEquipped = kind === "armor" || kind === "weapon";
     return {
-      id: sourceId(item, kind),
+      id: daggerheartSourceId(item, kind),
       name: item.name,
       active: item.equipped ?? defaultEquipped,
       owned: true,
@@ -261,7 +262,7 @@ function gearSources(character: DaggerheartEffectCharacter): RuntimeSource[] {
 
 function cardSources(character: DaggerheartEffectCharacter): RuntimeSource[] {
   return character.domain_cards.map((card) => ({
-    id: sourceId(card, "card"),
+    id: daggerheartSourceId(card, "card"),
     name: card.name,
     active: card.state === "loadout",
     owned: true,
