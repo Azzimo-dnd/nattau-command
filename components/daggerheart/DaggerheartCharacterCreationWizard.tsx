@@ -14,7 +14,10 @@ import {
   DaggerheartCompendiumPicker,
   compendiumEntryDetails,
 } from "@/components/daggerheart/DaggerheartCompendiumPicker";
-import type { DaggerheartCompendiumEntry } from "@/lib/daggerheart/compendium";
+import {
+  compendiumEffectiveMetadata,
+  type DaggerheartCompendiumEntry,
+} from "@/lib/daggerheart/compendium";
 import {
   DaggerheartHeritageBuilder,
   type HeritageState,
@@ -116,7 +119,7 @@ function gearFromEntry(entry: DaggerheartCompendiumEntry): GearItem {
     category: entry.category,
     slug: entry.slug,
     source_key: entry.source_key,
-    metadata: entry.metadata ?? {},
+    metadata: compendiumEffectiveMetadata(entry),
   };
 }
 
@@ -1001,7 +1004,7 @@ export function DaggerheartCharacterCreationWizard({
                 label="Choose Tier 1 armor…"
                 maxTier={1}
                 onSelect={(entry) => {
-                  const metadata = entry.metadata ?? {};
+                  const metadata = compendiumEffectiveMetadata(entry);
                   const score = typeof metadata.base_score === "number" ? metadata.base_score : 0;
                   const major = typeof metadata.base_major === "number" ? metadata.base_major + 1 : 0;
                   const severe = typeof metadata.base_severe === "number" ? metadata.base_severe + 1 : 0;
