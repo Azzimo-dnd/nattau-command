@@ -238,22 +238,6 @@ export function spellcastTraitKey(
   }
 }
 
-function hasAncestryFeature(
-  character: DaggerheartEffectCharacter,
-  ancestry: string,
-  feature: string
-) {
-  if (character.heritage_state?.mixed) {
-    return [
-      character.heritage_state.feature_one,
-      character.heritage_state.feature_two,
-    ].some(
-      (item) => item?.ancestry === ancestry && item?.name === feature
-    );
-  }
-  return character.ancestry_key === ancestry;
-}
-
 type RuntimeSource = {
   id: string;
   name: string;
@@ -341,53 +325,6 @@ function intrinsicSources(
     add("Brawler", "brawler-unarmed-evasion", "Unarmored Defense", "evasion", 1);
   }
 
-  if (
-    character.class_key === "guardian" &&
-    character.subclass_key === "vengeance"
-  ) {
-    add("Vengeance", "vengeance-stress", "At Ease", "stress_max", 1);
-  }
-
-  if (
-    character.class_key === "wizard" &&
-    character.subclass_key === "school-war"
-  ) {
-    add("School of War", "school-war-hp", "Battlemage", "hp_max", 1);
-  }
-
-  if (
-    character.class_key === "guardian" &&
-    character.subclass_key === "stalwart"
-  ) {
-    add("Stalwart", "stalwart-major", "Unwavering", "major_threshold", 1);
-    add("Stalwart", "stalwart-severe", "Unwavering", "severe_threshold", 1);
-  }
-
-  if (
-    character.class_key === "brawler" &&
-    character.subclass_key === "juggernaut"
-  ) {
-    add("Juggernaut", "juggernaut-severe", "Heavy Hitter", "severe_threshold", 3);
-  }
-
-  if (hasAncestryFeature(character, "Giant", "Endurance")) {
-    add("Giant", "giant-endurance", "Endurance", "hp_max", 1);
-  }
-  if (hasAncestryFeature(character, "Human", "High Stamina")) {
-    add("Human", "human-stamina", "High Stamina", "stress_max", 1);
-  }
-  if (hasAncestryFeature(character, "Simiah", "Nimble")) {
-    add("Simiah", "simiah-nimble", "Nimble", "evasion", 1);
-  }
-  if (hasAncestryFeature(character, "Earthkin", "Stoneskin")) {
-    add("Earthkin", "earthkin-armor", "Stoneskin", "armor_score", 1);
-    add("Earthkin", "earthkin-major", "Stoneskin", "major_threshold", 1);
-    add("Earthkin", "earthkin-severe", "Stoneskin", "severe_threshold", 1);
-  }
-  if (hasAncestryFeature(character, "Galapa", "Shell")) {
-    add("Galapa", "galapa-major", "Shell", "major_threshold", undefined, "proficiency");
-    add("Galapa", "galapa-severe", "Shell", "severe_threshold", undefined, "proficiency");
-  }
 
   const grouped = new Map<string, DaggerheartEffect[]>();
   for (const item of effects) {
