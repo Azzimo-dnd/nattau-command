@@ -424,8 +424,19 @@ export function resolveDaggerheartAction(
   }
 
   const uses = { ...(currentState.action_uses ?? {}) };
+  const actionResets = { ...(currentState.action_resets ?? {}) };
+  const effectResets = { ...(currentState.effect_resets ?? {}) };
   if (source.action.limit) {
     uses[source.action_key] = (uses[source.action_key] ?? 0) + 1;
+    actionResets[source.action_key] = source.action.limit.reset;
+  }
+  if (source.action.clear_effect_on) {
+    for (const id of activateIds) {
+      effectResets[`${source.source_key}:${id}`] = source.action.clear_effect_on;
+    }
+  }
+  for (const id of deactivateIds) {
+    delete effectResets[`${source.source_key}:${id}`];
   }
 
   return {
@@ -440,6 +451,8 @@ export function resolveDaggerheartAction(
         active_effect_ids: [...activeIds],
         active_effect_values: activeValues,
         action_uses: uses,
+        action_resets: actionResets,
+        effect_resets: effectResets,
       },
       special_resources: specialResources,
     },
@@ -451,33 +464,51 @@ export function resolveDaggerheartAction(
 export function resetDaggerheartActionUses(
   effectState: DaggerheartEffectState,
   reset: DaggerheartActionReset,
-  sources: DaggerheartActionSource[]
+  sources: DaggerheartActionSource[] = []
 ) {
   const uses = { ...(effectState.action_uses ?? {}) };
-  const resets: DaggerheartActionReset[] =
-    reset === "long_rest"
-      ? ["scene", "rest", "long_rest"]
-      : reset === "rest"
-        ? ["scene", "rest"]
-        : reset === "session"
-          ? ["scene", "rest", "long_rest", "session"]
-          : ["scene"];
-
+  const actionResets = { ...(effectState.action_resets ?? {}) };
+  const effectResets = { ...(effectState.effect_resets ?? {}) };
   const activeIds = new Set(effectState.active_effect_ids ?? []);
   const activeValues = { ...(effectState.active_effect_values ?? {}) };
 
-  for (const source of sources) {
-    const resetsUses =
-      source.action.limit && resets.includes(source.action.limit.reset);
-    const clearsEffect =
-      source.action.clear_effect_on &&
-      resets.includes(source.action.clear_effect_on);
+  const resetMatches = (policy: DaggerheartActionReset) => {
+    if (reset === "scene") return policy === "scene";
+    if (reset === "rest") return policy === "scene" || policy === "rest";
+    if (reset === "long_rest") {
+      return policy === "scene" || policy === "rest" || policy === "long_rest";
+    }
+    // A session boundary is not a rest and does not imply the end of a scene.
+    return policy === "session";
+  };
 
-    if (resetsUses) {
+  // Persisted policies make resets independent of whether the source is currently
+  // equipped, in Loadout, visible during Beastform, or the active stance.
+  for (const [actionKey, policy] of Object.entries(actionResets)) {
+    if (!resetMatches(policy)) continue;
+    delete uses[actionKey];
+    delete actionResets[actionKey];
+  }
+  for (const [effectKey, policy] of Object.entries(effectResets)) {
+    if (!resetMatches(policy)) continue;
+    activeIds.delete(effectKey);
+    delete activeValues[effectKey];
+    delete effectResets[effectKey];
+  }
+
+  // Backward compatibility for saves created before reset policies were persisted.
+  for (const source of sources) {
+    if (
+      source.action.limit &&
+      !(source.action_key in actionResets) &&
+      resetMatches(source.action.limit.reset)
+    ) {
       delete uses[source.action_key];
     }
-
-    if (resetsUses || clearsEffect) {
+    if (
+      source.action.clear_effect_on &&
+      resetMatches(source.action.clear_effect_on)
+    ) {
       for (const id of [
         ...(source.action.activate_effect_id ? [source.action.activate_effect_id] : []),
         ...(source.action.activate_effect_ids ?? []),
@@ -494,5 +525,7 @@ export function resetDaggerheartActionUses(
     active_effect_ids: [...activeIds],
     active_effect_values: activeValues,
     action_uses: uses,
+    action_resets: actionResets,
+    effect_resets: effectResets,
   };
 }
