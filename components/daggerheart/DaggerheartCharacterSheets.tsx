@@ -21,7 +21,14 @@ type GearItem = { name: string; details: string };
 type Advancement = { level: number; choice: string };
 type Resource = { name: string; current: number; max: number; notes: string };
 type Gold = { handfuls: number; bags: number; chests: number };
-type NotesState = { notes?: string };
+type ClassOptionRef = {
+  id: string;
+  name: string;
+  category: "beastform" | "martial_stance";
+  tier: number | null;
+  details: string;
+};
+type NotesState = { notes?: string; options?: ClassOptionRef[] };
 
 type CharacterRow = {
   id: string;
@@ -551,9 +558,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         checked={checked}
                         onChange={() =>
                           patch({
-                            transformations: checked
-                              ? draft.transformations.filter((value) => value !== item)
-                              : [...draft.transformations, item],
+                            transformations: checked ? [] : [item],
                           })
                         }
                       />
@@ -768,6 +773,110 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                 <textarea className={`${inputClass} min-h-32`} value={draft.subclass_state?.notes ?? ""} onChange={(e) => patch({ subclass_state: { ...draft.subclass_state, notes: e.target.value } })} />
               </label>
             </div>
+            {(draft.class_key === "druid" ||
+              (draft.class_key === "brawler" &&
+                draft.subclass_key === "martial-artist")) && (
+              <div className="mt-5 space-y-3 rounded-xl border border-[#3a252d] bg-black/15 p-3">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">
+                  Class compendium
+                </p>
+                {draft.class_key === "druid" && (
+                  <DaggerheartCompendiumPicker
+                    categories={["beastform"]}
+                    label="Choose an available Beastform…"
+                    maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
+                    onSelect={(entry) => {
+                      const options = draft.class_state.options ?? [];
+                      if (options.some((option) => option.id === entry.id)) return;
+                      patch({
+                        class_state: {
+                          ...draft.class_state,
+                          options: [
+                            ...options,
+                            {
+                              id: entry.id,
+                              name: entry.name,
+                              category: "beastform",
+                              tier: entry.tier,
+                              details: compendiumEntryDetails(entry),
+                            },
+                          ],
+                        },
+                      });
+                    }}
+                  />
+                )}
+                {draft.class_key === "brawler" &&
+                  draft.subclass_key === "martial-artist" && (
+                    <DaggerheartCompendiumPicker
+                      categories={["martial_stance"]}
+                      label="Choose an available Martial Stance…"
+                      maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
+                      onSelect={(entry) => {
+                        const options = draft.class_state.options ?? [];
+                        if (options.some((option) => option.id === entry.id)) return;
+                        patch({
+                          class_state: {
+                            ...draft.class_state,
+                            options: [
+                              ...options,
+                              {
+                                id: entry.id,
+                                name: entry.name,
+                                category: "martial_stance",
+                                tier: entry.tier,
+                                details: compendiumEntryDetails(entry),
+                              },
+                            ],
+                          },
+                        });
+                      }}
+                    />
+                  )}
+
+                {(draft.class_state.options ?? []).length > 0 && (
+                  <div className="space-y-2">
+                    {(draft.class_state.options ?? []).map((option) => (
+                      <div
+                        key={option.id}
+                        className="flex items-start justify-between gap-3 rounded-xl border border-[#35232b] bg-black/20 p-3"
+                      >
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-[#e2cbd2]">{option.name}</p>
+                            {option.tier && (
+                              <span className="text-[10px] uppercase tracking-[0.14em] text-[#846c74]">
+                                Tier {option.tier}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-5 text-[#967f87]">
+                            {option.details}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className={smallButton}
+                          onClick={() =>
+                            patch({
+                              class_state: {
+                                ...draft.class_state,
+                                options: (draft.class_state.options ?? []).filter(
+                                  (item) => item.id !== option.id
+                                ),
+                              },
+                            })
+                          }
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="mt-5 space-y-3">
               {draft.special_resources.map((resource, index) => (
                 <div key={index} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1fr_90px_90px_2fr_auto]">
