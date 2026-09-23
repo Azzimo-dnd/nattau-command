@@ -640,6 +640,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         return {
           id: `intrinsic:${entry.category}:${entry.slug}`,
           name: entry.name,
+          category: entry.category,
           details: compendiumEntryDetails(entry),
           effects: filterForHeritage(entry.effects ?? []),
           actions: filterForHeritage(entry.actions ?? []),
