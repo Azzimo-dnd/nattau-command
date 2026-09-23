@@ -50,6 +50,7 @@ type GearItem = {
   category?: string;
   slug?: string;
   source_key?: string;
+  tier?: number | null;
   metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   equipped?: boolean;
@@ -203,6 +204,7 @@ function gearFromCompendium(
     category: entry.category,
     slug: entry.slug,
     source_key: entry.source_key,
+    tier: entry.tier,
     metadata: compendiumEffectiveMetadata(entry),
     effects: entry.effects ?? [],
     equipped,
