@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DaggerheartCompendiumPicker, compendiumEntryDetails } from "@/components/daggerheart/DaggerheartCompendiumPicker";
 import { DaggerheartCharacterCreationWizard } from "@/components/daggerheart/DaggerheartCharacterCreationWizard";
+import type { HeritageState } from "@/components/daggerheart/DaggerheartHeritageBuilder";
 import {
   classOption,
   daggerheartAncestries,
@@ -43,6 +44,7 @@ type CharacterRow = {
   subclass_key: string | null;
   ancestry_key: string | null;
   community_key: string | null;
+  heritage_state: HeritageState;
   transformations: string[];
   traits: Traits;
   evasion: number;
@@ -109,6 +111,7 @@ function emptyCharacter(campaignId: string, playerId: string): CharacterRow {
     subclass_key: null,
     ancestry_key: null,
     community_key: null,
+    heritage_state: {},
     transformations: [],
     traits: { agility: 0, strength: 0, finesse: 0, instinct: 0, presence: 0, knowledge: 0 },
     evasion: 10,
@@ -341,9 +344,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     setDraft(characters.find((row) => row.player_id === playerId) ?? emptyCharacter(campaignId, playerId));
   }
 
-  function patch(patchValue: Partial<CharacterRow>) {
+  const patch = useCallback((patchValue: Partial<CharacterRow>) => {
     setDraft((current) => ({ ...current, ...patchValue }));
-  }
+  }, []);
 
   async function save() {
     if (!draft.name.trim()) {
@@ -369,6 +372,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       subclass_key: draft.subclass_key,
       ancestry_key: draft.ancestry_key,
       community_key: draft.community_key,
+      heritage_state: draft.heritage_state,
       transformations: draft.transformations,
       traits: draft.traits,
       evasion: draft.evasion,
@@ -556,8 +560,24 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               </label>
               <label>
                 <span className="mb-1.5 block text-xs text-[#a48d95]">Ancestry</span>
-                <select className={inputClass} value={draft.ancestry_key ?? ""} onChange={(e) => patch({ ancestry_key: e.target.value || null })}>
+                <select
+                  className={inputClass}
+                  value={draft.ancestry_key ?? ""}
+                  onChange={(e) =>
+                    patch({
+                      ancestry_key: e.target.value || null,
+                      heritage_state: {
+                        mixed: false,
+                        ancestry_one: e.target.value,
+                        display_name: e.target.value,
+                      },
+                    })
+                  }
+                >
                   <option value="">Choose ancestry</option>
+                  {draft.heritage_state?.mixed && draft.ancestry_key && (
+                    <option value={draft.ancestry_key}>{draft.ancestry_key} · Mixed ancestry</option>
+                  )}
                   {daggerheartAncestries.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </label>
