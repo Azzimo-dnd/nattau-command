@@ -63,6 +63,7 @@ as $
 $;
 
 revoke all on function private.has_daggerheart_compendium_access() from public;
+revoke execute on function private.has_daggerheart_compendium_access() from anon;
 grant usage on schema private to authenticated;
 grant execute on function private.has_daggerheart_compendium_access() to authenticated;
 
@@ -126,6 +127,12 @@ as $$
   limit greatest(1, least(coalesce(p_limit, 100), 250));
 $$;
 
+revoke execute on function public.search_daggerheart_compendium(
+  text, text, text, integer, integer
+) from public;
+revoke execute on function public.search_daggerheart_compendium(
+  text, text, text, integer, integer
+) from anon;
 grant execute on function public.search_daggerheart_compendium(
   text, text, text, integer, integer
 ) to authenticated;
