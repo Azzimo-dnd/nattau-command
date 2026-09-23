@@ -17,6 +17,7 @@ type Props = {
   categories: DaggerheartCompendiumCategory[];
   label: string;
   domains?: string[];
+  names?: string[];
   maxLevel?: number;
   maxTier?: number;
   allowMagicWeapons?: boolean;
@@ -30,6 +31,7 @@ export function DaggerheartCompendiumPicker({
   categories,
   label,
   domains,
+  names,
   maxLevel,
   maxTier,
   allowMagicWeapons = true,
@@ -57,6 +59,7 @@ export function DaggerheartCompendiumPicker({
         .limit(500);
 
       if (domains?.length) request = request.in("domain", domains);
+      if (names?.length) request = request.in("name", names);
       if (maxLevel) request = request.lte("level", maxLevel);
       if (maxTier) request = request.lte("tier", maxTier);
 
@@ -81,7 +84,7 @@ export function DaggerheartCompendiumPicker({
     return () => {
       cancelled = true;
     };
-  }, [allowMagicWeapons, categories.join("|"), domains?.join("|"), maxLevel, maxTier, supabase]);
+  }, [allowMagicWeapons, categories.join("|"), domains?.join("|"), names?.join("|"), maxLevel, maxTier, supabase]);
 
   const selected = entries.find((entry) => entry.id === selectedId) ?? null;
 
