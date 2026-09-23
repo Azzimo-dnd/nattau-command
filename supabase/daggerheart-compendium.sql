@@ -42,13 +42,15 @@ create index if not exists daggerheart_compendium_name_search_idx
 
 alter table public.daggerheart_compendium_entries enable row level security;
 
-create or replace function public.has_daggerheart_compendium_access()
+create schema if not exists private;
+
+create or replace function private.has_daggerheart_compendium_access()
 returns boolean
 language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $$
+as $
   select exists (
     select 1
     from public.campaign_members cm
@@ -58,10 +60,11 @@ as $$
       and c.is_active = true
       and c.system_key = 'daggerheart'
   );
-$$;
+$;
 
-revoke all on function public.has_daggerheart_compendium_access() from public;
-grant execute on function public.has_daggerheart_compendium_access() to authenticated;
+revoke all on function private.has_daggerheart_compendium_access() from public;
+grant usage on schema private to authenticated;
+grant execute on function private.has_daggerheart_compendium_access() to authenticated;
 
 drop policy if exists "Daggerheart players can read compendium"
   on public.daggerheart_compendium_entries;
@@ -70,7 +73,7 @@ create policy "Daggerheart players can read compendium"
 on public.daggerheart_compendium_entries
 for select
 to authenticated
-using ((select public.has_daggerheart_compendium_access()));
+using ((select private.has_daggerheart_compendium_access()));
 
 revoke all on public.daggerheart_compendium_entries from anon;
 revoke insert, update, delete on public.daggerheart_compendium_entries from authenticated;
