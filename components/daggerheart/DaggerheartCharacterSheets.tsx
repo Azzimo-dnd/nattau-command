@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DaggerheartCompendiumPicker, compendiumEntryDetails } from "@/components/daggerheart/DaggerheartCompendiumPicker";
+import { DaggerheartCharacterCreationWizard } from "@/components/daggerheart/DaggerheartCharacterCreationWizard";
 import {
   classOption,
   daggerheartAncestries,
@@ -16,8 +17,8 @@ import {
 type TraitKey = (typeof daggerheartTraits)[number];
 type Traits = Record<TraitKey, number>;
 type Experience = { name: string; modifier: number };
-type DomainCard = { name: string; domain: string; level: number; state: "loadout" | "vault" };
-type GearItem = { name: string; details: string };
+type DomainCard = { name: string; domain: string; level: number; state: "loadout" | "vault"; compendium_id?: string; slug?: string; source_key?: string };
+type GearItem = { name: string; details: string; compendium_id?: string; category?: string; slug?: string; source_key?: string; metadata?: Record<string, unknown> };
 type Advancement = { level: number; choice: string };
 type Resource = { name: string; current: number; max: number; notes: string };
 type Gold = { handfuls: number; bags: number; chests: number };
@@ -28,7 +29,7 @@ type ClassOptionRef = {
   tier: number | null;
   details: string;
 };
-type NotesState = { notes?: string; options?: ClassOptionRef[] };
+type NotesState = { notes?: string; options?: ClassOptionRef[]; [key: string]: unknown };
 
 type CharacterRow = {
   id: string;
@@ -288,6 +289,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [advancedCreation, setAdvancedCreation] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -335,6 +337,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   function choosePlayer(playerId: string) {
     setSelectedPlayerId(playerId);
     setMessage(null);
+    setAdvancedCreation(false);
     setDraft(characters.find((row) => row.player_id === playerId) ?? emptyCharacter(campaignId, playerId));
   }
 
@@ -468,6 +471,18 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       </aside>
 
       <div className="min-w-0 space-y-4">
+        {!draft.id && canEdit && !advancedCreation && (
+          <DaggerheartCharacterCreationWizard
+            draft={draft}
+            patch={patch}
+            onFinish={save}
+            onAdvanced={() => setAdvancedCreation(true)}
+            saving={saving}
+          />
+        )}
+
+        {(draft.id || !canEdit || advancedCreation) && (
+          <>
         <header className="rounded-2xl border border-[#4a2935] bg-gradient-to-br from-[#2b111a] to-[#100a0e] p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -480,9 +495,20 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               </p>
             </div>
             {canEdit && (
-              <button type="button" onClick={save} disabled={saving || roster.length === 0} className="min-h-11 rounded-xl border border-[#9b4b61] bg-[#6b2438] px-5 font-bold text-[#f6e4e9] transition hover:bg-[#7a2a40] disabled:opacity-50">
-                {saving ? "Saving…" : draft.id ? "Save changes" : "Create character"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                {!draft.id && advancedCreation && (
+                  <button
+                    type="button"
+                    onClick={() => setAdvancedCreation(false)}
+                    className="min-h-11 rounded-xl border border-[#5c3542] bg-[#241219] px-4 text-sm font-bold text-[#c9adb5] transition hover:bg-[#321720]"
+                  >
+                    Guided creation
+                  </button>
+                )}
+                <button type="button" onClick={save} disabled={saving || roster.length === 0} className="min-h-11 rounded-xl border border-[#9b4b61] bg-[#6b2438] px-5 font-bold text-[#f6e4e9] transition hover:bg-[#7a2a40] disabled:opacity-50">
+                  {saving ? "Saving…" : draft.id ? "Save changes" : "Create character"}
+                </button>
+              </div>
             )}
           </div>
           {message && <p className="mt-4 rounded-xl border border-[#55303d] bg-black/20 px-3 py-2 text-sm text-[#d8bbc3]">{message}</p>}
@@ -651,6 +677,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         domain: entry.domain ?? "",
                         level: entry.level ?? 1,
                         state: "loadout",
+                        compendium_id: entry.id,
+                        slug: entry.slug,
+                        source_key: entry.source_key,
                       },
                     ],
                   })
@@ -696,7 +725,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                       patch({
                         weapons: [
                           ...draft.weapons,
-                          { name: entry.name, details: compendiumEntryDetails(entry) },
+                          {
+                            name: entry.name,
+                            details: compendiumEntryDetails(entry),
+                            compendium_id: entry.id,
+                            category: entry.category,
+                            slug: entry.slug,
+                            source_key: entry.source_key,
+                            metadata: entry.metadata ?? {},
+                          },
                         ],
                       })
                     }
@@ -716,12 +753,24 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                       patch({
                         armor: [
                           ...draft.armor,
-                          { name: entry.name, details: compendiumEntryDetails(entry) },
+                          {
+                            name: entry.name,
+                            details: compendiumEntryDetails(entry),
+                            compendium_id: entry.id,
+                            category: entry.category,
+                            slug: entry.slug,
+                            source_key: entry.source_key,
+                            metadata: entry.metadata ?? {},
+                          },
                         ],
                         armor_score:
                           typeof metadata.base_score === "number"
                             ? metadata.base_score
                             : draft.armor_score,
+                        armor_slots_max:
+                          typeof metadata.base_score === "number"
+                            ? metadata.base_score
+                            : draft.armor_slots_max,
                         major_threshold:
                           typeof metadata.base_major === "number"
                             ? metadata.base_major + draft.level
@@ -746,7 +795,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                       patch({
                         inventory: [
                           ...draft.inventory,
-                          { name: entry.name, details: compendiumEntryDetails(entry) },
+                          {
+                            name: entry.name,
+                            details: compendiumEntryDetails(entry),
+                            compendium_id: entry.id,
+                            category: entry.category,
+                            slug: entry.slug,
+                            source_key: entry.source_key,
+                            metadata: entry.metadata ?? {},
+                          },
                         ],
                       })
                     }
@@ -944,6 +1001,8 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               {saving ? "Saving…" : draft.id ? "Save character sheet" : "Create character sheet"}
             </button>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>
