@@ -24,27 +24,48 @@ function signed(value: number) {
   return value > 0 ? `+${value}` : String(value);
 }
 
-function effectiveDamage(raw: string, proficiency: number) {
+function damageBonusFromMetadata(
+  metadata: Record<string, unknown> | undefined,
+  stats: DaggerheartDerivedStats,
+  level: number
+) {
+  const source = text(metadata?.damage_bonus_from).toLowerCase();
+  if (source === "level") return level;
+  if (
+    ["agility", "strength", "finesse", "instinct", "presence", "knowledge"].includes(source)
+  ) {
+    return traitValue(stats, source);
+  }
+  return 0;
+}
+
+function effectiveDamage(raw: string, proficiency: number, extraBonus = 0) {
   const compact = raw.replaceAll(" ", "");
   const match = compact.match(/^d(\d+)([+-]\d+)?(phy|mag)?$/i);
   if (!match) return raw || "—";
 
   const [, die, modifier = "", kind = ""] = match;
+  const baseModifier = modifier ? Number(modifier) : 0;
+  const totalModifier = baseModifier + extraBonus;
   const type =
     kind.toLowerCase() === "phy"
       ? " physical"
       : kind.toLowerCase() === "mag"
         ? " magic"
         : "";
-  return `${Math.max(1, proficiency)}d${die}${modifier}${type}`;
+  const renderedModifier =
+    totalModifier === 0 ? "" : totalModifier > 0 ? `+${totalModifier}` : String(totalModifier);
+  return `${Math.max(1, proficiency)}d${die}${renderedModifier}${type}`;
 }
 
 export function DaggerheartCombatPanel({
   weapons,
   stats,
+  level,
 }: {
   weapons: Weapon[];
   stats: DaggerheartDerivedStats;
+  level: number;
 }) {
   const equipped = weapons.filter(
     (weapon) =>
@@ -68,6 +89,7 @@ export function DaggerheartCombatPanel({
         const damage = text(weapon.metadata?.damage);
         const burden = text(weapon.metadata?.burden);
         const modifier = traitValue(stats, trait);
+        const damageBonus = damageBonusFromMetadata(weapon.metadata, stats, level);
 
         return (
           <div
@@ -112,16 +134,19 @@ export function DaggerheartCombatPanel({
                   Current damage · Proficiency {stats.proficiency}
                 </p>
                 <p className="mt-1 text-sm font-black text-[#e3cbd2]">
-                  {effectiveDamage(damage, stats.proficiency)}
+                  {effectiveDamage(damage, stats.proficiency, damageBonus)}
                 </p>
               </div>
             </div>
 
-            {burden && (
-              <p className="mt-3 text-[11px] text-[#806d74]">
-                {burden}
-              </p>
-            )}
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[#806d74]">
+              {burden && <span>{burden}</span>}
+              {damageBonus !== 0 && (
+                <span className="rounded-full border border-[#4a3038] bg-black/20 px-2 py-0.5 text-[#bd8d9b]">
+                  Dynamic damage {damageBonus > 0 ? "+" : ""}{damageBonus}
+                </span>
+              )}
+            </div>
           </div>
         );
       })}
