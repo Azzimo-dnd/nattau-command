@@ -1613,6 +1613,11 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       </aside>
 
       <div className="min-w-0 space-y-4">
+        {message && (
+          <p className="rounded-xl border border-[#55303d] bg-black/20 px-3 py-2 text-sm text-[#d8bbc3]">
+            {message}
+          </p>
+        )}
         {!draft.id && canEdit && !advancedCreation && (
           <DaggerheartCharacterCreationWizard
             draft={draft}
@@ -1653,7 +1658,6 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               </div>
             )}
           </div>
-          {message && <p className="mt-4 rounded-xl border border-[#55303d] bg-black/20 px-3 py-2 text-sm text-[#d8bbc3]">{message}</p>}
           {!canEdit && <p className="mt-4 text-xs text-[#88747b]">You can inspect this sheet, but only its player and the Game Master can edit it.</p>}
         </header>
 
