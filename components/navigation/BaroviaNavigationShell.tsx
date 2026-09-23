@@ -48,15 +48,15 @@ const primaryItems: NavigationItem[] = [
     href: "/campaigns/barovia/characters",
     icon: "account",
   },
-  {
-    label: "Archive",
-    href: "/campaigns/barovia/compendium",
-    icon: "spark",
-  },
 ];
 
 const desktopItems: NavigationItem[] = [
   ...primaryItems,
+  {
+    label: "Daggerheart Archive",
+    href: "/campaigns/barovia/compendium",
+    icon: "spark",
+  },
   {
     label: "Compendium",
     href: "/campaigns/barovia/compendium",
@@ -81,6 +81,7 @@ const desktopItems: NavigationItem[] = [
 ];
 
 const sessionItems: NavigationItem[] = [
+  { label: "Daggerheart Archive", href: "/campaigns/barovia/compendium", icon: "spark" },
   { label: "Tabletop of the Mists", href: "/campaigns/barovia/vtt", icon: "war-room" },
   { label: "Sealed Relics", href: "/campaigns/barovia/puzzles", icon: "spark" },
 ];
