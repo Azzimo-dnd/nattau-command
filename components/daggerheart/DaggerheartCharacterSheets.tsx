@@ -859,6 +859,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const revisionRef = useRef<Map<string, number>>(new Map());
   const runtimeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const runtimeConflictRef = useRef<Set<string>>(new Set());
+  const editGenerationRef = useRef(0);
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -966,6 +967,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       nextCharacters.find((row) => row.player_id === preferred) ??
       emptyCharacter(campaignId, preferred);
     draftRef.current = preferredDraft;
+    editGenerationRef.current = 0;
     setDraft(preferredDraft);
     setDirty(false);
     setLoading(false);
@@ -993,11 +995,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       characters.find((row) => row.player_id === playerId) ??
       emptyCharacter(campaignId, playerId);
     draftRef.current = next;
+    editGenerationRef.current = 0;
     setDraft(next);
     setDirty(false);
   }
 
   const patch = useCallback((patchValue: Partial<CharacterRow>) => {
+    editGenerationRef.current += 1;
     setDraft((current) => {
       const next = { ...current, ...patchValue };
       draftRef.current = next;
@@ -1211,6 +1215,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     }
     const normalized = normalizeRuntimePatch(patchValue);
     const base = draftRef.current;
+    const persistedGeneration = ++editGenerationRef.current;
     const optimistic: CharacterRow = { ...base, ...normalized };
     draftRef.current = optimistic;
     setDraft((current) =>
@@ -1270,7 +1275,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         draftRef.current = next;
         return next;
       });
-      setDirty(false);
+      if (editGenerationRef.current === persistedGeneration) {
+        setDirty(false);
+      }
     });
   }
 
@@ -1325,6 +1332,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const mutablePayload = mutableCharacterPayload(normalized);
     const requestId = currentDraft.id;
     const requestPlayerId = currentDraft.player_id;
+    const saveGeneration = editGenerationRef.current;
 
     const result = requestId
       ? await supabase
@@ -1375,6 +1383,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
           : !current.id && current.player_id === requestPlayerId) &&
         current.player_id === requestPlayerId;
       if (!sameRequest) return current;
+
+      if (editGenerationRef.current !== saveGeneration) {
+        const next = { ...current, id: saved.id, state_revision: saved.state_revision };
+        draftRef.current = next;
+        return next;
+      }
+
       draftRef.current = saved;
       return saved;
     });
@@ -1395,8 +1410,14 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
           : row
       )
     );
-    setMessage("Character sheet saved.");
-    setDirty(false);
+    setMessage(
+      editGenerationRef.current === saveGeneration
+        ? "Character sheet saved."
+        : "Save completed, but newer local edits are still unsaved."
+    );
+    if (editGenerationRef.current === saveGeneration) {
+      setDirty(false);
+    }
     setSaving(false);
   }
 
