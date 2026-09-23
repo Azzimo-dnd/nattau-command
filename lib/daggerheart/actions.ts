@@ -32,6 +32,10 @@ export type DaggerheartAction = {
     hope?: number;
     stress?: number;
     armor?: number;
+    special_resource?: {
+      name: string;
+      amount: number;
+    };
   };
   limit?: {
     uses: number;
@@ -76,12 +80,21 @@ export type DaggerheartActionIntrinsicSource = {
   effects?: DaggerheartEffect[];
 };
 
+export type DaggerheartActionSpecialResource = {
+  name: string;
+  current: number;
+  max: number;
+  notes: string;
+};
+
 export type DaggerheartActionCharacter = {
   weapons: DaggerheartActionGearItem[];
   armor: DaggerheartActionGearItem[];
   inventory: DaggerheartActionGearItem[];
   domain_cards: DaggerheartActionDomainCard[];
   intrinsic_sources?: DaggerheartActionIntrinsicSource[];
+  special_resources: DaggerheartActionSpecialResource[];
+  consumable_clear_bonus?: number;
   hope_current: number;
   hope_max: number;
   hp_current: number;
@@ -114,6 +127,7 @@ export type DaggerheartActionResolution = {
     stress_current: number;
     armor_slots_current: number;
     effect_state: DaggerheartEffectState;
+    special_resources?: DaggerheartActionSpecialResource[];
   };
   roll_messages?: string[];
   consume_quantity?: number;
@@ -250,6 +264,18 @@ export function actionAvailable(
   ) {
     return { ok: false, reason: "Not enough unmarked Armor Slots." };
   }
+  if (cost?.special_resource) {
+    const resource = character.special_resources.find(
+      (item) =>
+        item.name.toLowerCase() === cost.special_resource?.name.toLowerCase()
+    );
+    if (!resource || resource.current < cost.special_resource.amount) {
+      return {
+        ok: false,
+        reason: `Not enough ${cost.special_resource.name}.`,
+      };
+    }
+  }
 
   return { ok: true as const };
 }
@@ -286,6 +312,22 @@ export function resolveDaggerheartAction(
   let stress = character.stress_current + (cost.stress ?? 0);
   let hp = character.hp_current;
   let armor = character.armor_slots_current + (cost.armor ?? 0);
+  const specialResources = character.special_resources.map((item) => ({ ...item }));
+  if (cost.special_resource) {
+    const index = specialResources.findIndex(
+      (item) =>
+        item.name.toLowerCase() === cost.special_resource?.name.toLowerCase()
+    );
+    if (index >= 0) {
+      specialResources[index] = {
+        ...specialResources[index],
+        current: Math.max(
+          0,
+          specialResources[index].current - cost.special_resource.amount
+        ),
+      };
+    }
+  }
   const rollMessages: string[] = [];
 
   for (const result of source.action.results ?? []) {
@@ -305,13 +347,22 @@ export function resolveDaggerheartAction(
           : result.resource === "stress"
             ? character.stress_max
             : character.armor_slots_max;
-    const amount = result.all
+    let amount = result.all
       ? result.type === "clear"
         ? currentForResource
         : Math.max(0, maxForResource - currentForResource)
       : result.roll
         ? rollAmount(result.roll)
         : result.amount ?? 0;
+    if (
+      result.type === "clear" &&
+      source.collection === "inventory" &&
+      (source.action.consume_quantity ?? 0) > 0 &&
+      (result.resource === "hp" || result.resource === "stress") &&
+      amount > 0
+    ) {
+      amount += Math.max(0, character.consumable_clear_bonus ?? 0);
+    }
     if (result.type === "clear") {
       if (result.resource === "hp") hp = Math.max(0, hp - amount);
       if (result.resource === "stress") stress = Math.max(0, stress - amount);
@@ -382,6 +433,7 @@ export function resolveDaggerheartAction(
         active_effect_values: activeValues,
         action_uses: uses,
       },
+      special_resources: specialResources,
     },
     roll_messages: rollMessages,
     consume_quantity: source.action.consume_quantity,
