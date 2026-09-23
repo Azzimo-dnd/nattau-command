@@ -40,16 +40,19 @@ function RuleCard({
 }
 
 export function DaggerheartActiveRulesPanel({
+  intrinsicRules,
   domainCards,
   weapons,
   armor,
   inventory,
 }: {
+  intrinsicRules: RuleItem[];
   domainCards: RuleItem[];
   weapons: RuleItem[];
   armor: RuleItem[];
   inventory: RuleItem[];
 }) {
+  const activeIntrinsic = intrinsicRules.filter((item) => item.details?.trim());
   const activeCards = domainCards.filter(
     (item) => item.state === "loadout" && item.details?.trim()
   );
@@ -58,7 +61,8 @@ export function DaggerheartActiveRulesPanel({
   );
   const carried = inventory.filter((item) => item.details?.trim());
 
-  const total = activeCards.length + equippedGear.length + carried.length;
+  const total =
+    activeIntrinsic.length + activeCards.length + equippedGear.length + carried.length;
   if (total === 0) {
     return (
       <p className="rounded-xl border border-[#34242b] bg-black/15 p-4 text-sm text-[#806f75]">
@@ -73,6 +77,23 @@ export function DaggerheartActiveRulesPanel({
         Dynamic modifiers and resource costs are handled automatically where the rule is deterministic.
         Contextual rules remain visible here so the sheet never guesses whether a narrative condition applies.
       </p>
+
+      {activeIntrinsic.length > 0 && (
+        <div>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#956475]">
+            Character features
+          </p>
+          <div className="grid gap-2 lg:grid-cols-2">
+            {activeIntrinsic.map((item, index) => (
+              <RuleCard
+                key={`intrinsic-${item.name}-${index}`}
+                item={item}
+                badge="Active character source"
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {activeCards.length > 0 && (
         <div>
