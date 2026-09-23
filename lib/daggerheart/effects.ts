@@ -631,12 +631,23 @@ export function deriveDaggerheartStats(
     applyContribution(stats, breakdown, effect, value, source.name, key);
   }
 
-  // Pass 4: remaining derived sheet stats.
+  // Pass 4: Armor Score must settle before effects that scale from it
+  // or inspect whether every Armor Slot is marked.
+  for (const { source, effect } of candidateEffects) {
+    if (effect.stat !== "armor_score" || !shouldApply(source, effect)) continue;
+    const key = effectKey(source, effect);
+    const value = resolveEffectValue(effect, source, stats, spellcastTrait, character, key);
+    applyContribution(stats, breakdown, effect, value, source.name, key);
+  }
+  stats.armor_slots_max = Math.max(0, stats.armor_score);
+
+  // Pass 5: remaining derived sheet stats.
   for (const { source, effect } of candidateEffects) {
     if (
       traitKeys.includes(effect.stat as (typeof traitKeys)[number]) ||
       resourceMaxStats.has(effect.stat) ||
       effect.stat === "proficiency" ||
+      effect.stat === "armor_score" ||
       !shouldApply(source, effect)
     ) {
       continue;
