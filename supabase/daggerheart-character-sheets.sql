@@ -195,3 +195,121 @@ alter table public.daggerheart_characters
 
 alter table public.daggerheart_characters
   alter column schema_version set default 2;
+
+
+-- Final access hardening: character sheets exist only inside active Daggerheart campaigns.
+create schema if not exists private;
+
+create or replace function private.is_active_daggerheart_campaign_member(
+  target_campaign_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.campaign_members cm
+    join public.campaigns c on c.id = cm.campaign_id
+    where cm.campaign_id = target_campaign_id
+      and cm.user_id = (select auth.uid())
+      and cm.is_active = true
+      and c.is_active = true
+      and c.system_key = 'daggerheart'
+  );
+$$;
+
+revoke all on function private.is_active_daggerheart_campaign_member(uuid) from public;
+revoke all on function private.is_active_daggerheart_campaign_member(uuid) from anon;
+grant execute on function private.is_active_daggerheart_campaign_member(uuid) to authenticated;
+
+drop policy if exists "Daggerheart campaign members can view characters" on public.daggerheart_characters;
+drop policy if exists "Daggerheart players and DMs can create characters" on public.daggerheart_characters;
+drop policy if exists "Daggerheart players and DMs can update characters" on public.daggerheart_characters;
+drop policy if exists "Daggerheart players and DMs can delete characters" on public.daggerheart_characters;
+drop policy if exists "Active Daggerheart campaign members can view characters" on public.daggerheart_characters;
+drop policy if exists "Active Daggerheart players and DMs can create characters" on public.daggerheart_characters;
+drop policy if exists "Active Daggerheart players and DMs can update characters" on public.daggerheart_characters;
+drop policy if exists "Active Daggerheart players and DMs can delete characters" on public.daggerheart_characters;
+
+create policy "Active Daggerheart campaign members can view characters"
+on public.daggerheart_characters for select to authenticated
+using ((select private.is_active_daggerheart_campaign_member(campaign_id)));
+
+create policy "Active Daggerheart players and DMs can create characters"
+on public.daggerheart_characters for insert to authenticated
+with check (
+  (select private.is_active_daggerheart_campaign_member(campaign_id))
+  and public.is_active_campaign_player(campaign_id, player_id)
+  and (player_id = (select auth.uid()) or public.is_campaign_dm(campaign_id))
+);
+
+create policy "Active Daggerheart players and DMs can update characters"
+on public.daggerheart_characters for update to authenticated
+using (
+  (select private.is_active_daggerheart_campaign_member(campaign_id))
+  and (player_id = (select auth.uid()) or public.is_campaign_dm(campaign_id))
+)
+with check (
+  (select private.is_active_daggerheart_campaign_member(campaign_id))
+  and public.is_active_campaign_player(campaign_id, player_id)
+  and (player_id = (select auth.uid()) or public.is_campaign_dm(campaign_id))
+);
+
+create policy "Active Daggerheart players and DMs can delete characters"
+on public.daggerheart_characters for delete to authenticated
+using (
+  (select private.is_active_daggerheart_campaign_member(campaign_id))
+  and (player_id = (select auth.uid()) or public.is_campaign_dm(campaign_id))
+);
+
+create or replace function public.prevent_daggerheart_character_reassignment()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if new.campaign_id is distinct from old.campaign_id
+     or new.player_id is distinct from old.player_id then
+    raise exception 'Character ownership and campaign cannot be changed by UPDATE';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists prevent_daggerheart_character_reassignment on public.daggerheart_characters;
+create trigger prevent_daggerheart_character_reassignment
+before update on public.daggerheart_characters
+for each row execute function public.prevent_daggerheart_character_reassignment();
+
+create or replace function public.list_daggerheart_character_roster(p_campaign_id uuid)
+returns table (
+  player_id uuid, display_name text, member_role text, character_id uuid,
+  character_name text, character_level integer, character_class text
+)
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if not (select private.is_active_daggerheart_campaign_member(p_campaign_id)) then
+    raise exception 'Active Daggerheart campaign membership required';
+  end if;
+  return query
+  select cm.user_id, coalesce(p.display_name, 'Unknown wanderer')::text, cm.role::text,
+         dc.id, nullif(dc.name, '')::text, dc.level, dc.class_key::text
+  from public.campaign_members cm
+  join public.profiles p on p.id = cm.user_id
+  left join public.daggerheart_characters dc
+    on dc.campaign_id = cm.campaign_id and dc.player_id = cm.user_id and dc.is_active = true
+  where cm.campaign_id = p_campaign_id and cm.is_active = true and cm.role = 'player'
+  order by lower(coalesce(p.display_name, ''));
+end;
+$$;
+
+revoke all on table public.daggerheart_characters from anon;
+revoke all on table public.daggerheart_characters from authenticated;
+grant select, insert, update, delete on table public.daggerheart_characters to authenticated;
+
+revoke all on function public.list_daggerheart_character_roster(uuid) from public;
+revoke all on function public.list_daggerheart_character_roster(uuid) from anon;
+grant execute on function public.list_daggerheart_character_roster(uuid) to authenticated;
