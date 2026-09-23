@@ -77,6 +77,9 @@ type ClassOptionRef = {
   category: "beastform" | "martial_stance";
   tier: number | null;
   details: string;
+  metadata?: Record<string, unknown>;
+  effects?: DaggerheartEffect[];
+  actions?: DaggerheartAction[];
 };
 type NotesState = { notes?: string; options?: ClassOptionRef[]; [key: string]: unknown };
 
@@ -241,6 +244,7 @@ function characterCompendiumIds(character: CharacterRow) {
     ...character.armor.map((item) => item.compendium_id),
     ...character.inventory.map((item) => item.compendium_id),
     ...character.domain_cards.map((card) => card.compendium_id),
+    ...(character.class_state.options ?? []).map((option) => option.id),
   ].filter((id): id is string => Boolean(id));
 }
 
@@ -260,6 +264,21 @@ function hydrateCharacterCompendium(
       slug: entry.slug,
       source_key: entry.source_key,
       tier: entry.tier,
+      metadata: compendiumEffectiveMetadata(entry),
+      effects: entry.effects ?? [],
+      actions: entry.actions ?? [],
+    };
+  };
+
+  const hydrateClassOption = (option: ClassOptionRef): ClassOptionRef => {
+    const entry = entries.get(option.id);
+    if (!entry) return option;
+    return {
+      ...option,
+      name: entry.name,
+      category: entry.category as ClassOptionRef["category"],
+      tier: entry.tier,
+      details: compendiumEntryDetails(entry),
       metadata: compendiumEffectiveMetadata(entry),
       effects: entry.effects ?? [],
       actions: entry.actions ?? [],
@@ -289,6 +308,10 @@ function hydrateCharacterCompendium(
     armor: character.armor.map(hydrateGear),
     inventory: character.inventory.map(hydrateGear),
     domain_cards: character.domain_cards.map(hydrateCard),
+    class_state: {
+      ...character.class_state,
+      options: (character.class_state.options ?? []).map(hydrateClassOption),
+    },
   };
 }
 
@@ -648,9 +671,45 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       });
   }, [draft.ancestry_key, draft.class_key, draft.community_key, draft.heritage_state, draft.subclass_key, draft.transformations, intrinsicCatalog]);
 
+  const activeClassOptions = useMemo(() => {
+    const options = draft.class_state.options ?? [];
+    const activeBeastformId =
+      typeof draft.class_state.active_beastform_id === "string"
+        ? draft.class_state.active_beastform_id
+        : null;
+    const activeStanceId =
+      typeof draft.class_state.active_stance_id === "string"
+        ? draft.class_state.active_stance_id
+        : null;
+
+    return options
+      .filter(
+        (option) =>
+          (option.category === "beastform" && option.id === activeBeastformId) ||
+          (option.category === "martial_stance" && option.id === activeStanceId)
+      )
+      .map((option) => ({
+        id: `class-option:${option.id}`,
+        name: option.name,
+        category: option.category,
+        details: option.details,
+        effects: option.effects ?? [],
+        actions: option.actions ?? [],
+        metadata: option.metadata ?? {},
+      }));
+  }, [draft.class_state]);
+
+  const activeBeastform = useMemo(
+    () => activeClassOptions.find((option) => option.category === "beastform") ?? null,
+    [activeClassOptions]
+  );
+
   const runtimeCharacter = useMemo(
-    () => ({ ...draft, intrinsic_sources: selectedIntrinsicSources }),
-    [draft, selectedIntrinsicSources]
+    () => ({
+      ...draft,
+      intrinsic_sources: [...selectedIntrinsicSources, ...activeClassOptions],
+    }),
+    [draft, selectedIntrinsicSources, activeClassOptions]
   );
   const effectResult = useMemo(
     () => deriveDaggerheartStats(runtimeCharacter),
@@ -714,7 +773,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const nextDraft = { ...draft, ...patchValue };
     const calculated = deriveDaggerheartStats({
       ...nextDraft,
-      intrinsic_sources: selectedIntrinsicSources,
+      intrinsic_sources: [...selectedIntrinsicSources, ...activeClassOptions],
     });
     const snapshot = effectiveSnapshot(calculated);
 
@@ -752,6 +811,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     for (const key of [
       "effect_state",
       "special_resources",
+      "class_state",
       "weapons",
       "armor",
       "inventory",
@@ -803,7 +863,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
     const calculated = deriveDaggerheartStats({
       ...draft,
-      intrinsic_sources: selectedIntrinsicSources,
+      intrinsic_sources: [...selectedIntrinsicSources, ...activeClassOptions],
     });
     const snapshot = effectiveSnapshot(calculated);
     if (snapshot.major_threshold > snapshot.severe_threshold) {
@@ -936,6 +996,58 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     });
   }
 
+  function setActiveClassOption(option: ClassOptionRef) {
+    if (option.category === "beastform") {
+      const current =
+        typeof draft.class_state.active_beastform_id === "string"
+          ? draft.class_state.active_beastform_id
+          : null;
+      void persistRuntimePatch({
+        class_state: {
+          ...draft.class_state,
+          active_beastform_id: current === option.id ? null : option.id,
+        },
+      });
+      setActionMessage(
+        current === option.id
+          ? `${option.name} Beastform cleared.`
+          : `${option.name} is now the active Beastform. Use the Druid Beastform action to pay the transformation cost when required.`
+      );
+      return;
+    }
+
+    const current =
+      typeof draft.class_state.active_stance_id === "string"
+        ? draft.class_state.active_stance_id
+        : null;
+    if (current === option.id) {
+      void persistRuntimePatch({
+        class_state: { ...draft.class_state, active_stance_id: null },
+      });
+      setActionMessage(`${option.name} stance dropped.`);
+      return;
+    }
+
+    const focusIndex = draft.special_resources.findIndex(
+      (resource) => resource.name.toLowerCase() === "focus"
+    );
+    if (focusIndex < 0 || draft.special_resources[focusIndex].current < 1) {
+      setActionMessage("Not enough Focus to shift into this stance.");
+      return;
+    }
+
+    const resources = draft.special_resources.map((resource, index) =>
+      index === focusIndex
+        ? { ...resource, current: Math.max(0, resource.current - 1) }
+        : resource
+    );
+    void persistRuntimePatch({
+      special_resources: resources,
+      class_state: { ...draft.class_state, active_stance_id: option.id },
+    });
+    setActionMessage(`Spent 1 Focus. ${option.name} is now your active stance.`);
+  }
+
   function useResourceAction(source: (typeof actionSources)[number]) {
     const resolution = resolveDaggerheartAction(actionCharacter, source);
     if (!resolution.ok || !resolution.patch) {
@@ -978,6 +1090,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         reset,
         actionSources
       ),
+      class_state: {
+        ...draft.class_state,
+        active_stance_id: null,
+      },
     });
     setActionMessage(
       `${reset.replaceAll("_", " ")} uses reset.`
@@ -1199,7 +1315,20 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             subtitle="Equipped weapons use the current trait modifiers, Proficiency and errata-aware weapon data."
           >
             <DaggerheartCombatPanel
-              weapons={draft.weapons}
+              weapons={
+                activeBeastform
+                  ? [
+                      ...draft.weapons,
+                      {
+                        instance_id: `beastform:${activeBeastform.id}`,
+                        name: activeBeastform.name,
+                        category: "beastform",
+                        equipped: true,
+                        metadata: activeBeastform.metadata,
+                      },
+                    ]
+                  : draft.weapons
+              }
               stats={effectResult.stats}
               level={draft.level}
             />
@@ -1223,7 +1352,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             subtitle="Full linked rules for your current Loadout, equipped gear and carried compendium items."
           >
             <DaggerheartActiveRulesPanel
-              intrinsicRules={selectedIntrinsicSources}
+              intrinsicRules={[...selectedIntrinsicSources, ...activeClassOptions]}
               domainCards={draft.domain_cards}
               weapons={draft.weapons}
               armor={draft.armor}
@@ -1578,6 +1707,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                               category: "beastform",
                               tier: entry.tier,
                               details: compendiumEntryDetails(entry),
+                              metadata: compendiumEffectiveMetadata(entry),
+                              effects: entry.effects ?? [],
+                              actions: entry.actions ?? [],
                             },
                           ],
                         },
@@ -1633,22 +1765,43 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                             {option.details}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          className={smallButton}
-                          onClick={() =>
-                            patch({
-                              class_state: {
-                                ...draft.class_state,
-                                options: (draft.class_state.options ?? []).filter(
-                                  (item) => item.id !== option.id
-                                ),
-                              },
-                            })
-                          }
-                        >
-                          ×
-                        </button>
+                        <div className="flex shrink-0 flex-col gap-2">
+                          <button
+                            type="button"
+                            className={smallButton}
+                            onClick={() => setActiveClassOption(option)}
+                          >
+                            {(option.category === "beastform"
+                              ? draft.class_state.active_beastform_id
+                              : draft.class_state.active_stance_id) === option.id
+                              ? "Active"
+                              : option.category === "martial_stance"
+                                ? "Shift · 1 Focus"
+                                : "Set active"}
+                          </button>
+                          <button
+                            type="button"
+                            className={smallButton}
+                            onClick={() =>
+                              patch({
+                                class_state: {
+                                  ...draft.class_state,
+                                  options: (draft.class_state.options ?? []).filter(
+                                    (item) => item.id !== option.id
+                                  ),
+                                  ...(draft.class_state.active_beastform_id === option.id
+                                    ? { active_beastform_id: null }
+                                    : {}),
+                                  ...(draft.class_state.active_stance_id === option.id
+                                    ? { active_stance_id: null }
+                                    : {}),
+                                },
+                              })
+                            }
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
