@@ -16,6 +16,7 @@ export const daggerheartEffectStats = [
   "major_threshold",
   "severe_threshold",
   "domain_loadout_max",
+  "consumable_clear_bonus",
 ] as const;
 
 export type DaggerheartEffectStat = (typeof daggerheartEffectStats)[number];
@@ -69,6 +70,7 @@ export type DaggerheartBaseStats = {
   major_threshold: number;
   severe_threshold: number;
   domain_loadout_max: number;
+  consumable_clear_bonus: number;
 };
 
 export type DaggerheartManualStatModifiers = Partial<
@@ -204,6 +206,7 @@ export function baseStatsForClass(
     major_threshold: 0,
     severe_threshold: 0,
     domain_loadout_max: 5,
+    consumable_clear_bonus: 0,
   };
 }
 
@@ -325,6 +328,50 @@ function intrinsicSources(
     add("Brawler", "brawler-unarmed-evasion", "Unarmored Defense", "evasion", 1);
   }
 
+  if (!character.intrinsic_sources) {
+    if (character.class_key === "guardian" && character.subclass_key === "vengeance") {
+      add("Vengeance", "vengeance-stress", "At Ease", "stress_max", 1);
+    }
+    if (character.class_key === "wizard" && character.subclass_key === "school-war") {
+      add("School of War", "school-war-hp", "Battlemage", "hp_max", 1);
+    }
+    if (character.class_key === "guardian" && character.subclass_key === "stalwart") {
+      add("Stalwart", "stalwart-major", "Unwavering", "major_threshold", 1);
+      add("Stalwart", "stalwart-severe", "Unwavering", "severe_threshold", 1);
+    }
+    if (character.class_key === "brawler" && character.subclass_key === "juggernaut") {
+      add("Juggernaut", "juggernaut-severe", "Rugged", "severe_threshold", 3);
+    }
+
+    const heritageHas = (ancestry: string, feature: string) => {
+      if (character.heritage_state?.mixed) {
+        return [
+          character.heritage_state.feature_one,
+          character.heritage_state.feature_two,
+        ].some((item) => item?.ancestry === ancestry && item?.name === feature);
+      }
+      return character.ancestry_key === ancestry;
+    };
+
+    if (heritageHas("Giant", "Endurance")) {
+      add("Giant", "giant-endurance", "Endurance", "hp_max", 1);
+    }
+    if (heritageHas("Human", "High Stamina")) {
+      add("Human", "human-stamina", "High Stamina", "stress_max", 1);
+    }
+    if (heritageHas("Simiah", "Nimble")) {
+      add("Simiah", "simiah-nimble", "Nimble", "evasion", 1);
+    }
+    if (heritageHas("Earthkin", "Stoneskin")) {
+      add("Earthkin", "earthkin-armor", "Stoneskin", "armor_score", 1);
+      add("Earthkin", "earthkin-major", "Stoneskin", "major_threshold", 1);
+      add("Earthkin", "earthkin-severe", "Stoneskin", "severe_threshold", 1);
+    }
+    if (heritageHas("Galapa", "Shell")) {
+      add("Galapa", "galapa-major", "Shell", "major_threshold", undefined, "proficiency");
+      add("Galapa", "galapa-severe", "Shell", "severe_threshold", undefined, "proficiency");
+    }
+  }
 
   const grouped = new Map<string, DaggerheartEffect[]>();
   for (const item of effects) {
@@ -486,6 +533,7 @@ export function deriveDaggerheartStats(
     major_threshold: numberValue(base.major_threshold),
     severe_threshold: numberValue(base.severe_threshold),
     domain_loadout_max: numberValue(base.domain_loadout_max, 5),
+    consumable_clear_bonus: numberValue(base.consumable_clear_bonus, 0),
     armor_slots_max: 0,
   } satisfies DaggerheartDerivedStats;
 
