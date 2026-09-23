@@ -25,6 +25,12 @@ function actionMeta(source: DaggerheartActionSource) {
     bits.push(`Consume ×${source.action.consume_quantity}`);
   }
   if (source.action.availability === "during_rest") bits.push("During rest");
+  for (const result of source.action.results ?? []) {
+    const amount = result.roll
+      ? `${result.roll.count}d${result.roll.die}${(result.roll.bonus ?? 0) > 0 ? `+${result.roll.bonus}` : ""}`
+      : String(result.amount ?? 0);
+    bits.push(`Clear ${amount} ${result.resource}`);
+  }
   if (source.action.limit) {
     bits.push(
       `${source.action.limit.uses} / ${source.action.limit.reset.replaceAll("_", " ")}`
