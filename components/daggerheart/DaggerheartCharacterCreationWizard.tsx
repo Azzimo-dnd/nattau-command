@@ -19,6 +19,16 @@ import {
   type DaggerheartCompendiumEntry,
 } from "@/lib/daggerheart/compendium";
 import {
+  baseStatsForClass,
+  deriveDaggerheartStats,
+  effectiveSnapshot,
+  spellcastTraitKey,
+  type DaggerheartBaseStats,
+  type DaggerheartEffect,
+  type DaggerheartEffectState,
+  type DaggerheartManualStatModifiers,
+} from "@/lib/daggerheart/effects";
+import {
   DaggerheartHeritageBuilder,
   type HeritageState,
 } from "@/components/daggerheart/DaggerheartHeritageBuilder";
@@ -34,8 +44,10 @@ type DomainCard = {
   compendium_id?: string;
   slug?: string;
   source_key?: string;
+  effects?: DaggerheartEffect[];
 };
 type GearItem = {
+  instance_id?: string;
   name: string;
   details: string;
   compendium_id?: string;
@@ -43,6 +55,9 @@ type GearItem = {
   slug?: string;
   source_key?: string;
   metadata?: Record<string, unknown>;
+  effects?: DaggerheartEffect[];
+  equipped?: boolean;
+  quantity?: number;
 };
 type Resource = { name: string; current: number; max: number; notes: string };
 type Gold = { handfuls: number; bags: number; chests: number };
@@ -84,6 +99,9 @@ export type WizardCharacter = {
   special_resources: Resource[];
   class_state: StateBag;
   subclass_state: StateBag;
+  base_stats: DaggerheartBaseStats;
+  manual_stat_modifiers: DaggerheartManualStatModifiers;
+  effect_state: DaggerheartEffectState;
 };
 
 type Props = {
@@ -120,6 +138,10 @@ function gearFromEntry(entry: DaggerheartCompendiumEntry): GearItem {
     slug: entry.slug,
     source_key: entry.source_key,
     metadata: compendiumEffectiveMetadata(entry),
+    effects: entry.effects ?? [],
+    instance_id: crypto.randomUUID(),
+    equipped: ["weapon_primary", "weapon_secondary", "armor"].includes(entry.category),
+    quantity: 1,
   };
 }
 
@@ -152,131 +174,8 @@ function hasAncestryFeature(
   return character.ancestry_key === ancestry;
 }
 
-function spellcastTraitKey(character: WizardCharacter): TraitKey | null {
-  switch (character.class_key) {
-    case "bard":
-      return "presence";
-    case "druid":
-      return "instinct";
-    case "ranger":
-      return "agility";
-    case "rogue":
-      return "finesse";
-    case "seraph":
-      return "strength";
-    case "sorcerer":
-      return "instinct";
-    case "wizard":
-      return "knowledge";
-    case "assassin":
-      return character.subclass_key === "poisoners-guild" ? "knowledge" : "agility";
-    case "warlock":
-      return "presence";
-    case "witch":
-      return character.subclass_key === "moon" ? "instinct" : "knowledge";
-    default:
-      return null;
-  }
-}
-
 function hasSpellcastTrait(character: WizardCharacter) {
   return spellcastTraitKey(character) !== null;
-}
-
-function containsRule(item: GearItem | undefined, text: string) {
-  return (item?.details ?? "").toLowerCase().includes(text.toLowerCase());
-}
-
-function deriveStartingStats(character: WizardCharacter) {
-  const option = classOption(character.class_key);
-  if (!option) return null;
-
-  const activePrimary = character.weapons.find(
-    (item) => item.category === "weapon_primary"
-  );
-  const armor = character.armor[0];
-  const armorMeta = armor?.metadata ?? {};
-
-  let evasion = option.startingEvasion;
-  let hpMax = option.startingHitPoints;
-  let stressMax = 6;
-  let armorScore =
-    typeof armorMeta.base_score === "number" ? armorMeta.base_score : 0;
-  let majorThreshold =
-    typeof armorMeta.base_major === "number"
-      ? armorMeta.base_major + character.level
-      : 0;
-  let severeThreshold =
-    typeof armorMeta.base_severe === "number"
-      ? armorMeta.base_severe + character.level
-      : 0;
-
-  const activeSecondary = character.weapons.find(
-    (item) => item.category === "weapon_secondary"
-  );
-
-  if (character.class_key === "brawler" && !activePrimary) evasion += 1;
-
-  // Foundation subclass features that permanently affect starting tracks.
-  if (character.class_key === "guardian" && character.subclass_key === "vengeance") {
-    stressMax += 1;
-  }
-  if (character.class_key === "wizard" && character.subclass_key === "school-war") {
-    hpMax += 1;
-  }
-  if (character.class_key === "guardian" && character.subclass_key === "stalwart") {
-    if (majorThreshold) majorThreshold += 1;
-    if (severeThreshold) severeThreshold += 1;
-  }
-  if (character.class_key === "brawler" && character.subclass_key === "juggernaut") {
-    if (severeThreshold) severeThreshold += 3;
-  }
-
-  if (hasAncestryFeature(character, "Giant", "Endurance")) hpMax += 1;
-  if (hasAncestryFeature(character, "Human", "High Stamina")) stressMax += 1;
-  if (hasAncestryFeature(character, "Simiah", "Nimble")) evasion += 1;
-
-  if (hasAncestryFeature(character, "Earthkin", "Stoneskin")) {
-    armorScore += 1;
-    if (majorThreshold) majorThreshold += 1;
-    if (severeThreshold) severeThreshold += 1;
-  }
-
-  if (hasAncestryFeature(character, "Galapa", "Shell")) {
-    if (majorThreshold) majorThreshold += character.proficiency;
-    if (severeThreshold) severeThreshold += character.proficiency;
-  }
-
-  // Active equipment features that modify sheet-level defenses.
-  if (containsRule(armor, "+1 to Evasion")) evasion += 1;
-  if (containsRule(armor, "−1 to Evasion") || containsRule(armor, "-1 to Evasion")) evasion -= 1;
-  if (containsRule(armor, "−2 to Evasion") || containsRule(armor, "-2 to Evasion")) evasion -= 2;
-  if (containsRule(activePrimary, "−1 to Evasion") || containsRule(activePrimary, "-1 to Evasion")) evasion -= 1;
-  if (containsRule(activeSecondary, "−1 to Evasion") || containsRule(activeSecondary, "-1 to Evasion")) evasion -= 1;
-
-  if (containsRule(activeSecondary, "+1 to Armor Score")) armorScore += 1;
-  if (containsRule(activeSecondary, "+2 to Armor Score")) armorScore += 2;
-  if (containsRule(activeSecondary, "+2 to damage thresholds")) {
-    if (majorThreshold) majorThreshold += 2;
-    if (severeThreshold) severeThreshold += 2;
-  }
-
-  if (containsRule(armor, "bonus to your damage thresholds equal to your Spellcast trait")) {
-    const spellcastTrait = spellcastTraitKey(character);
-    const bonus = spellcastTrait ? Number(character.traits[spellcastTrait] ?? 0) : 0;
-    if (majorThreshold) majorThreshold += bonus;
-    if (severeThreshold) severeThreshold += bonus;
-  }
-
-  return {
-    evasion,
-    hp_max: hpMax,
-    stress_max: stressMax,
-    armor_score: armorScore,
-    armor_slots_max: armorScore,
-    major_threshold: majorThreshold,
-    severe_threshold: severeThreshold,
-  };
 }
 
 export function DaggerheartCharacterCreationWizard({
@@ -296,12 +195,14 @@ export function DaggerheartCharacterCreationWizard({
   const creationGuidance = draft.class_key
     ? daggerheartClassCreationGuidance[draft.class_key]
     : null;
+  const effectResult = useMemo(() => deriveDaggerheartStats(draft), [draft]);
 
   useEffect(() => {
-    const derived = deriveStartingStats(draft);
-    if (!derived) return;
+    const derived = effectiveSnapshot(effectResult);
     if (
       draft.evasion !== derived.evasion ||
+      draft.proficiency !== derived.proficiency ||
+      draft.hope_max !== derived.hope_max ||
       draft.hp_max !== derived.hp_max ||
       draft.stress_max !== derived.stress_max ||
       draft.armor_score !== derived.armor_score ||
@@ -311,23 +212,7 @@ export function DaggerheartCharacterCreationWizard({
     ) {
       patch(derived);
     }
-  }, [
-    draft.ancestry_key,
-    draft.armor,
-    draft.class_key,
-    draft.heritage_state,
-    draft.level,
-    draft.proficiency,
-    draft.weapons,
-    draft.evasion,
-    draft.hp_max,
-    draft.stress_max,
-    draft.armor_score,
-    draft.armor_slots_max,
-    draft.major_threshold,
-    draft.severe_threshold,
-    patch,
-  ]);
+  }, [draft, effectResult, patch]);
 
   useEffect(() => {
     if (step !== 4) return;
@@ -369,6 +254,9 @@ export function DaggerheartCharacterCreationWizard({
       class_key: key,
       subclass_key: null,
       level: 1,
+      base_stats: baseStatsForClass(key, 1),
+      manual_stat_modifiers: {},
+      effect_state: { active_effect_ids: [] },
       evasion: nextClass.startingEvasion,
       hp_current: 0,
       hp_max: nextClass.startingHitPoints,
@@ -1004,17 +892,9 @@ export function DaggerheartCharacterCreationWizard({
                 label="Choose Tier 1 armor…"
                 maxTier={1}
                 onSelect={(entry) => {
-                  const metadata = compendiumEffectiveMetadata(entry);
-                  const score = typeof metadata.base_score === "number" ? metadata.base_score : 0;
-                  const major = typeof metadata.base_major === "number" ? metadata.base_major + 1 : 0;
-                  const severe = typeof metadata.base_severe === "number" ? metadata.base_severe + 1 : 0;
                   patch({
                     armor: [gearFromEntry(entry)],
-                    armor_score: score,
                     armor_slots_current: 0,
-                    armor_slots_max: score,
-                    major_threshold: major,
-                    severe_threshold: severe,
                   });
                 }}
               />
