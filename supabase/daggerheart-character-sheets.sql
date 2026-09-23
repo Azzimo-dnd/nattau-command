@@ -47,7 +47,10 @@ create table if not exists public.daggerheart_characters (
   transformation_notes text not null default '',
   description text not null default '',
   notes text not null default '',
-  schema_version integer not null default 1,
+  base_stats jsonb not null default '{"evasion":10,"proficiency":1,"hope_max":6,"hp_max":0,"stress_max":6,"armor_score":0,"major_threshold":0,"severe_threshold":0}'::jsonb,
+  manual_stat_modifiers jsonb not null default '{}'::jsonb,
+  effect_state jsonb not null default '{"active_effect_ids":[]}'::jsonb,
+  schema_version integer not null default 2,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint daggerheart_character_threshold_order check (major_threshold <= severe_threshold),
@@ -134,3 +137,24 @@ grant execute on function public.list_daggerheart_character_roster(uuid) to auth
 -- Keep reapplication safe for databases created before mixed ancestry support.
 alter table public.daggerheart_characters
   add column if not exists heritage_state jsonb not null default '{}'::jsonb;
+
+
+-- Effects engine state for dynamically derived character sheets.
+alter table public.daggerheart_characters
+  add column if not exists base_stats jsonb not null default
+    '{"evasion":10,"proficiency":1,"hope_max":6,"hp_max":0,"stress_max":6,"armor_score":0,"major_threshold":0,"severe_threshold":0}'::jsonb,
+  add column if not exists manual_stat_modifiers jsonb not null default '{}'::jsonb,
+  add column if not exists effect_state jsonb not null default '{"active_effect_ids":[]}'::jsonb;
+
+alter table public.daggerheart_characters
+  drop constraint if exists daggerheart_character_base_stats_object,
+  drop constraint if exists daggerheart_character_manual_modifiers_object,
+  drop constraint if exists daggerheart_character_effect_state_object;
+
+alter table public.daggerheart_characters
+  add constraint daggerheart_character_base_stats_object check (jsonb_typeof(base_stats) = 'object'),
+  add constraint daggerheart_character_manual_modifiers_object check (jsonb_typeof(manual_stat_modifiers) = 'object'),
+  add constraint daggerheart_character_effect_state_object check (jsonb_typeof(effect_state) = 'object');
+
+alter table public.daggerheart_characters
+  alter column schema_version set default 2;
