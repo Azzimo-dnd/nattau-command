@@ -48,6 +48,7 @@ type DomainCard = {
   domain: string;
   level: number;
   state: "loadout" | "vault";
+  permanent_vault?: boolean;
   compendium_id?: string;
   slug?: string;
   source_key?: string;
@@ -797,6 +798,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [advancedCreation, setAdvancedCreation] = useState(false);
+  const [freeLoadoutEditing, setFreeLoadoutEditing] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -1028,10 +1030,23 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     () => draft.domain_cards.filter((card) => card.state === "loadout").length,
     [draft.domain_cards]
   );
+  const duplicateDomainCardIds = useMemo(() => {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const card of draft.domain_cards) {
+      if (!card.compendium_id) continue;
+      if (seen.has(card.compendium_id)) duplicates.add(card.compendium_id);
+      seen.add(card.compendium_id);
+    }
+    return duplicates;
+  }, [draft.domain_cards]);
   const equipmentError = useMemo(
     () => equipmentConfigurationError(draft),
     [draft]
   );
+  const domainConfigurationValid =
+    domainLoadoutCount <= effectResult.stats.domain_loadout_max &&
+    duplicateDomainCardIds.size === 0;
 
   useEffect(() => {
     const snapshot = effectiveSnapshot(effectResult);
@@ -1205,6 +1220,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       setMessage("Major threshold cannot be higher than Severe threshold.");
       return;
     }
+    if (duplicateDomainCardIds.size > 0) {
+      setMessage("The same compendium Domain Card cannot be added twice.");
+      return;
+    }
     if (domainLoadoutCount > snapshot.domain_loadout_max) {
       const overflow = domainLoadoutCount - snapshot.domain_loadout_max;
       setMessage(
@@ -1318,6 +1337,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   function toggleEffects(effectKeys: string[]) {
+    if (!domainConfigurationValid) {
+      setActionMessage(
+        "Resolve the invalid Domain Loadout before activating sheet effects."
+      );
+      return;
+    }
     const active = new Set(draft.effect_state?.active_effect_ids ?? []);
     const values = { ...(draft.effect_state?.active_effect_values ?? {}) };
     const allActive = effectKeys.every((effectKey) => active.has(effectKey));
@@ -1341,6 +1366,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   function setActiveClassOption(option: ClassOptionRef) {
+    if (!domainConfigurationValid) {
+      setActionMessage(
+        "Resolve the invalid Domain Loadout before changing live combat state."
+      );
+      return;
+    }
     if (option.category === "beastform") {
       const current =
         typeof draft.class_state.active_beastform_id === "string"
@@ -1392,7 +1423,70 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     setActionMessage(`Spent 1 Focus. ${option.name} is now your active stance.`);
   }
 
+  function changeDomainCardState(
+    index: number,
+    nextState: DomainCard["state"]
+  ) {
+    const card = draft.domain_cards[index];
+    if (!card || card.state === nextState) return;
+    if (card.permanent_vault && nextState === "loadout") {
+      setActionMessage(`${card.name} is permanently in the Vault.`);
+      return;
+    }
+    if (
+      nextState === "loadout" &&
+      domainLoadoutCount >= effectResult.stats.domain_loadout_max
+    ) {
+      setActionMessage(
+        `Loadout is full (${effectResult.stats.domain_loadout_max} cards).`
+      );
+      return;
+    }
+
+    const nextCards = [...draft.domain_cards];
+    nextCards[index] = { ...card, state: nextState };
+
+    if (
+      nextState === "loadout" &&
+      card.state === "vault" &&
+      !freeLoadoutEditing
+    ) {
+      const recallCost = Math.max(
+        0,
+        Number(card.metadata?.recall_cost ?? 0) || 0
+      );
+      if (draft.stress_current + recallCost > effectResult.stats.stress_max) {
+        setActionMessage(
+          `Not enough unmarked Stress slots to Recall ${card.name}.`
+        );
+        return;
+      }
+      persistRuntimePatch({
+        domain_cards: nextCards,
+        stress_current: draft.stress_current + recallCost,
+      });
+      setActionMessage(
+        recallCost > 0
+          ? `Recalled ${card.name}; marked ${recallCost} Stress.`
+          : `Recalled ${card.name}.`
+      );
+      return;
+    }
+
+    if (draft.id) {
+      persistRuntimePatch({ domain_cards: nextCards });
+    } else {
+      patch({ domain_cards: nextCards });
+    }
+  }
+
   function useResourceAction(source: (typeof actionSources)[number]) {
+    if (!domainConfigurationValid) {
+      setActionMessage(
+        "Resolve the invalid Domain Loadout before using gameplay actions."
+      );
+      return;
+    }
     const resolution = resolveDaggerheartAction(actionCharacter, source);
     if (!resolution.ok || !resolution.patch) {
       setActionMessage(resolution.error ?? "This action cannot be used right now.");
@@ -1913,10 +2007,26 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#38242c] bg-black/15 px-3 py-2 text-xs text-[#a18a92]">
                 <span>Active Loadout</span>
-                <span className="font-black text-[#dfc5cd]">
-                  {domainLoadoutCount} / {effectResult.stats.domain_loadout_max}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-black text-[#dfc5cd]">
+                    {domainLoadoutCount} / {effectResult.stats.domain_loadout_max}
+                  </span>
+                  <button
+                    type="button"
+                    className={smallButton}
+                    onClick={() => setFreeLoadoutEditing((value) => !value)}
+                  >
+                    {freeLoadoutEditing
+                      ? "Rest / level-up edit: free"
+                      : "Gameplay: Recall costs apply"}
+                  </button>
+                </div>
               </div>
+              {duplicateDomainCardIds.size > 0 && (
+                <div className="rounded-xl border border-red-800/55 bg-red-950/20 px-3 py-2 text-xs leading-5 text-red-100/90">
+                  Duplicate compendium Domain Cards are not allowed. Remove the duplicate before saving or using gameplay actions.
+                </div>
+              )}
               {domainLoadoutCount > effectResult.stats.domain_loadout_max && (
                 <div className="rounded-xl border border-amber-800/55 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-100/90">
                   Loadout exceeds the current limit by{" "}
@@ -1928,7 +2038,16 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                 label={selectedClass ? `Choose a ${selectedClass.domains.join(" / ")} card…` : "Choose a domain card…"}
                 domains={selectedClass?.domains}
                 maxLevel={draft.level}
-                onSelect={(entry) =>
+                onSelect={(entry) => {
+                  if (
+                    draft.domain_cards.some(
+                      (card) => card.compendium_id === entry.id
+                    )
+                  ) {
+                    setMessage(`${entry.name} is already on this character.`);
+                    return;
+                  }
+                  const permanentVault = entry.slug === "blade-vitality";
                   patch({
                     domain_cards: [
                       ...draft.domain_cards,
@@ -1936,10 +2055,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         name: entry.name,
                         domain: entry.domain ?? "",
                         level: entry.level ?? 1,
-                        state:
-                          domainLoadoutCount < effectResult.stats.domain_loadout_max
+                        state: permanentVault
+                          ? "vault"
+                          : domainLoadoutCount <
+                              effectResult.stats.domain_loadout_max
                             ? "loadout"
                             : "vault",
+                        permanent_vault: permanentVault,
                         compendium_id: entry.id,
                         slug: entry.slug,
                         source_key: entry.source_key,
@@ -1949,7 +2071,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         actions: entry.actions ?? [],
                       },
                     ],
-                  })
+                  });
                 }
               />
               {draft.domain_cards.map((card, index) => (
@@ -1966,20 +2088,22 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                   <input type="number" min={1} max={10} className={inputClass} value={card.level} onChange={(e) => {
                     const next = [...draft.domain_cards]; next[index] = { ...card, level: toNumber(e.target.value, 1) }; patch({ domain_cards: next });
                   }} />
-                  <select className={inputClass} value={card.state} onChange={(e) => {
-                    const nextState = e.target.value as DomainCard["state"];
-                    if (
-                      nextState === "loadout" &&
-                      card.state !== "loadout" &&
-                      domainLoadoutCount >= effectResult.stats.domain_loadout_max
-                    ) {
-                      setMessage(`Loadout is full (${effectResult.stats.domain_loadout_max} cards).`);
-                      return;
+                  <select
+                    className={inputClass}
+                    value={card.state}
+                    onChange={(e) =>
+                      changeDomainCardState(
+                        index,
+                        e.target.value as DomainCard["state"]
+                      )
                     }
-                    const next = [...draft.domain_cards]; next[index] = { ...card, state: nextState }; patch({ domain_cards: next });
-                  }}>
-                    <option value="loadout">Loadout</option>
-                    <option value="vault">Vault</option>
+                  >
+                    <option value="loadout" disabled={card.permanent_vault}>
+                      Loadout
+                    </option>
+                    <option value="vault">
+                      {card.permanent_vault ? "Permanent Vault" : "Vault"}
+                    </option>
                   </select>
                   <button type="button" className={smallButton} onClick={() => patch({ domain_cards: draft.domain_cards.filter((_, i) => i !== index) })}>×</button>
                 </div>
