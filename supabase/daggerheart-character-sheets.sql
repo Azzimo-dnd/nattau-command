@@ -47,9 +47,9 @@ create table if not exists public.daggerheart_characters (
   transformation_notes text not null default '',
   description text not null default '',
   notes text not null default '',
-  base_stats jsonb not null default '{"evasion":10,"proficiency":1,"hope_max":6,"hp_max":0,"stress_max":6,"armor_score":0,"major_threshold":0,"severe_threshold":0}'::jsonb,
+  base_stats jsonb not null default '{"evasion":10,"proficiency":1,"hope_max":6,"hp_max":0,"stress_max":6,"armor_score":0,"major_threshold":0,"severe_threshold":0,"domain_loadout_max":5}'::jsonb,
   manual_stat_modifiers jsonb not null default '{}'::jsonb,
-  effect_state jsonb not null default '{"active_effect_ids":[]}'::jsonb,
+  effect_state jsonb not null default '{"active_effect_ids":[],"active_effect_values":{},"action_uses":{}}'::jsonb,
   schema_version integer not null default 2,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -143,9 +143,9 @@ alter table public.daggerheart_characters
 -- Effects engine state for dynamically derived character sheets.
 alter table public.daggerheart_characters
   add column if not exists base_stats jsonb not null default
-    '{"evasion":10,"proficiency":1,"hope_max":6,"hp_max":0,"stress_max":6,"armor_score":0,"major_threshold":0,"severe_threshold":0}'::jsonb,
+    '{"evasion":10,"proficiency":1,"hope_max":6,"hp_max":0,"stress_max":6,"armor_score":0,"major_threshold":0,"severe_threshold":0,"domain_loadout_max":5}'::jsonb,
   add column if not exists manual_stat_modifiers jsonb not null default '{}'::jsonb,
-  add column if not exists effect_state jsonb not null default '{"active_effect_ids":[]}'::jsonb;
+  add column if not exists effect_state jsonb not null default '{"active_effect_ids":[],"active_effect_values":{},"action_uses":{}}'::jsonb;
 
 alter table public.daggerheart_characters
   drop constraint if exists daggerheart_character_base_stats_object,
