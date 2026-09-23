@@ -8,6 +8,7 @@ import {
 } from "../lib/daggerheart/effects";
 import {
   actionAvailable,
+  collectDaggerheartActions,
   resetDaggerheartActionUses,
   resolveDaggerheartAction,
   type DaggerheartActionCharacter,
@@ -392,6 +393,44 @@ test("Hedge consumable recovery bonus increases HP/Stress clearing", () => {
   assert.equal(resolution.ok, true);
   assert.equal(resolution.patch?.hp_current, 2);
   assert.equal(resolution.consume_quantity, 1);
+});
+
+test("Beastform disables spell-card actions but keeps ability-card actions", () => {
+  const character = actionCharacter({
+    beastform_active: true,
+    domain_cards: [
+      {
+        slug: "spell-card",
+        name: "Spell Card",
+        domain: "Sage",
+        state: "loadout",
+        metadata: { card_type: "spell" },
+        actions: [
+          { id: "cast", label: "Cast", scope: "loadout" },
+        ],
+      },
+      {
+        slug: "ability-card",
+        name: "Ability Card",
+        domain: "Bone",
+        state: "loadout",
+        metadata: { card_type: "ability" },
+        actions: [
+          { id: "use", label: "Use ability", scope: "loadout" },
+        ],
+      },
+    ],
+  });
+
+  const actions = collectDaggerheartActions(character);
+  assert.equal(
+    actions.find((source) => source.source_name === "Spell Card")?.active,
+    false
+  );
+  assert.equal(
+    actions.find((source) => source.source_name === "Ability Card")?.active,
+    true
+  );
 });
 
 test("scene reset clears temporary effects even when the action has no use limit", () => {
