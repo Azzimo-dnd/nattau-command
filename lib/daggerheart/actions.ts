@@ -48,6 +48,7 @@ export type DaggerheartAction = {
   activate_effect_roll?: DaggerheartActionRoll;
   deactivate_effect_id?: string;
   deactivate_effect_ids?: string[];
+  clear_effect_on?: DaggerheartActionReset;
   feature?: string;
 };
 
@@ -459,8 +460,17 @@ export function resetDaggerheartActionUses(
   const activeValues = { ...(effectState.active_effect_values ?? {}) };
 
   for (const source of sources) {
-    if (source.action.limit && resets.includes(source.action.limit.reset)) {
+    const resetsUses =
+      source.action.limit && resets.includes(source.action.limit.reset);
+    const clearsEffect =
+      source.action.clear_effect_on &&
+      resets.includes(source.action.clear_effect_on);
+
+    if (resetsUses) {
       delete uses[source.action_key];
+    }
+
+    if (resetsUses || clearsEffect) {
       for (const id of [
         ...(source.action.activate_effect_id ? [source.action.activate_effect_id] : []),
         ...(source.action.activate_effect_ids ?? []),
