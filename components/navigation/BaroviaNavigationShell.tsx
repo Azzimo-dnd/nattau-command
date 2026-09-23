@@ -48,6 +48,11 @@ const primaryItems: NavigationItem[] = [
     href: "/campaigns/barovia/characters",
     icon: "account",
   },
+  {
+    label: "Archive",
+    href: "/campaigns/barovia/compendium",
+    icon: "spark",
+  },
 ];
 
 const desktopItems: NavigationItem[] = [
