@@ -374,13 +374,22 @@ function sourceScopeActive(source: RuntimeSource, effect: DaggerheartEffect) {
 function conditionActive(
   effect: DaggerheartEffect,
   character: DaggerheartEffectCharacter,
-  wearingArmor: boolean
+  wearingArmor: boolean,
+  stats: DaggerheartDerivedStats
 ) {
   const condition = effect.condition;
   if (!condition) return true;
   if (condition.type === "wearing_armor") return wearingArmor;
   if (condition.type === "stress_full") {
-    return character.stress_max > 0 && character.stress_current >= character.stress_max;
+    const manualStress = numberValue(
+      character.manual_stat_modifiers?.stress_max,
+      0
+    );
+    const effectiveStressMax = Math.max(0, stats.stress_max + manualStress);
+    return (
+      effectiveStressMax > 0 &&
+      character.stress_current >= effectiveStressMax
+    );
   }
   if (condition.type === "domain_count") {
     const count = character.domain_cards.filter(
@@ -493,7 +502,7 @@ export function deriveDaggerheartStats(
 
   const shouldApply = (source: RuntimeSource, effect: DaggerheartEffect) => {
     if (!sourceScopeActive(source, effect)) return false;
-    if (!conditionActive(effect, character, wearingArmor)) return false;
+    if (!conditionActive(effect, character, wearingArmor, stats)) return false;
     if (effect.mode === "toggle" && !activeIds.has(effectKey(source, effect))) {
       return false;
     }
@@ -517,7 +526,31 @@ export function deriveDaggerheartStats(
     );
   }
 
-  // Pass 2: proficiency, because several threshold formulas depend on it.
+  // Pass 2: resource maxima. Conditional effects such as "all Stress
+  // slots marked" must evaluate against the already modified maximum.
+  const resourceMaxStats = new Set<DaggerheartEffectStat>([
+    "hp_max",
+    "stress_max",
+    "hope_max",
+  ]);
+  for (const { source, effect } of candidateEffects) {
+    if (!resourceMaxStats.has(effect.stat) || !shouldApply(source, effect)) {
+      continue;
+    }
+    const value = resolveEffectValue(effect, source, stats, spellcastTrait);
+    applyContribution(
+      stats,
+      breakdown,
+      effect.stat,
+      value,
+      source.name,
+      effect.label,
+      effectKey(source, effect),
+      effect.mode === "toggle"
+    );
+  }
+
+  // Pass 3: proficiency, because later formulas can depend on it.
   for (const { source, effect } of candidateEffects) {
     if (effect.stat !== "proficiency" || !shouldApply(source, effect)) continue;
     const value = resolveEffectValue(effect, source, stats, spellcastTrait);
@@ -533,10 +566,11 @@ export function deriveDaggerheartStats(
     );
   }
 
-  // Pass 3: remaining derived sheet stats.
+  // Pass 4: remaining derived sheet stats.
   for (const { source, effect } of candidateEffects) {
     if (
       traitKeys.includes(effect.stat as (typeof traitKeys)[number]) ||
+      resourceMaxStats.has(effect.stat) ||
       effect.stat === "proficiency" ||
       !shouldApply(source, effect)
     ) {
@@ -578,7 +612,7 @@ export function deriveDaggerheartStats(
       if (effect.mode !== "toggle") return false;
       return (
         sourceScopeActive(source, effect) &&
-        conditionActive(effect, character, wearingArmor)
+        conditionActive(effect, character, wearingArmor, stats)
       );
     })
     .map(({ source, effect }) => ({
