@@ -898,19 +898,39 @@ export function DaggerheartCharacterCreationWizard({
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-[#957681]">Starting potion</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {(["Minor Health Potion", "Minor Stamina Potion"] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setPotion(item)}
-                    className={`rounded-xl border p-3 text-left text-sm ${draft.inventory.some((gear) => gear.name === item) ? "border-[#985066] bg-[#401723] text-[#f0d4dc]" : "border-[#3b262e] bg-black/15 text-[#ad979e]"}`}
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-[#957681]">
+                Starting potion
+              </p>
+              <DaggerheartCompendiumPicker
+                categories={["consumable"]}
+                names={["Minor Health Potion", "Minor Stamina Potion"]}
+                label="Choose your starting potion…"
+                onSelect={(entry) => {
+                  const inventory = draft.inventory.filter(
+                    (item) =>
+                      !["Minor Health Potion", "Minor Stamina Potion"].includes(
+                        item.name
+                      )
+                  );
+                  patch({
+                    inventory: [...inventory, { ...gearFromEntry(entry), equipped: false }],
+                  });
+                }}
+              />
+              {draft.inventory
+                .filter((item) =>
+                  ["Minor Health Potion", "Minor Stamina Potion"].includes(
+                    item.name
+                  )
+                )
+                .map((item) => (
+                  <div
+                    key={item.instance_id ?? item.name}
+                    className="mt-2 rounded-xl border border-[#5d3341] bg-[#29131c] p-3 text-sm text-[#d9bcc5]"
                   >
-                    {item}
-                  </button>
+                    {item.name} · usable directly from the finished character sheet
+                  </div>
                 ))}
-              </div>
             </div>
 
             {creationGuidance && (
@@ -1122,6 +1142,8 @@ export function DaggerheartCharacterCreationWizard({
                       compendium_id: entry.id,
                       slug: entry.slug,
                       source_key: entry.source_key,
+                      effects: entry.effects ?? [],
+                      actions: entry.actions ?? [],
                     },
                   ],
                 });
