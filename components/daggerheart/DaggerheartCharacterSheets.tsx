@@ -72,6 +72,8 @@ type GearItem = {
   equipped?: boolean;
   quantity?: number;
   marked_slots?: number;
+  notes?: string;
+  pending_rule?: boolean;
 };
 type Advancement = { level: number; choice: string };
 type Resource = { name: string; current: number; max: number; notes: string };
@@ -439,6 +441,8 @@ function gearFromCompendium(
     equipped,
     quantity: 1,
     marked_slots: entry.category === "armor" ? 0 : undefined,
+    notes: "",
+    pending_rule: false,
   };
 }
 
@@ -702,6 +706,7 @@ function GearEditor({
               className={inputClass}
               placeholder="Name"
               value={item.name}
+              readOnly={Boolean(item.compendium_id)}
               onChange={(event) => {
                 const next = [...value];
                 next[index] = { ...item, name: event.target.value };
@@ -710,8 +715,9 @@ function GearEditor({
             />
             <input
               className={inputClass}
-              placeholder="Traits, range, damage, feature, burden, notes..."
+              placeholder="Traits, range, damage, feature, burden..."
               value={item.details}
+              readOnly={Boolean(item.compendium_id)}
               onChange={(event) => {
                 const next = [...value];
                 next[index] = { ...item, details: event.target.value };
@@ -726,6 +732,24 @@ function GearEditor({
               ×
             </button>
           </div>
+
+          {item.compendium_id && (
+            <input
+              className={`${inputClass} mt-2`}
+              placeholder="Instance notes / alias / campaign-specific reminder…"
+              value={item.notes ?? ""}
+              onChange={(event) => {
+                const next = [...value];
+                next[index] = { ...item, notes: event.target.value };
+                onChange(next);
+              }}
+            />
+          )}
+          {item.pending_rule && (
+            <p className="mt-2 rounded-lg border border-amber-800/45 bg-amber-950/20 px-2.5 py-1.5 text-[11px] text-amber-100/85">
+              Consumed · this rule is still being resolved. Remove the entry after the effect ends.
+            </p>
+          )}
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {equipMode !== "none" && (
@@ -862,12 +886,22 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         .select("*")
         .in("id", compendiumIds);
 
-      if (!compendiumResult.error) {
+      if (compendiumResult.error) {
+        setMessage(
+          `Could not refresh linked compendium rules. Cached definitions are being used: ${compendiumResult.error.message}`
+        );
+      } else {
         const byId = new Map(
           ((compendiumResult.data ?? []) as DaggerheartCompendiumEntry[]).map(
             (entry) => [entry.id, entry]
           )
         );
+        const missingDefinitions = compendiumIds.filter((id) => !byId.has(id));
+        if (missingDefinitions.length > 0) {
+          setMessage(
+            `${missingDefinitions.length} linked compendium definition${missingDefinitions.length === 1 ? "" : "s"} could not be refreshed. Cached rules remain in use for those items.`
+          );
+        }
         nextCharacters = nextCharacters.map((character) =>
           hydrateCharacterCompendium(character, byId)
         );
@@ -1544,9 +1578,17 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         .map((item, index) => {
           if (index !== source.index) return item;
           const quantity = Math.max(0, (item.quantity ?? 1) - consume);
-          return { ...item, quantity };
+          return {
+            ...item,
+            quantity,
+            pending_rule:
+              quantity === 0 &&
+              Boolean(source.action.preserve_rule_after_use),
+          };
         })
-        .filter((item) => (item.quantity ?? 1) > 0) as CharacterRow[typeof collection];
+        .filter(
+          (item) => (item.quantity ?? 1) > 0 || item.pending_rule === true
+        ) as CharacterRow[typeof collection];
     }
 
     void persistRuntimePatch(nextPatch);
