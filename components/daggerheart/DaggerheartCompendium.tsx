@@ -308,6 +308,11 @@ export function DaggerheartCompendium() {
                             Tier {entry.tier}
                           </span>
                         )}
+                        {(entry.effects?.length ?? 0) > 0 && (
+                          <span className="rounded-full border border-emerald-900/50 bg-emerald-950/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-200/90">
+                            Sheet automation
+                          </span>
+                        )}
                         {hasErrata && (
                           <span className="rounded-full border border-amber-800/50 bg-amber-950/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-200">
                             Errata
@@ -355,6 +360,39 @@ export function DaggerheartCompendium() {
                     {entry.rules_text}
                   </div>
                 </section>
+
+                {(entry.effects?.length ?? 0) > 0 && (
+                  <section className="mt-5 rounded-xl border border-emerald-900/30 bg-emerald-950/10 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300/65">
+                      Character sheet automation
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {entry.effects.map((effect) => (
+                        <div
+                          key={effect.id}
+                          className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                        >
+                          <div>
+                            <span className="font-semibold text-emerald-100/85">
+                              {effect.label}
+                            </span>
+                            <span className="ml-2 text-emerald-100/45">
+                              {effect.mode === "toggle" ? "situational" : "automatic"} · {effect.scope}
+                            </span>
+                          </div>
+                          <span className="rounded-md border border-emerald-900/30 bg-black/20 px-2 py-1 font-mono text-emerald-100/75">
+                            {effect.stat.replaceAll("_", " ")}
+                            {typeof effect.value === "number"
+                              ? ` ${effect.value >= 0 ? "+" : ""}${effect.value}`
+                              : effect.value_from
+                                ? ` ← ${effect.value_from.replaceAll("_", " ")}`
+                                : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
                 <ErrataPanel entry={entry} />
 
