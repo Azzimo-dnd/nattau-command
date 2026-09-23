@@ -546,6 +546,88 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     }
   }, [draft, effectResult, patch]);
 
+  function normalizeRuntimePatch(
+    patchValue: Partial<CharacterRow>
+  ): Partial<CharacterRow> {
+    const nextDraft = { ...draft, ...patchValue };
+    const calculated = deriveDaggerheartStats(nextDraft);
+    const snapshot = effectiveSnapshot(calculated);
+
+    return {
+      ...patchValue,
+      ...snapshot,
+      hope_current: Math.min(
+        patchValue.hope_current ?? nextDraft.hope_current,
+        snapshot.hope_max
+      ),
+      hp_current: Math.min(
+        patchValue.hp_current ?? nextDraft.hp_current,
+        snapshot.hp_max
+      ),
+      stress_current: Math.min(
+        patchValue.stress_current ?? nextDraft.stress_current,
+        snapshot.stress_max
+      ),
+      armor_slots_current: Math.min(
+        patchValue.armor_slots_current ?? nextDraft.armor_slots_current,
+        snapshot.armor_slots_max
+      ),
+    };
+  }
+
+  async function persistRuntimePatch(
+    patchValue: Partial<CharacterRow>
+  ) {
+    const normalized = normalizeRuntimePatch(patchValue);
+    patch(normalized);
+
+    if (!draft.id) return;
+
+    const runtimePayload: Record<string, unknown> = {};
+    for (const key of [
+      "effect_state",
+      "weapons",
+      "armor",
+      "inventory",
+      "domain_cards",
+      "hope_current",
+      "hope_max",
+      "hp_current",
+      "hp_max",
+      "stress_current",
+      "stress_max",
+      "armor_score",
+      "armor_slots_current",
+      "armor_slots_max",
+      "evasion",
+      "proficiency",
+      "major_threshold",
+      "severe_threshold",
+    ] as const) {
+      if (key in normalized) runtimePayload[key] = normalized[key];
+    }
+
+    const result = await supabase
+      .from("daggerheart_characters")
+      .update(runtimePayload)
+      .eq("id", draft.id)
+      .select("*")
+      .single();
+
+    if (result.error) {
+      setActionMessage(
+        `Local state changed, but runtime save failed: ${result.error.message}`
+      );
+      return;
+    }
+
+    const saved = result.data as CharacterRow;
+    setDraft(saved);
+    setCharacters((current) =>
+      current.map((row) => (row.id === saved.id ? saved : row))
+    );
+  }
+
   async function save() {
     if (!draft.name.trim()) {
       setMessage("Give the character a name before saving.");
@@ -658,7 +740,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const active = new Set(draft.effect_state?.active_effect_ids ?? []);
     if (active.has(effectKey)) active.delete(effectKey);
     else active.add(effectKey);
-    patch({
+    void persistRuntimePatch({
       effect_state: {
         ...draft.effect_state,
         active_effect_ids: [...active],
@@ -688,7 +770,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         .filter((item) => (item.quantity ?? 1) > 0) as CharacterRow[typeof collection];
     }
 
-    patch(nextPatch);
+    void persistRuntimePatch(nextPatch);
     setActionMessage(
       resolution.roll_messages?.length
         ? resolution.roll_messages.join(" · ")
@@ -699,7 +781,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   function resetResourceActions(
     reset: Parameters<typeof resetDaggerheartActionUses>[1]
   ) {
-    patch({
+    void persistRuntimePatch({
       effect_state: resetDaggerheartActionUses(
         draft.effect_state,
         reset,
