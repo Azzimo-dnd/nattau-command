@@ -50,6 +50,7 @@ type DomainCard = {
   slug?: string;
   source_key?: string;
   details?: string;
+  metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
 };
@@ -367,6 +368,7 @@ function hydrateCharacterCompendium(
       slug: entry.slug,
       source_key: entry.source_key,
       details: compendiumEntryDetails(entry),
+      metadata: compendiumEffectiveMetadata(entry),
       effects: entry.effects ?? [],
       actions: entry.actions ?? [],
     };
@@ -772,6 +774,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       ...runtimeCharacter,
       ...effectiveSnapshot(effectResult),
       consumable_clear_bonus: effectResult.stats.consumable_clear_bonus,
+      beastform_active: Boolean(activeBeastform),
     }),
     [runtimeCharacter, effectResult]
   );
@@ -1406,7 +1409,6 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               weapons={
                 activeBeastform
                   ? [
-                      ...draft.weapons,
                       {
                         instance_id: `beastform:${activeBeastform.id}`,
                         name: activeBeastform.name,
@@ -1499,7 +1501,20 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                   min={0}
                   max={effectResult.stats.hp_max}
                   value={draft.hp_current}
-                  onChange={(hp_current) => patch({ hp_current })}
+                  onChange={(hp_current) =>
+                    patch({
+                      hp_current,
+                      class_state:
+                        hp_current >= effectResult.stats.hp_max &&
+                        effectResult.stats.hp_max > 0
+                          ? {
+                              ...draft.class_state,
+                              active_beastform_id: null,
+                              active_stance_id: null,
+                            }
+                          : draft.class_state,
+                    })
+                  }
                 />
                 <NumberField
                   label={`Stress marked · max ${effectResult.stats.stress_max}`}
@@ -1632,6 +1647,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         slug: entry.slug,
                         source_key: entry.source_key,
                         details: compendiumEntryDetails(entry),
+                        metadata: compendiumEffectiveMetadata(entry),
                         effects: entry.effects ?? [],
                         actions: entry.actions ?? [],
                       },
@@ -1774,7 +1790,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                 draft.subclass_key === "martial-artist")) && (
               <div className="mt-5 space-y-3 rounded-xl border border-[#3a252d] bg-black/15 p-3">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">
-                  Class compendium
+                  {draft.class_key === "druid"
+                    ? "Beastform quick access"
+                    : "Known Martial Stances"}
                 </p>
                 {draft.class_key === "druid" && (
                   <DaggerheartCompendiumPicker
