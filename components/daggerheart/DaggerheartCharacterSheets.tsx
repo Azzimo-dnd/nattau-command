@@ -668,6 +668,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     () => collectDaggerheartActions(actionCharacter),
     [actionCharacter]
   );
+  const domainLoadoutCount = useMemo(
+    () => draft.domain_cards.filter((card) => card.state === "loadout").length,
+    [draft.domain_cards]
+  );
 
   useEffect(() => {
     const snapshot = effectiveSnapshot(effectResult);
@@ -804,6 +808,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const snapshot = effectiveSnapshot(calculated);
     if (snapshot.major_threshold > snapshot.severe_threshold) {
       setMessage("Major threshold cannot be higher than Severe threshold.");
+      return;
+    }
+    if (domainLoadoutCount > snapshot.domain_loadout_max) {
+      const overflow = domainLoadoutCount - snapshot.domain_loadout_max;
+      setMessage(
+        `Move ${overflow} Domain Card${overflow === 1 ? "" : "s"} to the Vault before saving. Current Loadout: ${domainLoadoutCount}/${snapshot.domain_loadout_max}.`
+      );
       return;
     }
 
@@ -1374,9 +1385,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#38242c] bg-black/15 px-3 py-2 text-xs text-[#a18a92]">
                 <span>Active Loadout</span>
                 <span className="font-black text-[#dfc5cd]">
-                  {draft.domain_cards.filter((card) => card.state === "loadout").length} / {effectResult.stats.domain_loadout_max}
+                  {domainLoadoutCount} / {effectResult.stats.domain_loadout_max}
                 </span>
               </div>
+              {domainLoadoutCount > effectResult.stats.domain_loadout_max && (
+                <div className="rounded-xl border border-amber-800/55 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-100/90">
+                  Loadout exceeds the current limit by{" "}
+                  {domainLoadoutCount - effectResult.stats.domain_loadout_max}. Move a card to the Vault before saving.
+                </div>
+              )}
               <DaggerheartCompendiumPicker
                 categories={["domain_card"]}
                 label={selectedClass ? `Choose a ${selectedClass.domains.join(" / ")} card…` : "Choose a domain card…"}
@@ -1391,8 +1408,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         domain: entry.domain ?? "",
                         level: entry.level ?? 1,
                         state:
-                          draft.domain_cards.filter((card) => card.state === "loadout").length <
-                          effectResult.stats.domain_loadout_max
+                          domainLoadoutCount < effectResult.stats.domain_loadout_max
                             ? "loadout"
                             : "vault",
                         compendium_id: entry.id,
@@ -1422,11 +1438,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                   }} />
                   <select className={inputClass} value={card.state} onChange={(e) => {
                     const nextState = e.target.value as DomainCard["state"];
-                    const loadoutCount = draft.domain_cards.filter((item) => item.state === "loadout").length;
                     if (
                       nextState === "loadout" &&
                       card.state !== "loadout" &&
-                      loadoutCount >= effectResult.stats.domain_loadout_max
+                      domainLoadoutCount >= effectResult.stats.domain_loadout_max
                     ) {
                       setMessage(`Loadout is full (${effectResult.stats.domain_loadout_max} cards).`);
                       return;
@@ -1439,7 +1454,29 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                   <button type="button" className={smallButton} onClick={() => patch({ domain_cards: draft.domain_cards.filter((_, i) => i !== index) })}>×</button>
                 </div>
               ))}
-              <button type="button" className={smallButton} onClick={() => patch({ domain_cards: [...draft.domain_cards, { name: "", domain: selectedClass?.domains[0] ?? "", level: 1, state: "loadout", effects: [] }] })}>+ Domain card</button>
+              <button
+                type="button"
+                className={smallButton}
+                onClick={() =>
+                  patch({
+                    domain_cards: [
+                      ...draft.domain_cards,
+                      {
+                        name: "",
+                        domain: selectedClass?.domains[0] ?? "",
+                        level: 1,
+                        state:
+                          domainLoadoutCount < effectResult.stats.domain_loadout_max
+                            ? "loadout"
+                            : "vault",
+                        effects: [],
+                      },
+                    ],
+                  })
+                }
+              >
+                + Domain card
+              </button>
             </div>
           </Section>
 
