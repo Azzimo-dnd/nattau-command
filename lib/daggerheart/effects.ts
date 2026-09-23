@@ -402,7 +402,10 @@ function resolveEffectValue(
   key: string
 ) {
   let total = typeof effect.value === "number" ? effect.value : 0;
-  const tier = source.tier ?? characterTier(character.level);
+  const tier: 1 | 2 | 3 | 4 =
+    source.tier === 1 || source.tier === 2 || source.tier === 3 || source.tier === 4
+      ? source.tier
+      : characterTier(character.level);
   if (effect.value_by_tier?.[tier] !== undefined) {
     total += effect.value_by_tier[tier] ?? 0;
   }
