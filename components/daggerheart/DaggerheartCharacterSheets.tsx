@@ -494,12 +494,52 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     setDraft((current) => ({ ...current, ...patchValue }));
   }, []);
 
+  const effectResult = useMemo(() => deriveDaggerheartStats(draft), [draft]);
+
+  useEffect(() => {
+    const snapshot = effectiveSnapshot(effectResult);
+    const nextHp = Math.min(draft.hp_current, snapshot.hp_max);
+    const nextStress = Math.min(draft.stress_current, snapshot.stress_max);
+    const nextHope = Math.min(draft.hope_current, snapshot.hope_max);
+    const nextArmorSlots = Math.min(
+      draft.armor_slots_current,
+      snapshot.armor_slots_max
+    );
+
+    if (
+      draft.evasion !== snapshot.evasion ||
+      draft.proficiency !== snapshot.proficiency ||
+      draft.hope_max !== snapshot.hope_max ||
+      draft.hp_max !== snapshot.hp_max ||
+      draft.stress_max !== snapshot.stress_max ||
+      draft.armor_score !== snapshot.armor_score ||
+      draft.armor_slots_max !== snapshot.armor_slots_max ||
+      draft.major_threshold !== snapshot.major_threshold ||
+      draft.severe_threshold !== snapshot.severe_threshold ||
+      draft.hp_current !== nextHp ||
+      draft.stress_current !== nextStress ||
+      draft.hope_current !== nextHope ||
+      draft.armor_slots_current !== nextArmorSlots
+    ) {
+      patch({
+        ...snapshot,
+        hp_current: nextHp,
+        stress_current: nextStress,
+        hope_current: nextHope,
+        armor_slots_current: nextArmorSlots,
+      });
+    }
+  }, [draft, effectResult, patch]);
+
   async function save() {
     if (!draft.name.trim()) {
       setMessage("Give the character a name before saving.");
       return;
     }
-    if (draft.major_threshold > draft.severe_threshold) {
+
+    const calculated = deriveDaggerheartStats(draft);
+    const snapshot = effectiveSnapshot(calculated);
+    if (snapshot.major_threshold > snapshot.severe_threshold) {
       setMessage("Major threshold cannot be higher than Severe threshold.");
       return;
     }
@@ -521,19 +561,25 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       heritage_state: draft.heritage_state,
       transformations: draft.transformations,
       traits: draft.traits,
-      evasion: draft.evasion,
-      proficiency: draft.proficiency,
-      hope_current: draft.hope_current,
-      hope_max: draft.hope_max,
-      hp_current: draft.hp_current,
-      hp_max: draft.hp_max,
-      stress_current: draft.stress_current,
-      stress_max: draft.stress_max,
-      armor_score: draft.armor_score,
-      armor_slots_current: draft.armor_slots_current,
-      armor_slots_max: draft.armor_slots_max,
-      major_threshold: draft.major_threshold,
-      severe_threshold: draft.severe_threshold,
+      base_stats: draft.base_stats,
+      manual_stat_modifiers: draft.manual_stat_modifiers,
+      effect_state: draft.effect_state,
+      evasion: snapshot.evasion,
+      proficiency: snapshot.proficiency,
+      hope_current: Math.min(draft.hope_current, snapshot.hope_max),
+      hope_max: snapshot.hope_max,
+      hp_current: Math.min(draft.hp_current, snapshot.hp_max),
+      hp_max: snapshot.hp_max,
+      stress_current: Math.min(draft.stress_current, snapshot.stress_max),
+      stress_max: snapshot.stress_max,
+      armor_score: snapshot.armor_score,
+      armor_slots_current: Math.min(
+        draft.armor_slots_current,
+        snapshot.armor_slots_max
+      ),
+      armor_slots_max: snapshot.armor_slots_max,
+      major_threshold: snapshot.major_threshold,
+      severe_threshold: snapshot.severe_threshold,
       experiences: draft.experiences,
       domain_cards: draft.domain_cards,
       weapons: draft.weapons,
@@ -583,6 +629,27 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
   const selectedClass = classOption(draft.class_key);
   const canEdit = isDm || selectedPlayerId === currentUserId;
+
+  function setManualModifier(stat: keyof DaggerheartManualStatModifiers, value: number) {
+    patch({
+      manual_stat_modifiers: {
+        ...draft.manual_stat_modifiers,
+        [stat]: value,
+      },
+    });
+  }
+
+  function toggleEffect(effectKey: string) {
+    const active = new Set(draft.effect_state?.active_effect_ids ?? []);
+    if (active.has(effectKey)) active.delete(effectKey);
+    else active.add(effectKey);
+    patch({
+      effect_state: {
+        ...draft.effect_state,
+        active_effect_ids: [...active],
+      },
+    });
+  }
 
   if (loading) {
     return <div className="rounded-2xl border border-[#402630] bg-[#120c10]/80 p-6 text-sm text-[#a9969d]">Reading the names written in the Mists…</div>;
