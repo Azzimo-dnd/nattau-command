@@ -63,6 +63,11 @@ create index if not exists daggerheart_characters_player_idx on public.daggerhea
 
 alter table public.daggerheart_characters enable row level security;
 
+drop policy if exists "Daggerheart campaign members can view characters" on public.daggerheart_characters;
+drop policy if exists "Daggerheart players and DMs can create characters" on public.daggerheart_characters;
+drop policy if exists "Daggerheart players and DMs can update characters" on public.daggerheart_characters;
+drop policy if exists "Daggerheart players and DMs can delete characters" on public.daggerheart_characters;
+
 create policy "Daggerheart campaign members can view characters"
 on public.daggerheart_characters for select to authenticated
 using (public.is_campaign_member(campaign_id));
@@ -93,6 +98,7 @@ returns trigger language plpgsql set search_path = public, pg_temp as $$
 begin new.updated_at = now(); return new; end;
 $$;
 
+drop trigger if exists daggerheart_characters_set_updated_at on public.daggerheart_characters;
 create trigger daggerheart_characters_set_updated_at
 before update on public.daggerheart_characters
 for each row execute function public.set_daggerheart_character_updated_at();
