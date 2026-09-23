@@ -1,3 +1,5 @@
+import type { DaggerheartEffect } from "@/lib/daggerheart/effects";
+
 export type DaggerheartCompendiumCategory =
   | "class"
   | "subclass"
@@ -36,6 +38,7 @@ export type DaggerheartCompendiumEntry = {
   summary: string;
   rules_text: string;
   metadata: Record<string, unknown>;
+  effects: DaggerheartEffect[];
   errata: DaggerheartCompendiumErrata;
   source_page_start: number | null;
   source_page_end: number | null;
