@@ -186,7 +186,7 @@ export function DaggerheartHeritageBuilder({
       ) : (
         <div className="space-y-4 rounded-2xl border border-[#3d2830] bg-black/15 p-4">
           <p className="text-xs leading-5 text-[#97838a]">
-            Choose two different ancestries, then one feature from each lineage. The display name can be anything that fits the character.
+            Choose two different ancestries. Use the first listed ancestry feature from the first lineage and the second listed feature from the second lineage, as required by mixed ancestry. The display name can be anything that fits the character.
           </p>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -226,7 +226,9 @@ export function DaggerheartHeritageBuilder({
                   }
                 >
                   <option value="">Choose one feature</option>
-                  {firstFeatures.map((feature) => <option key={feature} value={feature}>{feature}</option>)}
+                  {firstFeatures[0] && (
+                    <option value={firstFeatures[0]}>{firstFeatures[0]}</option>
+                  )}
                 </select>
               </label>
             </div>
@@ -267,7 +269,9 @@ export function DaggerheartHeritageBuilder({
                   }
                 >
                   <option value="">Choose one feature</option>
-                  {secondFeatures.map((feature) => <option key={feature} value={feature}>{feature}</option>)}
+                  {secondFeatures[1] && (
+                    <option value={secondFeatures[1]}>{secondFeatures[1]}</option>
+                  )}
                 </select>
               </label>
             </div>
