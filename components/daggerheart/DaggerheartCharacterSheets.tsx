@@ -8,6 +8,7 @@ import {
   type DaggerheartCompendiumEntry,
 } from "@/lib/daggerheart/compendium";
 import { DaggerheartEffectsPanel } from "@/components/daggerheart/DaggerheartEffectsPanel";
+import { DaggerheartActionsPanel } from "@/components/daggerheart/DaggerheartActionsPanel";
 import {
   type DaggerheartAction,
   collectDaggerheartActions,
@@ -450,6 +451,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [advancedCreation, setAdvancedCreation] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -498,6 +500,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     setSelectedPlayerId(playerId);
     setMessage(null);
     setAdvancedCreation(false);
+    setActionMessage(null);
     setDraft(characters.find((row) => row.player_id === playerId) ?? emptyCharacter(campaignId, playerId));
   }
 
@@ -506,6 +509,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }, []);
 
   const effectResult = useMemo(() => deriveDaggerheartStats(draft), [draft]);
+  const actionSources = useMemo(() => collectDaggerheartActions(draft), [draft]);
 
   useEffect(() => {
     const snapshot = effectiveSnapshot(effectResult);
@@ -660,6 +664,51 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         active_effect_ids: [...active],
       },
     });
+  }
+
+  function useResourceAction(source: (typeof actionSources)[number]) {
+    const resolution = resolveDaggerheartAction(draft, source);
+    if (!resolution.ok || !resolution.patch) {
+      setActionMessage(resolution.error ?? "This action cannot be used right now.");
+      return;
+    }
+
+    const nextPatch: Partial<CharacterRow> = { ...resolution.patch };
+    const consume = resolution.consume_quantity ?? 0;
+
+    if (consume > 0 && source.collection !== "domain_cards") {
+      const collection = source.collection;
+      const current = draft[collection] as GearItem[];
+      nextPatch[collection] = current
+        .map((item, index) => {
+          if (index !== source.index) return item;
+          const quantity = Math.max(0, (item.quantity ?? 1) - consume);
+          return { ...item, quantity };
+        })
+        .filter((item) => (item.quantity ?? 1) > 0) as CharacterRow[typeof collection];
+    }
+
+    patch(nextPatch);
+    setActionMessage(
+      resolution.roll_messages?.length
+        ? resolution.roll_messages.join(" · ")
+        : `${source.action.label} used.`
+    );
+  }
+
+  function resetResourceActions(
+    reset: Parameters<typeof resetDaggerheartActionUses>[1]
+  ) {
+    patch({
+      effect_state: resetDaggerheartActionUses(
+        draft.effect_state,
+        reset,
+        actionSources
+      ),
+    });
+    setActionMessage(
+      `${reset.replaceAll("_", " ")} uses reset.`
+    );
   }
 
   if (loading) {
@@ -869,6 +918,19 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               effectState={draft.effect_state}
               onManualModifierChange={setManualModifier}
               onToggleEffect={toggleEffect}
+            />
+          </Section>
+
+          <Section
+            title="Actions & Resources"
+            subtitle="Use consumables and abilities directly from the sheet. Costs, marked tracks, use limits and linked temporary effects update automatically."
+          >
+            <DaggerheartActionsPanel
+              character={draft}
+              sources={actionSources}
+              lastMessage={actionMessage}
+              onUse={useResourceAction}
+              onReset={resetResourceActions}
             />
           </Section>
 
