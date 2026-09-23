@@ -10,6 +10,7 @@ import {
 import { DaggerheartEffectsPanel } from "@/components/daggerheart/DaggerheartEffectsPanel";
 import { DaggerheartActionsPanel } from "@/components/daggerheart/DaggerheartActionsPanel";
 import { DaggerheartCombatPanel } from "@/components/daggerheart/DaggerheartCombatPanel";
+import { DaggerheartActiveRulesPanel } from "@/components/daggerheart/DaggerheartActiveRulesPanel";
 import {
   type DaggerheartAction,
   collectDaggerheartActions,
@@ -48,6 +49,7 @@ type DomainCard = {
   compendium_id?: string;
   slug?: string;
   source_key?: string;
+  details?: string;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
 };
@@ -275,6 +277,7 @@ function hydrateCharacterCompendium(
       level: entry.level ?? card.level,
       slug: entry.slug,
       source_key: entry.source_key,
+      details: compendiumEntryDetails(entry),
       effects: entry.effects ?? [],
       actions: entry.actions ?? [],
     };
@@ -1172,6 +1175,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             <DaggerheartCombatPanel
               weapons={draft.weapons}
               stats={effectResult.stats}
+              level={draft.level}
             />
           </Section>
 
@@ -1185,6 +1189,18 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               lastMessage={actionMessage}
               onUse={useResourceAction}
               onReset={resetResourceActions}
+            />
+          </Section>
+
+          <Section
+            title="Active Rules Reference"
+            subtitle="Full linked rules for your current Loadout, equipped gear and carried compendium items."
+          >
+            <DaggerheartActiveRulesPanel
+              domainCards={draft.domain_cards}
+              weapons={draft.weapons}
+              armor={draft.armor}
+              inventory={draft.inventory}
             />
           </Section>
 
@@ -1366,6 +1382,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         compendium_id: entry.id,
                         slug: entry.slug,
                         source_key: entry.source_key,
+                        details: compendiumEntryDetails(entry),
                         effects: entry.effects ?? [],
                         actions: entry.actions ?? [],
                       },
