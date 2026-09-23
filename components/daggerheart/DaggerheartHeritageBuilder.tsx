@@ -23,6 +23,7 @@ export type HeritageState = {
   ancestry_two?: string;
   feature_one?: HeritageFeature | null;
   feature_two?: HeritageFeature | null;
+  purposeful_experience_index?: number;
 };
 
 type Props = {
