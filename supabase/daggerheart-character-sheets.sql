@@ -127,6 +127,7 @@ end;
 $$;
 
 revoke all on function public.list_daggerheart_character_roster(uuid) from public;
+revoke execute on function public.list_daggerheart_character_roster(uuid) from anon;
 grant execute on function public.list_daggerheart_character_roster(uuid) to authenticated;
 
 
