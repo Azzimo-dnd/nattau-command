@@ -254,7 +254,7 @@ export function resolveDaggerheartAction(
   let hope = character.hope_current - (cost.hope ?? 0);
   let stress = character.stress_current + (cost.stress ?? 0);
   let hp = character.hp_current;
-  let armor = character.armor_slots_current;
+  let armor = character.armor_slots_current + (cost.armor ?? 0);
   const rollMessages: string[] = [];
 
   for (const result of source.action.results ?? []) {
