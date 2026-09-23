@@ -22,6 +22,7 @@ const statLabels: Record<DaggerheartEffectStat, string> = {
   armor_score: "Armor Score",
   major_threshold: "Major Threshold",
   severe_threshold: "Severe Threshold",
+  domain_loadout_max: "Domain Loadout",
 };
 
 const primaryStats: DaggerheartEffectStat[] = [
@@ -33,6 +34,7 @@ const primaryStats: DaggerheartEffectStat[] = [
   "hp_max",
   "stress_max",
   "hope_max",
+  "domain_loadout_max",
 ];
 
 function signed(value: number) {
@@ -132,7 +134,11 @@ export function DaggerheartEffectsPanel({
                               : "font-black text-rose-300/85"
                           }
                         >
-                          {signed(item.value)}
+                          {item.operation === "set"
+                            ? `→ ${item.result_value}`
+                            : item.operation === "minimum"
+                              ? `min ${item.result_value}`
+                              : signed(item.value)}
                         </span>
                       </div>
                     ))}
