@@ -39,23 +39,42 @@ function damageBonusFromMetadata(
   return 0;
 }
 
-function effectiveDamage(raw: string, proficiency: number, extraBonus = 0) {
-  const compact = raw.replaceAll(" ", "");
-  const match = compact.match(/^d(\d+)([+-]\d+)?(phy|mag)?$/i);
+export function effectiveDamage(
+  raw: string,
+  proficiency: number,
+  extraBonus = 0
+) {
+  const compact = raw.replace(/\s+/g, "");
+  const typeMatch = compact.match(/(phy\/mag|mag\/phy|phy|mag)$/i);
+  const kind = typeMatch?.[1]?.toLowerCase() ?? "";
+  const expression = typeMatch
+    ? compact.slice(0, -typeMatch[1].length)
+    : compact;
+  const match = expression.match(/^d(\d+)(?:\+d(\d+))?([+-]\d+)?$/i);
   if (!match) return raw || "—";
 
-  const [, die, modifier = "", kind = ""] = match;
+  const [, firstDie, secondDie, modifier = ""] = match;
+  const dice = [
+    `${Math.max(1, proficiency)}d${firstDie}`,
+    ...(secondDie ? [`${Math.max(1, proficiency)}d${secondDie}`] : []),
+  ];
   const baseModifier = modifier ? Number(modifier) : 0;
   const totalModifier = baseModifier + extraBonus;
-  const type =
-    kind.toLowerCase() === "phy"
-      ? " physical"
-      : kind.toLowerCase() === "mag"
-        ? " magic"
-        : "";
   const renderedModifier =
-    totalModifier === 0 ? "" : totalModifier > 0 ? `+${totalModifier}` : String(totalModifier);
-  return `${Math.max(1, proficiency)}d${die}${renderedModifier}${type}`;
+    totalModifier === 0
+      ? ""
+      : totalModifier > 0
+        ? `+${totalModifier}`
+        : String(totalModifier);
+  const type =
+    kind === "phy"
+      ? " physical"
+      : kind === "mag"
+        ? " magic"
+        : kind === "phy/mag" || kind === "mag/phy"
+          ? " physical/magic"
+          : "";
+  return `${dice.join("+")}${renderedModifier}${type}`;
 }
 
 export function DaggerheartCombatPanel({
@@ -70,7 +89,7 @@ export function DaggerheartCombatPanel({
   const equipped = weapons.filter((weapon) => {
     if (
       weapon.equipped === false ||
-      !["weapon_primary", "weapon_secondary", "beastform"].includes(
+      !["weapon_primary", "weapon_secondary", "beastform", "brawler_strike"].includes(
         weapon.category ?? ""
       )
     ) {
@@ -118,7 +137,9 @@ export function DaggerheartCombatPanel({
                     ? "Secondary weapon"
                     : weapon.category === "beastform"
                       ? "Beastform attack"
-                      : "Primary weapon"}
+                      : weapon.category === "brawler_strike"
+                        ? "Brawler's Strike"
+                        : "Primary weapon"}
                 </p>
                 <h4 className="mt-1 font-serif text-xl font-black text-[#ead8dd]">
                   {weapon.name}
