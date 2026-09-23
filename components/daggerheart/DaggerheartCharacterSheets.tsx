@@ -344,7 +344,7 @@ function managedSpecialResources(
       existing ?? {
         name: "Favor",
         current: 3,
-        max: 0,
+        max: 6,
         notes: "Patron Die d6 (d8 at level 5)",
       }
     );
