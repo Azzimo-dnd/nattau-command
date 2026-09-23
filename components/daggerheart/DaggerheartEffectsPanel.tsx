@@ -47,15 +47,35 @@ export function DaggerheartEffectsPanel({
   manualModifiers,
   effectState,
   onManualModifierChange,
-  onToggleEffect,
+  onToggleEffects,
 }: {
   result: DaggerheartEffectResult;
   manualModifiers: DaggerheartManualStatModifiers;
   effectState: DaggerheartEffectState;
   onManualModifierChange: (stat: DaggerheartEffectStat, value: number) => void;
-  onToggleEffect: (effectKey: string) => void;
+  onToggleEffects: (effectKeys: string[]) => void;
 }) {
   const activeIds = new Set(effectState.active_effect_ids ?? []);
+  const toggleGroups = Object.values(
+    result.toggles.reduce<Record<string, typeof result.toggles>>(
+      (groups, toggle) => {
+        const key = toggle.bundle_id ?? toggle.key;
+        groups[key] = [...(groups[key] ?? []), toggle];
+        return groups;
+      },
+      {}
+    )
+  );
+
+  const activeChoices = new Map<string, number>();
+  for (const group of toggleGroups) {
+    const choiceGroup = group[0]?.choice_group;
+    if (!choiceGroup) continue;
+    const active = group.every((toggle) => activeIds.has(toggle.key));
+    if (active) {
+      activeChoices.set(choiceGroup, (activeChoices.get(choiceGroup) ?? 0) + 1);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -181,14 +201,34 @@ export function DaggerheartEffectsPanel({
           </div>
 
           <div className="grid gap-2 lg:grid-cols-2">
-            {result.toggles.map((toggle) => {
-              const active = activeIds.has(toggle.key);
+            {toggleGroups.map((group) => {
+              const first = group[0];
+              if (!first) return null;
+              const keys = group.map((toggle) => toggle.key);
+              const active = group.every((toggle) => activeIds.has(toggle.key));
+              const choiceCount = first.choice_group
+                ? activeChoices.get(first.choice_group) ?? 0
+                : 0;
+              const choiceLimit = first.choice_limit ?? 0;
+              const limitReached =
+                !active &&
+                Boolean(first.choice_group) &&
+                choiceLimit > 0 &&
+                choiceCount >= choiceLimit;
+              const statSummary = group
+                .map(
+                  (toggle) =>
+                    `${statLabels[toggle.stat]} ${signed(toggle.value)}`
+                )
+                .join(" · ");
+
               return (
                 <button
-                  key={toggle.key}
+                  key={first.bundle_id ?? first.key}
                   type="button"
-                  onClick={() => onToggleEffect(toggle.key)}
-                  className={`rounded-xl border p-3 text-left transition ${
+                  disabled={limitReached}
+                  onClick={() => onToggleEffects(keys)}
+                  className={`rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
                     active
                       ? "border-[#9c5065] bg-[#421824]/70"
                       : "border-[#39252d] bg-[#120b0f] hover:border-[#654052]"
@@ -196,10 +236,16 @@ export function DaggerheartEffectsPanel({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-[#dbc8ce]">{toggle.label}</p>
+                      <p className="font-semibold text-[#dbc8ce]">{first.label}</p>
                       <p className="mt-0.5 text-[11px] text-[#816c73]">
-                        {toggle.source} · {statLabels[toggle.stat]} {signed(toggle.value)}
+                        {first.source} · {statSummary}
                       </p>
+                      {first.choice_group && choiceLimit > 0 && (
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#8d707a]">
+                          Choice {choiceCount}/{choiceLimit}
+                          {limitReached ? " · limit reached" : ""}
+                        </p>
+                      )}
                     </div>
                     <span
                       className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
@@ -211,14 +257,14 @@ export function DaggerheartEffectsPanel({
                       {active ? "Active" : "Inactive"}
                     </span>
                   </div>
-                  {toggle.description && (
+                  {first.description && (
                     <p className="mt-2 text-xs leading-5 text-[#a18c93]">
-                      {toggle.description}
+                      {first.description}
                     </p>
                   )}
-                  {toggle.duration && (
+                  {first.duration && (
                     <p className="mt-1 text-[11px] leading-5 text-[#756269]">
-                      {toggle.duration}
+                      {first.duration}
                     </p>
                   )}
                 </button>
