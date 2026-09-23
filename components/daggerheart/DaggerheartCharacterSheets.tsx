@@ -509,7 +509,14 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }, []);
 
   const effectResult = useMemo(() => deriveDaggerheartStats(draft), [draft]);
-  const actionSources = useMemo(() => collectDaggerheartActions(draft), [draft]);
+  const actionCharacter = useMemo(
+    () => ({ ...draft, ...effectiveSnapshot(effectResult) }),
+    [draft, effectResult]
+  );
+  const actionSources = useMemo(
+    () => collectDaggerheartActions(actionCharacter),
+    [actionCharacter]
+  );
 
   useEffect(() => {
     const snapshot = effectiveSnapshot(effectResult);
@@ -750,7 +757,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   function useResourceAction(source: (typeof actionSources)[number]) {
-    const resolution = resolveDaggerheartAction(draft, source);
+    const resolution = resolveDaggerheartAction(actionCharacter, source);
     if (!resolution.ok || !resolution.patch) {
       setActionMessage(resolution.error ?? "This action cannot be used right now.");
       return;
@@ -1009,7 +1016,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             subtitle="Use consumables and abilities directly from the sheet. Costs, marked tracks, use limits and linked temporary effects update automatically."
           >
             <DaggerheartActionsPanel
-              character={draft}
+              character={actionCharacter}
               sources={actionSources}
               lastMessage={actionMessage}
               onUse={useResourceAction}
