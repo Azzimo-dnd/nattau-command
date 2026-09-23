@@ -1,3 +1,4 @@
+import type { DaggerheartAction } from "@/lib/daggerheart/actions";
 import type { DaggerheartEffect } from "@/lib/daggerheart/effects";
 
 export type DaggerheartCompendiumCategory =
@@ -39,6 +40,7 @@ export type DaggerheartCompendiumEntry = {
   rules_text: string;
   metadata: Record<string, unknown>;
   effects: DaggerheartEffect[];
+  actions: DaggerheartAction[];
   errata: DaggerheartCompendiumErrata;
   source_page_start: number | null;
   source_page_end: number | null;
