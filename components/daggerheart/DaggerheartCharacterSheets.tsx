@@ -2110,7 +2110,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                       },
                     ],
                   });
-                }
+                }}
               />
               {draft.domain_cards.map((card, index) => (
                 <div key={index} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1.5fr_1fr_90px_120px_auto]">
