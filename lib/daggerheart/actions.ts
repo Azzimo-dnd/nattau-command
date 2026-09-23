@@ -70,6 +70,7 @@ export type DaggerheartActionDomainCard = {
   name: string;
   domain: string;
   state: "loadout" | "vault";
+  metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
 };
@@ -94,6 +95,7 @@ export type DaggerheartActionCharacter = {
   inventory: DaggerheartActionGearItem[];
   domain_cards: DaggerheartActionDomainCard[];
   intrinsic_sources?: DaggerheartActionIntrinsicSource[];
+  beastform_active?: boolean;
   special_resources: DaggerheartActionSpecialResource[];
   consumable_clear_bonus?: number;
   hope_current: number;
@@ -208,7 +210,12 @@ export function collectDaggerheartActions(
         index,
         action,
         action_key: `${sourceKey}:action:${action.id}`,
-        active: sourceActionActive(card, action, "domain_cards"),
+        active:
+          sourceActionActive(card, action, "domain_cards") &&
+          !(
+            character.beastform_active &&
+            String(card.metadata?.card_type ?? "").toLowerCase() !== "ability"
+          ),
         quantity: null,
         effects: card.effects ?? [],
       });
