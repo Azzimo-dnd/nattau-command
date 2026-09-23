@@ -1103,6 +1103,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         slug: entry.slug,
                         source_key: entry.source_key,
                         effects: entry.effects ?? [],
+                        actions: entry.actions ?? [],
                       },
                     ],
                   })
