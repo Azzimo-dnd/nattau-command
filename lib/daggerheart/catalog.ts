@@ -5,7 +5,7 @@ export type DaggerheartClassOption = {
   domains: [string, string];
   startingEvasion: number;
   startingHitPoints: number;
-  subclasses: { key: string; label: string }[];
+  subclasses: { key: string; label: string; compendiumSlug: string }[];
 };
 
 export const daggerheartDomains = [
@@ -14,43 +14,43 @@ export const daggerheartDomains = [
 
 export const daggerheartClasses: DaggerheartClassOption[] = [
   { key: "bard", label: "Bard", source: "core", domains: ["Grace", "Codex"], startingEvasion: 10, startingHitPoints: 5, subclasses: [
-    { key: "troubadour", label: "Troubadour" }, { key: "wordsmith", label: "Wordsmith" },
+    { key: "troubadour", label: "Troubadour", compendiumSlug: "troubadour" }, { key: "wordsmith", label: "Wordsmith", compendiumSlug: "wordsmith" },
   ]},
   { key: "druid", label: "Druid", source: "core", domains: ["Sage", "Arcana"], startingEvasion: 10, startingHitPoints: 6, subclasses: [
-    { key: "warden-elements", label: "Warden of the Elements" }, { key: "warden-renewal", label: "Warden of Renewal" },
+    { key: "warden-elements", label: "Warden of the Elements", compendiumSlug: "warden-of-the-elements" }, { key: "warden-renewal", label: "Warden of Renewal", compendiumSlug: "warden-of-renewal" },
   ]},
   { key: "guardian", label: "Guardian", source: "core", domains: ["Valor", "Blade"], startingEvasion: 9, startingHitPoints: 7, subclasses: [
-    { key: "stalwart", label: "Stalwart" }, { key: "vengeance", label: "Vengeance" },
+    { key: "stalwart", label: "Stalwart", compendiumSlug: "stalwart" }, { key: "vengeance", label: "Vengeance", compendiumSlug: "vengeance" },
   ]},
   { key: "ranger", label: "Ranger", source: "core", domains: ["Bone", "Sage"], startingEvasion: 12, startingHitPoints: 6, subclasses: [
-    { key: "beastbound", label: "Beastbound" }, { key: "wayfinder", label: "Wayfinder" },
+    { key: "beastbound", label: "Beastbound", compendiumSlug: "beastbound" }, { key: "wayfinder", label: "Wayfinder", compendiumSlug: "wayfinder" },
   ]},
   { key: "rogue", label: "Rogue", source: "core", domains: ["Midnight", "Grace"], startingEvasion: 12, startingHitPoints: 6, subclasses: [
-    { key: "nightwalker", label: "Nightwalker" }, { key: "syndicate", label: "Syndicate" },
+    { key: "nightwalker", label: "Nightwalker", compendiumSlug: "nightwalker" }, { key: "syndicate", label: "Syndicate", compendiumSlug: "syndicate" },
   ]},
   { key: "seraph", label: "Seraph", source: "core", domains: ["Splendor", "Valor"], startingEvasion: 9, startingHitPoints: 7, subclasses: [
-    { key: "divine-wielder", label: "Divine Wielder" }, { key: "winged-sentinel", label: "Winged Sentinel" },
+    { key: "divine-wielder", label: "Divine Wielder", compendiumSlug: "divine-wielder" }, { key: "winged-sentinel", label: "Winged Sentinel", compendiumSlug: "winged-sentinel" },
   ]},
   { key: "sorcerer", label: "Sorcerer", source: "core", domains: ["Arcana", "Midnight"], startingEvasion: 10, startingHitPoints: 6, subclasses: [
-    { key: "elemental-origin", label: "Elemental Origin" }, { key: "primal-origin", label: "Primal Origin" },
+    { key: "elemental-origin", label: "Elemental Origin", compendiumSlug: "elemental-origin" }, { key: "primal-origin", label: "Primal Origin", compendiumSlug: "primal-origin" },
   ]},
   { key: "warrior", label: "Warrior", source: "core", domains: ["Blade", "Bone"], startingEvasion: 11, startingHitPoints: 6, subclasses: [
-    { key: "call-brave", label: "Call of the Brave" }, { key: "call-slayer", label: "Call of the Slayer" },
+    { key: "call-brave", label: "Call of the Brave", compendiumSlug: "call-of-the-brave" }, { key: "call-slayer", label: "Call of the Slayer", compendiumSlug: "call-of-the-slayer" },
   ]},
   { key: "wizard", label: "Wizard", source: "core", domains: ["Codex", "Splendor"], startingEvasion: 11, startingHitPoints: 5, subclasses: [
-    { key: "school-knowledge", label: "School of Knowledge" }, { key: "school-war", label: "School of War" },
+    { key: "school-knowledge", label: "School of Knowledge", compendiumSlug: "school-of-knowledge" }, { key: "school-war", label: "School of War", compendiumSlug: "school-of-war" },
   ]},
   { key: "assassin", label: "Assassin", source: "hope-fear", domains: ["Blade", "Midnight"], startingEvasion: 12, startingHitPoints: 5, subclasses: [
-    { key: "executioners-guild", label: "Executioners Guild" }, { key: "poisoners-guild", label: "Poisoners Guild" },
+    { key: "executioners-guild", label: "Executioners Guild", compendiumSlug: "executioners-guild" }, { key: "poisoners-guild", label: "Poisoners Guild", compendiumSlug: "poisoners-guild" },
   ]},
   { key: "brawler", label: "Brawler", source: "hope-fear", domains: ["Valor", "Bone"], startingEvasion: 10, startingHitPoints: 6, subclasses: [
-    { key: "juggernaut", label: "Juggernaut" }, { key: "martial-artist", label: "Martial Artist" },
+    { key: "juggernaut", label: "Juggernaut", compendiumSlug: "juggernaut" }, { key: "martial-artist", label: "Martial Artist", compendiumSlug: "martial-artist" },
   ]},
   { key: "warlock", label: "Warlock", source: "hope-fear", domains: ["Dread", "Grace"], startingEvasion: 11, startingHitPoints: 5, subclasses: [
-    { key: "pact-endless", label: "Pact of the Endless" }, { key: "pact-wrathful", label: "Pact of the Wrathful" },
+    { key: "pact-endless", label: "Pact of the Endless", compendiumSlug: "pact-of-the-endless" }, { key: "pact-wrathful", label: "Pact of the Wrathful", compendiumSlug: "pact-of-the-wrathful" },
   ]},
   { key: "witch", label: "Witch", source: "hope-fear", domains: ["Sage", "Dread"], startingEvasion: 10, startingHitPoints: 6, subclasses: [
-    { key: "hedge", label: "Hedge" }, { key: "moon", label: "Moon" },
+    { key: "hedge", label: "Hedge", compendiumSlug: "hedge" }, { key: "moon", label: "Moon", compendiumSlug: "moon" },
   ]},
 ];
 
@@ -75,6 +75,19 @@ export const daggerheartTraits = [
 
 export function classOption(key: string | null | undefined) {
   return daggerheartClasses.find((item) => item.key === key) ?? null;
+}
+
+export function subclassOption(key: string | null | undefined) {
+  if (!key) return null;
+  for (const classItem of daggerheartClasses) {
+    const subclass = classItem.subclasses.find((item) => item.key === key);
+    if (subclass) return subclass;
+  }
+  return null;
+}
+
+export function subclassCompendiumSlug(key: string | null | undefined) {
+  return subclassOption(key)?.compendiumSlug ?? null;
 }
 
 
