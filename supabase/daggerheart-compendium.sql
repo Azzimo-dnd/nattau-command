@@ -180,3 +180,9 @@ revoke execute on function public.search_daggerheart_compendium(
 grant execute on function public.search_daggerheart_compendium(
   text, text, text, integer, integer
 ) to authenticated;
+
+
+-- Keep client roles on least privilege. RLS still applies to authenticated SELECT.
+revoke all on table public.daggerheart_compendium_entries from anon;
+revoke all on table public.daggerheart_compendium_entries from authenticated;
+grant select on table public.daggerheart_compendium_entries to authenticated;
