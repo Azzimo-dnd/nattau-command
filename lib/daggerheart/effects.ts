@@ -15,12 +15,15 @@ export const daggerheartEffectStats = [
   "armor_score",
   "major_threshold",
   "severe_threshold",
+  "domain_loadout_max",
 ] as const;
 
 export type DaggerheartEffectStat = (typeof daggerheartEffectStats)[number];
 
 export type DaggerheartEffectCondition =
   | { type: "wearing_armor" }
+  | { type: "not_wearing_armor" }
+  | { type: "armor_fully_marked" }
   | { type: "domain_count"; domain: string; minimum: number }
   | { type: "stress_full" };
 
@@ -28,14 +31,26 @@ export type DaggerheartEffect = {
   id: string;
   label: string;
   stat: DaggerheartEffectStat;
-  operation: "add";
+  operation: "add" | "set" | "minimum";
   value?: number;
   value_from?:
-    | "proficiency"
+    | "agility"
+    | "strength"
+    | "finesse"
+    | "instinct"
     | "presence"
+    | "knowledge"
+    | "proficiency"
     | "spellcast_trait"
     | "tier"
-    | "half_agility_rounded_up";
+    | "level"
+    | "armor_score"
+    | "available_armor_slots"
+    | "half_agility_rounded_up"
+    | "active_effect_value";
+  value_by_tier?: Partial<Record<1 | 2 | 3 | 4, number>>;
+  include_level?: boolean;
+  feature?: string;
   scope: "equipped" | "loadout" | "owned";
   mode: "passive" | "toggle";
   condition?: DaggerheartEffectCondition;
@@ -50,8 +65,11 @@ export type DaggerheartBaseStats = {
   hp_max: number;
   stress_max: number;
   armor_score: number;
+  armor_slots_current: number;
+  armor_slots_max: number;
   major_threshold: number;
   severe_threshold: number;
+  domain_loadout_max: number;
 };
 
 export type DaggerheartManualStatModifiers = Partial<
@@ -60,6 +78,7 @@ export type DaggerheartManualStatModifiers = Partial<
 
 export type DaggerheartEffectState = {
   active_effect_ids?: string[];
+  active_effect_values?: Record<string, number>;
   action_uses?: Record<string, number>;
 };
 
@@ -84,6 +103,12 @@ export type DaggerheartEffectDomainCard = {
   effects?: DaggerheartEffect[];
 };
 
+export type DaggerheartIntrinsicSource = {
+  id: string;
+  name: string;
+  effects?: DaggerheartEffect[];
+};
+
 type HeritageFeature = { ancestry?: string; name?: string } | null | undefined;
 
 export type DaggerheartEffectCharacter = {
@@ -104,6 +129,7 @@ export type DaggerheartEffectCharacter = {
   armor: DaggerheartEffectGearItem[];
   inventory: DaggerheartEffectGearItem[];
   domain_cards: DaggerheartEffectDomainCard[];
+  intrinsic_sources?: DaggerheartIntrinsicSource[];
   stress_current: number;
   stress_max: number;
   evasion: number;
@@ -122,6 +148,8 @@ export type DaggerheartEffectContribution = {
   label: string;
   effect_key: string;
   temporary: boolean;
+  operation: DaggerheartEffect["operation"];
+  result_value: number;
 };
 
 export type DaggerheartToggleEffect = {
@@ -174,6 +202,7 @@ export function baseStatsForClass(
     armor_score: 0,
     major_threshold: 0,
     severe_threshold: 0,
+    domain_loadout_max: 5,
   };
 }
 
@@ -387,6 +416,14 @@ function conditionActive(
   const condition = effect.condition;
   if (!condition) return true;
   if (condition.type === "wearing_armor") return wearingArmor;
+  if (condition.type === "not_wearing_armor") return !wearingArmor;
+  if (condition.type === "armor_fully_marked") {
+    return (
+      wearingArmor &&
+      character.armor_slots_max > 0 &&
+      character.armor_slots_current >= character.armor_slots_max
+    );
+  }
   if (condition.type === "stress_full") {
     const manualStress = numberValue(
       character.manual_stat_modifiers?.stress_max,
@@ -411,45 +448,75 @@ function effectKey(source: RuntimeSource, effect: DaggerheartEffect) {
   return `${source.id}:${effect.id}`;
 }
 
+function characterTier(level: number) {
+  if (level <= 1) return 1 as const;
+  if (level <= 4) return 2 as const;
+  if (level <= 7) return 3 as const;
+  return 4 as const;
+}
+
 function resolveEffectValue(
   effect: DaggerheartEffect,
   source: RuntimeSource,
   stats: DaggerheartDerivedStats,
-  spellcastTrait: string | null
+  spellcastTrait: string | null,
+  character: DaggerheartEffectCharacter,
+  key: string
 ) {
-  if (typeof effect.value === "number") return effect.value;
-  if (effect.value_from === "proficiency") return stats.proficiency;
-  if (effect.value_from === "presence") return stats.presence;
-  if (effect.value_from === "spellcast_trait") {
-    return spellcastTrait ? numberValue(stats[spellcastTrait as keyof DaggerheartDerivedStats], 0) : 0;
+  let total = typeof effect.value === "number" ? effect.value : 0;
+  const tier = source.tier ?? characterTier(character.level);
+  if (effect.value_by_tier?.[tier] !== undefined) {
+    total += effect.value_by_tier[tier] ?? 0;
   }
-  if (effect.value_from === "tier") return source.tier ?? 0;
-  if (effect.value_from === "half_agility_rounded_up") {
-    return Math.ceil(stats.agility / 2);
+  if (effect.include_level) total += character.level;
+
+  const from = effect.value_from;
+  if (from && ["agility", "strength", "finesse", "instinct", "presence", "knowledge"].includes(from)) {
+    total += numberValue(stats[from as keyof DaggerheartDerivedStats], 0);
+  } else if (from === "proficiency") total += stats.proficiency;
+  else if (from === "spellcast_trait") {
+    total += spellcastTrait
+      ? numberValue(stats[spellcastTrait as keyof DaggerheartDerivedStats], 0)
+      : 0;
+  } else if (from === "tier") total += tier;
+  else if (from === "level") total += character.level;
+  else if (from === "armor_score") total += stats.armor_score;
+  else if (from === "available_armor_slots") {
+    total += Math.max(0, stats.armor_score - character.armor_slots_current);
+  } else if (from === "half_agility_rounded_up") {
+    total += Math.ceil(stats.agility / 2);
+  } else if (from === "active_effect_value") {
+    total += character.effect_state?.active_effect_values?.[key] ?? 0;
   }
-  return 0;
+  return total;
 }
 
 function applyContribution(
   stats: DaggerheartDerivedStats,
   breakdown: DaggerheartEffectResult["breakdown"],
-  stat: DaggerheartEffectStat,
+  effect: DaggerheartEffect,
   value: number,
   source: string,
-  label: string,
-  key: string,
-  temporary: boolean
+  key: string
 ) {
-  stats[stat] = numberValue(stats[stat], 0) + value;
+  const previous = numberValue(stats[effect.stat], 0);
+  let next = previous;
+  if (effect.operation === "set") next = value;
+  else if (effect.operation === "minimum") next = Math.max(previous, value);
+  else next = previous + value;
+
+  stats[effect.stat] = next;
   const row: DaggerheartEffectContribution = {
-    stat,
-    value,
+    stat: effect.stat,
+    value: next - previous,
     source,
-    label,
+    label: effect.label,
     effect_key: key,
-    temporary,
+    temporary: effect.mode === "toggle",
+    operation: effect.operation,
+    result_value: next,
   };
-  breakdown[stat] = [...(breakdown[stat] ?? []), row];
+  breakdown[effect.stat] = [...(breakdown[effect.stat] ?? []), row];
 }
 
 export function deriveDaggerheartStats(
@@ -476,6 +543,7 @@ export function deriveDaggerheartStats(
     armor_score: numberValue(base.armor_score),
     major_threshold: numberValue(base.major_threshold),
     severe_threshold: numberValue(base.severe_threshold),
+    domain_loadout_max: numberValue(base.domain_loadout_max, 5),
     armor_slots_max: 0,
   } satisfies DaggerheartDerivedStats;
 
@@ -491,14 +559,24 @@ export function deriveDaggerheartStats(
     stats.severe_threshold = severe > 0 ? severe + character.level : stats.severe_threshold;
   }
 
+  stats.armor_slots_max = Math.max(0, stats.armor_score);
+
   const breakdown: DaggerheartEffectResult["breakdown"] = {};
   const gear = gearSources(character);
   const cards = cardSources(character);
   const hasEquippedPrimary = character.weapons.some(
     (item) => item.category === "weapon_primary" && item.equipped !== false
   );
+  const externalIntrinsic: RuntimeSource[] = (character.intrinsic_sources ?? []).map((source) => ({
+    id: source.id,
+    name: source.name,
+    active: true,
+    owned: true,
+    effects: source.effects ?? [],
+  }));
   const sources = [
     ...intrinsicSources(character, hasEquippedPrimary),
+    ...externalIntrinsic,
     ...gear,
     ...cards,
   ];
@@ -506,9 +584,14 @@ export function deriveDaggerheartStats(
   const wearingArmor = Boolean(equippedArmor);
   const spellcastTrait = spellcastTraitKey(character);
 
-  const candidateEffects = sources.flatMap((source) =>
-    source.effects.map((effect) => ({ source, effect }))
-  );
+  const operationOrder: Record<DaggerheartEffect["operation"], number> = {
+    set: 0,
+    minimum: 1,
+    add: 2,
+  };
+  const candidateEffects = sources
+    .flatMap((source) => source.effects.map((effect) => ({ source, effect })))
+    .sort((a, b) => operationOrder[a.effect.operation] - operationOrder[b.effect.operation]);
 
   const shouldApply = (source: RuntimeSource, effect: DaggerheartEffect) => {
     if (!sourceScopeActive(source, effect)) return false;
@@ -523,17 +606,9 @@ export function deriveDaggerheartStats(
   for (const { source, effect } of candidateEffects) {
     if (!traitKeys.includes(effect.stat as (typeof traitKeys)[number])) continue;
     if (!shouldApply(source, effect)) continue;
-    const value = resolveEffectValue(effect, source, stats, spellcastTrait);
-    applyContribution(
-      stats,
-      breakdown,
-      effect.stat,
-      value,
-      source.name,
-      effect.label,
-      effectKey(source, effect),
-      effect.mode === "toggle"
-    );
+    const key = effectKey(source, effect);
+    const value = resolveEffectValue(effect, source, stats, spellcastTrait, character, key);
+    applyContribution(stats, breakdown, effect, value, source.name, key);
   }
 
   // Pass 2: resource maxima. Conditional effects such as "all Stress
@@ -547,33 +622,17 @@ export function deriveDaggerheartStats(
     if (!resourceMaxStats.has(effect.stat) || !shouldApply(source, effect)) {
       continue;
     }
-    const value = resolveEffectValue(effect, source, stats, spellcastTrait);
-    applyContribution(
-      stats,
-      breakdown,
-      effect.stat,
-      value,
-      source.name,
-      effect.label,
-      effectKey(source, effect),
-      effect.mode === "toggle"
-    );
+    const key = effectKey(source, effect);
+    const value = resolveEffectValue(effect, source, stats, spellcastTrait, character, key);
+    applyContribution(stats, breakdown, effect, value, source.name, key);
   }
 
   // Pass 3: proficiency, because later formulas can depend on it.
   for (const { source, effect } of candidateEffects) {
     if (effect.stat !== "proficiency" || !shouldApply(source, effect)) continue;
-    const value = resolveEffectValue(effect, source, stats, spellcastTrait);
-    applyContribution(
-      stats,
-      breakdown,
-      effect.stat,
-      value,
-      source.name,
-      effect.label,
-      effectKey(source, effect),
-      effect.mode === "toggle"
-    );
+    const key = effectKey(source, effect);
+    const value = resolveEffectValue(effect, source, stats, spellcastTrait, character, key);
+    applyContribution(stats, breakdown, effect, value, source.name, key);
   }
 
   // Pass 4: remaining derived sheet stats.
@@ -586,17 +645,9 @@ export function deriveDaggerheartStats(
     ) {
       continue;
     }
-    const value = resolveEffectValue(effect, source, stats, spellcastTrait);
-    applyContribution(
-      stats,
-      breakdown,
-      effect.stat,
-      value,
-      source.name,
-      effect.label,
-      effectKey(source, effect),
-      effect.mode === "toggle"
-    );
+    const key = effectKey(source, effect);
+    const value = resolveEffectValue(effect, source, stats, spellcastTrait, character, key);
+    applyContribution(stats, breakdown, effect, value, source.name, key);
   }
 
   for (const stat of daggerheartEffectStats) {
@@ -605,12 +656,17 @@ export function deriveDaggerheartStats(
       applyContribution(
         stats,
         breakdown,
-        stat,
+        {
+          id: `manual-${stat}`,
+          label: "Manual modifier",
+          stat,
+          operation: "add",
+          scope: "owned",
+          mode: "passive",
+        },
         modifier,
         "GM / Homebrew",
-        "Manual modifier",
-        `manual:${stat}`,
-        false
+        `manual:${stat}`
       );
     }
   }
@@ -632,7 +688,14 @@ export function deriveDaggerheartStats(
       description: effect.description,
       duration: effect.duration,
       stat: effect.stat,
-      value: resolveEffectValue(effect, source, stats, spellcastTrait),
+      value: resolveEffectValue(
+        effect,
+        source,
+        stats,
+        spellcastTrait,
+        character,
+        effectKey(source, effect)
+      ),
       active: activeIds.has(effectKey(source, effect)),
     }));
 
@@ -655,5 +718,6 @@ export function effectiveSnapshot(result: DaggerheartEffectResult) {
     armor_slots_max: result.stats.armor_slots_max,
     major_threshold: result.stats.major_threshold,
     severe_threshold: result.stats.severe_threshold,
+    domain_loadout_max: result.stats.domain_loadout_max,
   };
 }
