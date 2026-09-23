@@ -53,6 +53,9 @@ export type DaggerheartEffect = {
   value_by_tier?: Partial<Record<1 | 2 | 3 | 4, number>>;
   include_level?: boolean;
   feature?: string;
+  bundle_id?: string;
+  choice_group?: string;
+  choice_limit?: number;
   scope: "equipped" | "loadout" | "owned";
   mode: "passive" | "toggle";
   condition?: DaggerheartEffectCondition;
@@ -164,6 +167,9 @@ export type DaggerheartToggleEffect = {
   stat: DaggerheartEffectStat;
   value: number;
   active: boolean;
+  bundle_id?: string;
+  choice_group?: string;
+  choice_limit?: number;
 };
 
 export type DaggerheartDerivedStats = DaggerheartBaseStats &
@@ -687,6 +693,9 @@ export function deriveDaggerheartStats(
         effectKey(source, effect)
       ),
       active: activeIds.has(effectKey(source, effect)),
+      bundle_id: effect.bundle_id,
+      choice_group: effect.choice_group,
+      choice_limit: effect.choice_limit,
     }));
 
   return {
