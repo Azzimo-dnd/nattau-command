@@ -197,7 +197,7 @@ test("Rune-Forged Exosuit changes thresholds and reduces domain loadout capacity
 });
 
 test("Vitality bundled thresholds behave as one active choice", () => {
-  const sourceId = "card:vitality";
+  const sourceId = "vitality";
   const result = deriveDaggerheartStats(
     effectCharacter({
       base_stats: {
