@@ -16,6 +16,7 @@ create table if not exists public.daggerheart_characters (
   subclass_key text,
   ancestry_key text,
   community_key text,
+  heritage_state jsonb not null default '{}'::jsonb,
   transformations text[] not null default '{}',
   traits jsonb not null default '{"agility":0,"strength":0,"finesse":0,"instinct":0,"presence":0,"knowledge":0}'::jsonb,
   evasion integer not null default 10,
@@ -127,3 +128,8 @@ $$;
 
 revoke all on function public.list_daggerheart_character_roster(uuid) from public;
 grant execute on function public.list_daggerheart_character_roster(uuid) to authenticated;
+
+
+-- Keep reapplication safe for databases created before mixed ancestry support.
+alter table public.daggerheart_characters
+  add column if not exists heritage_state jsonb not null default '{}'::jsonb;
