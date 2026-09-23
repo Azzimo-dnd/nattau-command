@@ -45,6 +45,7 @@ type DomainCard = {
   compendium_id?: string;
   slug?: string;
   source_key?: string;
+  details?: string;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
 };
@@ -1142,6 +1143,7 @@ export function DaggerheartCharacterCreationWizard({
                       compendium_id: entry.id,
                       slug: entry.slug,
                       source_key: entry.source_key,
+                      details: compendiumEntryDetails(entry),
                       effects: entry.effects ?? [],
                       actions: entry.actions ?? [],
                     },
