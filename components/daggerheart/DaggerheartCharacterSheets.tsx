@@ -622,9 +622,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     }
 
     const saved = result.data as CharacterRow;
-    setDraft(saved);
     setCharacters((current) =>
-      current.map((row) => (row.id === saved.id ? saved : row))
+      current.map((row) =>
+        row.id === saved.id ? { ...row, ...normalized } : row
+      )
     );
   }
 
