@@ -67,7 +67,21 @@ type GearItem = {
 };
 type Resource = { name: string; current: number; max: number; notes: string };
 type Gold = { handfuls: number; bags: number; chests: number };
-type StateBag = { notes?: string; [key: string]: unknown };
+type ClassOptionRef = {
+  id: string;
+  name: string;
+  category: "beastform" | "martial_stance";
+  tier: number | null;
+  details: string;
+  metadata?: Record<string, unknown>;
+  effects?: DaggerheartEffect[];
+  actions?: DaggerheartAction[];
+};
+type StateBag = {
+  notes?: string;
+  options?: ClassOptionRef[];
+  [key: string]: unknown;
+};
 
 export type WizardCharacter = {
   name: string;
@@ -316,10 +330,12 @@ export function DaggerheartCharacterCreationWizard({
         return "Choose the trait used by Brawler’s Strike.";
       }
       if (draft.class_key === "brawler" && draft.subclass_key === "martial-artist") {
-        const stances = Array.isArray(draft.subclass_state.martial_stances)
-          ? draft.subclass_state.martial_stances
-          : [];
-        if (stances.length !== 2) return "Martial Artist starts with exactly two Tier 1 stances.";
+        const stances = (draft.class_state.options ?? []).filter(
+          (option) => option.category === "martial_stance"
+        );
+        if (stances.length !== 2) {
+          return "Martial Artist starts with exactly two Tier 1 stances.";
+        }
       }
       if (draft.class_key === "warlock") {
         if (!String(draft.class_state.patron_name ?? "").trim()) return "Name the Warlock’s patron.";
@@ -647,30 +663,58 @@ export function DaggerheartCharacterCreationWizard({
                       label="Choose a Tier 1 stance…"
                       maxTier={1}
                       onSelect={(entry) => {
-                        const current = Array.isArray(draft.subclass_state.martial_stances)
-                          ? (draft.subclass_state.martial_stances as string[])
-                          : [];
-                        if (current.includes(entry.name) || current.length >= 2) return;
-                        patch({ subclass_state: { ...draft.subclass_state, martial_stances: [...current, entry.name] } });
+                        const options = draft.class_state.options ?? [];
+                        const stances = options.filter(
+                          (option) => option.category === "martial_stance"
+                        );
+                        if (
+                          stances.some((option) => option.id === entry.id) ||
+                          stances.length >= 2
+                        ) {
+                          return;
+                        }
+                        patch({
+                          class_state: {
+                            ...draft.class_state,
+                            options: [
+                              ...options,
+                              {
+                                id: entry.id,
+                                name: entry.name,
+                                category: "martial_stance",
+                                tier: entry.tier,
+                                details: compendiumEntryDetails(entry),
+                                metadata: compendiumEffectiveMetadata(entry),
+                                effects: entry.effects ?? [],
+                                actions: entry.actions ?? [],
+                              },
+                            ],
+                          },
+                        });
                       }}
                     />
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {(Array.isArray(draft.subclass_state.martial_stances)
-                        ? (draft.subclass_state.martial_stances as string[])
-                        : []
-                      ).map((stance) => (
-                        <button
-                          key={stance}
-                          type="button"
-                          className="rounded-full border border-[#694052] bg-[#2b1520] px-3 py-1.5 text-xs text-[#ddb8c3]"
-                          onClick={() => {
-                            const current = draft.subclass_state.martial_stances as string[];
-                            patch({ subclass_state: { ...draft.subclass_state, martial_stances: current.filter((item) => item !== stance) } });
-                          }}
-                        >
-                          {stance} ×
-                        </button>
-                      ))}
+                      {(draft.class_state.options ?? [])
+                        .filter((option) => option.category === "martial_stance")
+                        .map((stance) => (
+                          <button
+                            key={stance.id}
+                            type="button"
+                            className="rounded-full border border-[#694052] bg-[#2b1520] px-3 py-1.5 text-xs text-[#ddb8c3]"
+                            onClick={() =>
+                              patch({
+                                class_state: {
+                                  ...draft.class_state,
+                                  options: (draft.class_state.options ?? []).filter(
+                                    (item) => item.id !== stance.id
+                                  ),
+                                },
+                              })
+                            }
+                          >
+                            {stance.name} ×
+                          </button>
+                        ))}
                     </div>
                   </div>
                 )}
