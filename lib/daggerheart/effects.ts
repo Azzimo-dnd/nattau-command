@@ -28,7 +28,9 @@ export type DaggerheartEffectCondition =
   | { type: "not_wearing_armor" }
   | { type: "armor_fully_marked" }
   | { type: "domain_count"; domain: string; minimum: number }
-  | { type: "stress_full" };
+  | { type: "stress_full" }
+  | { type: "stress_empty" }
+  | { type: "stress_marked" };
 
 export type DaggerheartEffect = {
   id: string;
