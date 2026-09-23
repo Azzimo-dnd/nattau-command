@@ -269,7 +269,7 @@ export function DaggerheartCharacterCreationWizard({
     if (!nextClass) return;
     let resources = classManagedResources(draft.special_resources);
     if (key === "warlock") {
-      resources = [...resources, { name: "Favor", current: 3, max: 0, notes: "Patron Die d6 (d8 at level 5)" }];
+      resources = [...resources, { name: "Favor", current: 3, max: 6, notes: "Patron Die d6 (d8 at level 5)" }];
     }
 
     patch({
