@@ -254,7 +254,7 @@ function gearSources(character: DaggerheartEffectCharacter): RuntimeSource[] {
       active: item.equipped ?? defaultEquipped,
       owned: true,
       effects: item.effects ?? [],
-      tier: item.tier ?? numberValue(item.metadata?.tier, 0) || undefined,
+      tier: item.tier ?? (numberValue(item.metadata?.tier, 0) || undefined),
     };
   });
 }
