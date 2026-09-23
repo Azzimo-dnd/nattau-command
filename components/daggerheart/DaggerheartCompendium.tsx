@@ -129,6 +129,7 @@ export function DaggerheartCompendium() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const handle = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
@@ -145,6 +146,7 @@ export function DaggerheartCompendium() {
         }
       );
 
+      if (cancelled) return;
       if (searchError) {
         setError(searchError.message);
         setEntries([]);
@@ -154,7 +156,10 @@ export function DaggerheartCompendium() {
       setLoading(false);
     }, 180);
 
-    return () => window.clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
   }, [category, domain, level, query, supabase]);
 
   const visibleEntries = useMemo(
