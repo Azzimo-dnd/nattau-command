@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { DaggerheartCompendiumCategory, DaggerheartCompendiumEntry } from "@/lib/daggerheart/compendium";
+import {
+  compendiumEffectiveMetadata,
+  compendiumHasErrata,
+  type DaggerheartCompendiumCategory,
+  type DaggerheartCompendiumEntry,
+} from "@/lib/daggerheart/compendium";
+import {
+  DaggerheartCategoryIcon,
+  DaggerheartDomainIcon,
+} from "@/components/daggerheart/DaggerheartCompendiumIcons";
 
 type Props = {
   categories: DaggerheartCompendiumCategory[];
@@ -38,7 +47,7 @@ export function DaggerheartCompendiumPicker({
       setLoading(true);
       let request = supabase
         .from("daggerheart_compendium_entries")
-        .select("id,source_key,category,slug,name,parent_slug,domain,level,tier,summary,rules_text,metadata,source_page_start,source_page_end,sort_order")
+        .select("id,source_key,category,slug,name,parent_slug,domain,level,tier,summary,rules_text,metadata,errata,source_page_start,source_page_end,sort_order")
         .eq("is_active", true)
         .in("category", categories)
         .order("tier", { ascending: true, nullsFirst: true })
@@ -60,7 +69,7 @@ export function DaggerheartCompendiumPicker({
             : loaded.filter(
                 (entry) =>
                   !["weapon_primary", "weapon_secondary"].includes(entry.category) ||
-                  entry.metadata?.weapon_kind !== "magic"
+                  compendiumEffectiveMetadata(entry).weapon_kind !== "magic"
               )
         );
         setSelectedId("");
@@ -93,6 +102,7 @@ export function DaggerheartCompendiumPicker({
               {entry.level ? ` · Lv ${entry.level}` : ""}
               {entry.tier ? ` · Tier ${entry.tier}` : ""}
               {entry.source_key === "hope-fear" ? " · H&F" : ""}
+              {compendiumHasErrata(entry) ? " · ERRATA" : ""}
             </option>
           ))}
         </select>
@@ -109,27 +119,58 @@ export function DaggerheartCompendiumPicker({
           Add from compendium
         </button>
       </div>
+
       {selected && (
         <div className="mt-3 rounded-lg border border-[#302027] bg-black/20 p-3">
-          <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9b6978]">
-            <span>{selected.source_key === "hope-fear" ? "Hope & Fear" : "Core"}</span>
-            {selected.domain && <span>· {selected.domain}</span>}
-            {selected.level && <span>· Level {selected.level}</span>}
-            {selected.tier && <span>· Tier {selected.tier}</span>}
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-lg border border-[#432a34] bg-[#1b0e14] p-2 text-[#c78b9d]">
+              <DaggerheartCategoryIcon category={selected.category} className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9b6978]">
+                <span>{selected.source_key === "hope-fear" ? "Hope & Fear" : "Core"}</span>
+                {selected.domain && (
+                  <span className="inline-flex items-center gap-1">
+                    · <DaggerheartDomainIcon domain={selected.domain} className="size-3.5" />
+                    {selected.domain}
+                  </span>
+                )}
+                {selected.level && <span>· Level {selected.level}</span>}
+                {selected.tier && <span>· Tier {selected.tier}</span>}
+                {compendiumHasErrata(selected) && (
+                  <span className="rounded-full border border-amber-800/50 bg-amber-950/35 px-2 py-0.5 text-amber-200">
+                    Official errata
+                  </span>
+                )}
+              </div>
+
+              {selected.rules_text && (
+                <p className="mt-2 line-clamp-4 whitespace-pre-line text-xs leading-5 text-[#a9959c]">
+                  {selected.rules_text}
+                </p>
+              )}
+
+              {compendiumHasErrata(selected) && (
+                <div className="mt-3 rounded-lg border border-amber-900/35 bg-amber-950/15 p-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300/80">
+                    Current official rule
+                  </p>
+                  {selected.errata.summary && (
+                    <p className="mt-1 text-xs leading-5 text-amber-100/85">
+                      {selected.errata.summary}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          {selected.rules_text && (
-            <p className="mt-2 line-clamp-4 whitespace-pre-line text-xs leading-5 text-[#a9959c]">
-              {selected.rules_text}
-            </p>
-          )}
         </div>
       )}
     </div>
   );
 }
 
-export function compendiumEntryDetails(entry: DaggerheartCompendiumEntry) {
-  const metadata = entry.metadata ?? {};
+function metadataDetails(metadata: Record<string, unknown>) {
   const bits: string[] = [];
   for (const key of ["trait", "range", "damage", "burden", "base_major", "base_severe", "base_score"]) {
     const value = metadata[key];
@@ -137,6 +178,25 @@ export function compendiumEntryDetails(entry: DaggerheartCompendiumEntry) {
       bits.push(`${key.replaceAll("_", " ")}: ${String(value)}`);
     }
   }
-  if (entry.rules_text && entry.rules_text !== "—") bits.push(entry.rules_text);
-  return bits.join(" · ");
+  return bits;
+}
+
+export function compendiumEntryDetails(entry: DaggerheartCompendiumEntry) {
+  const originalBits = metadataDetails(entry.metadata ?? {});
+  if (entry.rules_text && entry.rules_text !== "—") originalBits.push(entry.rules_text);
+
+  if (!compendiumHasErrata(entry)) return originalBits.join(" · ");
+
+  const currentMetadata = compendiumEffectiveMetadata(entry);
+  const currentBits = metadataDetails(currentMetadata);
+  if (entry.errata.rules_text) currentBits.push(entry.errata.rules_text);
+
+  const revision = entry.errata.revision ? ` (${entry.errata.revision})` : "";
+  return [
+    `Original source: ${originalBits.join(" · ") || "See source entry."}`,
+    `Official errata/current${revision}: ${[
+      entry.errata.summary,
+      ...currentBits,
+    ].filter(Boolean).join(" · ")}`,
+  ].join("\n\n");
 }
