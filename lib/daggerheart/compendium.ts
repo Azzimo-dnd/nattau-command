@@ -13,6 +13,16 @@ export type DaggerheartCompendiumCategory =
   | "loot_item"
   | "consumable";
 
+export type DaggerheartCompendiumErrata = {
+  revision?: string;
+  published_at?: string;
+  kind?: "mechanical" | "clarity" | "typo" | string;
+  summary?: string;
+  rules_text?: string;
+  source_url?: string;
+  metadata?: Record<string, unknown>;
+};
+
 export type DaggerheartCompendiumEntry = {
   id: string;
   source_key: "core" | "hope-fear";
@@ -26,6 +36,7 @@ export type DaggerheartCompendiumEntry = {
   summary: string;
   rules_text: string;
   metadata: Record<string, unknown>;
+  errata: DaggerheartCompendiumErrata;
   source_page_start: number | null;
   source_page_end: number | null;
   sort_order: number;
@@ -78,4 +89,15 @@ export function compendiumCategoryLabel(category: string) {
 
 export function compendiumSourceLabel(source: string) {
   return source === "hope-fear" ? "Hope & Fear" : "Core Rulebook";
+}
+
+export function compendiumHasErrata(entry: DaggerheartCompendiumEntry) {
+  return Boolean(entry.errata?.summary || entry.errata?.rules_text);
+}
+
+export function compendiumEffectiveMetadata(entry: DaggerheartCompendiumEntry) {
+  return {
+    ...(entry.metadata ?? {}),
+    ...(entry.errata?.metadata ?? {}),
+  } as Record<string, unknown>;
 }
