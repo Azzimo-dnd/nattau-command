@@ -679,6 +679,9 @@ export function deriveDaggerheartStats(
   for (const stat of resourceMaxStats) {
     applyManualModifier(stats, breakdown, character, stat);
   }
+  stats.hope_max = Math.max(0, Math.min(6, stats.hope_max));
+  stats.hp_max = Math.max(0, Math.min(12, stats.hp_max));
+  stats.stress_max = Math.max(0, Math.min(12, stats.stress_max));
 
   // Pass 3: proficiency, because later formulas can depend on it.
   for (const { source, effect } of candidateEffects) {
@@ -689,6 +692,7 @@ export function deriveDaggerheartStats(
   }
 
   applyManualModifier(stats, breakdown, character, "proficiency");
+  stats.proficiency = Math.max(0, Math.min(6, stats.proficiency));
 
   // Pass 4: Armor Score must settle before effects that scale from it
   // or inspect whether every Armor Slot is marked.
@@ -699,7 +703,8 @@ export function deriveDaggerheartStats(
     applyContribution(stats, breakdown, effect, value, source.name, key);
   }
   applyManualModifier(stats, breakdown, character, "armor_score");
-  stats.armor_slots_max = Math.max(0, stats.armor_score);
+  stats.armor_score = Math.max(0, Math.min(12, stats.armor_score));
+  stats.armor_slots_max = stats.armor_score;
 
   // Pass 5: remaining derived sheet stats.
   for (const { source, effect } of candidateEffects) {
@@ -729,7 +734,12 @@ export function deriveDaggerheartStats(
     }
   }
 
-  stats.armor_slots_max = Math.max(0, stats.armor_score);
+  stats.hope_max = Math.max(0, Math.min(6, stats.hope_max));
+  stats.hp_max = Math.max(0, Math.min(12, stats.hp_max));
+  stats.stress_max = Math.max(0, Math.min(12, stats.stress_max));
+  stats.proficiency = Math.max(0, Math.min(6, stats.proficiency));
+  stats.armor_score = Math.max(0, Math.min(12, stats.armor_score));
+  stats.armor_slots_max = stats.armor_score;
 
   const toggles = candidateEffects
     .filter(({ source, effect }) => {
