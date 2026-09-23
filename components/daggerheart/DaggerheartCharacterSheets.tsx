@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DaggerheartCompendiumPicker, compendiumEntryDetails } from "@/components/daggerheart/DaggerheartCompendiumPicker";
+import { compendiumEffectiveMetadata } from "@/lib/daggerheart/compendium";
 import { DaggerheartCharacterCreationWizard } from "@/components/daggerheart/DaggerheartCharacterCreationWizard";
 import type { HeritageState } from "@/components/daggerheart/DaggerheartHeritageBuilder";
 import {
@@ -752,7 +753,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                             category: entry.category,
                             slug: entry.slug,
                             source_key: entry.source_key,
-                            metadata: entry.metadata ?? {},
+                            metadata: compendiumEffectiveMetadata(entry),
                           },
                         ],
                       })
@@ -769,7 +770,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     label="Choose eligible armor…"
                     maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
                     onSelect={(entry) => {
-                      const metadata = entry.metadata ?? {};
+                      const metadata = compendiumEffectiveMetadata(entry);
                       patch({
                         armor: [
                           ...draft.armor,
@@ -780,7 +781,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                             category: entry.category,
                             slug: entry.slug,
                             source_key: entry.source_key,
-                            metadata: entry.metadata ?? {},
+                            metadata: compendiumEffectiveMetadata(entry),
                           },
                         ],
                         armor_score:
@@ -822,7 +823,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                             category: entry.category,
                             slug: entry.slug,
                             source_key: entry.source_key,
-                            metadata: entry.metadata ?? {},
+                            metadata: compendiumEffectiveMetadata(entry),
                           },
                         ],
                       })
