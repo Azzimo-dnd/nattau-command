@@ -88,7 +88,7 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $$
   select exists (
     select 1
     from public.campaign_members cm
@@ -98,7 +98,7 @@ as $
       and c.is_active = true
       and c.system_key = 'daggerheart'
   );
-$;
+$$;
 
 revoke all on function private.has_daggerheart_compendium_access() from public;
 revoke execute on function private.has_daggerheart_compendium_access() from anon;
