@@ -21,6 +21,7 @@ export default async function Page() {
               Manage miniatures
             </WorkspaceLink>
           )}
+          <WorkspaceLink href="/campaigns/barovia/compendium">Open compendium</WorkspaceLink>
           <WorkspaceLink href="/campaigns/barovia/vtt">Open tabletop</WorkspaceLink>
         </>
       }
