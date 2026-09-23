@@ -18,6 +18,7 @@ import {
   compendiumEffectiveMetadata,
   type DaggerheartCompendiumEntry,
 } from "@/lib/daggerheart/compendium";
+import type { DaggerheartAction } from "@/lib/daggerheart/actions";
 import {
   baseStatsForClass,
   deriveDaggerheartStats,
@@ -45,6 +46,7 @@ type DomainCard = {
   slug?: string;
   source_key?: string;
   effects?: DaggerheartEffect[];
+  actions?: DaggerheartAction[];
 };
 type GearItem = {
   instance_id?: string;
@@ -57,6 +59,7 @@ type GearItem = {
   tier?: number | null;
   metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
+  actions?: DaggerheartAction[];
   equipped?: boolean;
   quantity?: number;
 };
@@ -141,6 +144,7 @@ function gearFromEntry(entry: DaggerheartCompendiumEntry): GearItem {
     tier: entry.tier,
     metadata: compendiumEffectiveMetadata(entry),
     effects: entry.effects ?? [],
+    actions: entry.actions ?? [],
     instance_id: crypto.randomUUID(),
     equipped: ["weapon_primary", "weapon_secondary", "armor"].includes(entry.category),
     quantity: 1,
@@ -434,21 +438,6 @@ export function DaggerheartCharacterCreationWizard({
   function back() {
     setError(null);
     setStep((current) => Math.max(0, current - 1));
-  }
-
-  function setPotion(name: "Minor Health Potion" | "Minor Stamina Potion") {
-    const inventory = draft.inventory.filter(
-      (item) => !["Minor Health Potion", "Minor Stamina Potion"].includes(item.name)
-    );
-    patch({
-      inventory: [
-        ...inventory,
-        {
-          name,
-          details: name === "Minor Health Potion" ? "Clear 1d4 Hit Points." : "Clear 1d4 Stress.",
-        },
-      ],
-    });
   }
 
   function selectClassStartingItem(name: string) {
