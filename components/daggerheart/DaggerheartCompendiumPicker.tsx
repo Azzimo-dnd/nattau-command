@@ -47,7 +47,7 @@ export function DaggerheartCompendiumPicker({
       setLoading(true);
       let request = supabase
         .from("daggerheart_compendium_entries")
-        .select("id,source_key,category,slug,name,parent_slug,domain,level,tier,summary,rules_text,metadata,effects,errata,source_page_start,source_page_end,sort_order")
+        .select("id,source_key,category,slug,name,parent_slug,domain,level,tier,summary,rules_text,metadata,effects,actions,errata,source_page_start,source_page_end,sort_order")
         .eq("is_active", true)
         .in("category", categories)
         .order("tier", { ascending: true, nullsFirst: true })
