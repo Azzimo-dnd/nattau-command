@@ -196,6 +196,59 @@ test("Rune-Forged Exosuit changes thresholds and reduces domain loadout capacity
   assert.equal(result.stats.domain_loadout_max, 4);
 });
 
+test("Armor-dependent effects use the final structured Armor Score regardless of source order", () => {
+  const result = deriveDaggerheartStats(
+    effectCharacter({
+      effect_state: {
+        active_effect_ids: ["vambrace:deflecting-evasion"],
+      },
+      weapons: [
+        {
+          slug: "vambrace",
+          name: "Eldritch Vambrace",
+          category: "weapon_secondary",
+          equipped: true,
+          effects: [
+            {
+              id: "deflecting-evasion",
+              label: "Deflecting",
+              stat: "evasion",
+              operation: "add",
+              value_from: "armor_score",
+              scope: "equipped",
+              mode: "toggle",
+            },
+          ],
+        },
+      ],
+      armor: [
+        {
+          slug: "finery",
+          name: "Granminster's Finery",
+          category: "armor",
+          equipped: true,
+          metadata: { base_score: 3, base_major: 10, base_severe: 20 },
+          effects: [
+            {
+              id: "magnificent-armor",
+              label: "Magnificent",
+              stat: "armor_score",
+              operation: "add",
+              value: 2,
+              scope: "equipped",
+              mode: "passive",
+            },
+          ],
+        },
+      ],
+    })
+  );
+
+  assert.equal(result.stats.armor_score, 5);
+  assert.equal(result.stats.evasion, 15);
+  assert.equal(result.stats.armor_slots_max, 5);
+});
+
 test("Vitality bundled thresholds behave as one active choice", () => {
   const sourceId = "vitality";
   const result = deriveDaggerheartStats(
