@@ -313,6 +313,11 @@ export function DaggerheartCompendium() {
                             Sheet automation
                           </span>
                         )}
+                        {(entry.actions?.length ?? 0) > 0 && (
+                          <span className="rounded-full border border-sky-900/50 bg-sky-950/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-sky-200/90">
+                            Quick action
+                          </span>
+                        )}
                         {hasErrata && (
                           <span className="rounded-full border border-amber-800/50 bg-amber-950/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-200">
                             Errata
@@ -388,6 +393,39 @@ export function DaggerheartCompendium() {
                                 ? ` ← ${effect.value_from.replaceAll("_", " ")}`
                                 : ""}
                           </span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {(entry.actions?.length ?? 0) > 0 && (
+                  <section className="mt-5 rounded-xl border border-sky-900/30 bg-sky-950/10 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300/65">
+                      Character sheet actions
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {entry.actions.map((action) => (
+                        <div
+                          key={action.id}
+                          className="rounded-lg border border-sky-950/50 bg-black/15 p-3 text-xs"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold text-sky-100/85">
+                              {action.label}
+                            </span>
+                            <span className="text-[10px] uppercase tracking-[0.12em] text-sky-100/45">
+                              {action.scope}
+                              {action.limit
+                                ? ` · ${action.limit.uses}/${action.limit.reset.replaceAll("_", " ")}`
+                                : ""}
+                            </span>
+                          </div>
+                          {action.description && (
+                            <p className="mt-2 leading-5 text-sky-100/55">
+                              {action.description}
+                            </p>
+                          )}
                         </div>
                       ))}
                     </div>
