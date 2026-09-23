@@ -18,6 +18,7 @@ export type DaggerheartActionResult = {
   type: "clear" | "gain";
   resource: "hope" | "hp" | "stress" | "armor";
   amount?: number;
+  all?: boolean;
   roll?: DaggerheartActionRoll;
 };
 
@@ -288,7 +289,29 @@ export function resolveDaggerheartAction(
   const rollMessages: string[] = [];
 
   for (const result of source.action.results ?? []) {
-    const amount = result.roll ? rollAmount(result.roll) : result.amount ?? 0;
+    const currentForResource =
+      result.resource === "hope"
+        ? hope
+        : result.resource === "hp"
+          ? hp
+          : result.resource === "stress"
+            ? stress
+            : armor;
+    const maxForResource =
+      result.resource === "hope"
+        ? character.hope_max
+        : result.resource === "hp"
+          ? character.hp_max
+          : result.resource === "stress"
+            ? character.stress_max
+            : character.armor_slots_max;
+    const amount = result.all
+      ? result.type === "clear"
+        ? currentForResource
+        : Math.max(0, maxForResource - currentForResource)
+      : result.roll
+        ? rollAmount(result.roll)
+        : result.amount ?? 0;
     if (result.type === "clear") {
       if (result.resource === "hp") hp = Math.max(0, hp - amount);
       if (result.resource === "stress") stress = Math.max(0, stress - amount);
