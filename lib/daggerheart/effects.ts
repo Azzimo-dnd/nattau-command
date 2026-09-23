@@ -63,6 +63,7 @@ export type DaggerheartEffectGearItem = {
   slug?: string;
   name: string;
   category?: string;
+  tier?: number | null;
   metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   equipped?: boolean;
@@ -253,7 +254,7 @@ function gearSources(character: DaggerheartEffectCharacter): RuntimeSource[] {
       active: item.equipped ?? defaultEquipped,
       owned: true,
       effects: item.effects ?? [],
-      tier: numberValue(item.metadata?.tier, 0) || undefined,
+      tier: item.tier ?? numberValue(item.metadata?.tier, 0) || undefined,
     };
   });
 }
