@@ -21,6 +21,9 @@ function actionMeta(source: DaggerheartActionSource) {
   if (cost?.hope) bits.push(`Spend ${cost.hope} Hope`);
   if (cost?.stress) bits.push(`Mark ${cost.stress} Stress`);
   if (cost?.armor) bits.push(`Mark ${cost.armor} Armor`);
+  if (cost?.special_resource) {
+    bits.push(`Spend ${cost.special_resource.amount} ${cost.special_resource.name}`);
+  }
   if (source.action.consume_quantity) {
     bits.push(`Consume ×${source.action.consume_quantity}`);
   }
