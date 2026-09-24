@@ -51,6 +51,7 @@ export function DaggerheartEffectsPanel({
   onManualModifierChange,
   onToggleEffects,
   actionControlledEffectKeys,
+  allowManualCorrections,
 }: {
   result: DaggerheartEffectResult;
   manualModifiers: DaggerheartManualStatModifiers;
@@ -58,6 +59,7 @@ export function DaggerheartEffectsPanel({
   onManualModifierChange: (stat: DaggerheartEffectStat, value: number) => void;
   onToggleEffects: (effectKeys: string[]) => void;
   actionControlledEffectKeys: Set<string>;
+  allowManualCorrections: boolean;
 }) {
   const activeIds = new Set(effectState.active_effect_ids ?? []);
   const toggleGroups = Object.values(
@@ -278,15 +280,17 @@ export function DaggerheartEffectsPanel({
                       <span className="rounded-lg border border-sky-900/40 bg-sky-950/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-200/85">
                         Activate from Actions
                       </span>
-                      <button
-                        type="button"
-                        disabled={limitReached}
-                        onClick={() => onToggleEffects(keys)}
-                        className="min-h-8 rounded-lg border border-[#54343f] bg-black/20 px-2.5 text-[10px] font-bold uppercase tracking-[0.11em] text-[#9b858c] transition hover:border-[#76505c] hover:text-[#ceb5bd] disabled:opacity-40"
-                        title="Only use this to correct state after the cost/effect was resolved outside the app."
-                      >
-                        Manual correction
-                      </button>
+                      {allowManualCorrections && (
+                        <button
+                          type="button"
+                          disabled={limitReached}
+                          onClick={() => onToggleEffects(keys)}
+                          className="min-h-8 rounded-lg border border-[#54343f] bg-black/20 px-2.5 text-[10px] font-bold uppercase tracking-[0.11em] text-[#9b858c] transition hover:border-[#76505c] hover:text-[#ceb5bd] disabled:opacity-40"
+                          title="GM correction only: use after the cost/effect was resolved outside the app."
+                        >
+                          GM correction
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <button
