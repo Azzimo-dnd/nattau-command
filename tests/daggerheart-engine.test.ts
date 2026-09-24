@@ -805,6 +805,30 @@ test("Favor and Focus are clamped to the rules maximum while custom resources re
       { name: "Momentum", current: 9, max: 10 },
     ]
   );
+
+  const source: DaggerheartActionSource = {
+    source_key: "legacy-warlock",
+    source_name: "Legacy Warlock",
+    collection: "intrinsic",
+    index: 0,
+    active: true,
+    quantity: null,
+    effects: [],
+    action_key: "legacy-warlock:action:spend-favor",
+    action: {
+      id: "spend-favor",
+      label: "Spend Favor",
+      scope: "owned",
+      cost: { special_resource: { name: "Favor", amount: 1 } },
+    },
+  };
+  const legacy = actionCharacter({
+    special_resources: [{ name: "Favor", current: 99, max: 99, notes: "" }],
+  });
+  const resolution = resolveDaggerheartAction(legacy, source);
+  assert.equal(resolution.ok, true);
+  assert.equal(resolution.patch?.special_resources?.[0]?.current, 5);
+  assert.equal(resolution.patch?.special_resources?.[0]?.max, 6);
 });
 
 test("Brawler unarmed Evasion bonus is disabled by a secondary active weapon", () => {
