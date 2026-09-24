@@ -993,6 +993,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     ).length;
     let nextCharacters = rawCharacters.filter(validCharacterRow).map((row) => ({
       ...row,
+      special_resources: normalizeDaggerheartSpecialResources(
+        row.special_resources
+      ),
       state_revision: Number(row.state_revision ?? 0),
     }));
 
