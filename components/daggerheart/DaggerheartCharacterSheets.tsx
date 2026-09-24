@@ -14,6 +14,10 @@ import { DaggerheartCombatPanel } from "@/components/daggerheart/DaggerheartComb
 import { DaggerheartActiveArmorPanel } from "@/components/daggerheart/DaggerheartActiveArmorPanel";
 import { DaggerheartActiveRulesPanel } from "@/components/daggerheart/DaggerheartActiveRulesPanel";
 import {
+  DaggerheartSheetDiceOverlay,
+  type DaggerheartSheetRollIntent,
+} from "@/components/daggerheart/DaggerheartSheetDiceOverlay";
+import {
   type DaggerheartAction,
   collectDaggerheartActions,
   normalizeDaggerheartSpecialResources,
@@ -905,6 +909,8 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const [advancedCreation, setAdvancedCreation] = useState(false);
   const [freeLoadoutEditing, setFreeLoadoutEditing] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [sheetRollIntent, setSheetRollIntent] =
+    useState<DaggerheartSheetRollIntent | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1751,6 +1757,41 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const canEdit =
     isDm || (selectedPlayerId !== null && selectedPlayerId === currentUserId);
 
+  function nextSheetRollId() {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function queueDualityRoll(title: string, modifier: number, source?: string) {
+    if (!draft.id || !canEdit) return;
+    setSheetRollIntent({
+      id: nextSheetRollId(),
+      kind: "duality",
+      title,
+      modifier,
+      source,
+    });
+  }
+
+  function queueDamageRoll(
+    title: string,
+    expression: string,
+    damageType?: string,
+    source?: string
+  ) {
+    if (!draft.id || !canEdit) return;
+    setSheetRollIntent({
+      id: nextSheetRollId(),
+      kind: "damage",
+      title,
+      expression,
+      damageType,
+      source,
+    });
+  }
+
   function setManualModifier(stat: keyof DaggerheartManualStatModifiers, value: number) {
     patch({
       manual_stat_modifiers: {
@@ -2073,7 +2114,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="grid gap-6 pb-24 xl:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="self-start rounded-2xl border border-[#402630] bg-[#100a0e]/90 p-3 xl:sticky xl:top-6">
         <p className="px-2 pb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-[#875765]">
           {isDm ? "Party roster" : "Your character"}
@@ -2460,6 +2501,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               }
               stats={effectResult.stats}
               level={draft.level}
+              onRollAttack={({ title, modifier, source }) =>
+                queueDualityRoll(title, modifier, source)
+              }
+              onRollDamage={({ title, expression, damageType, source }) =>
+                queueDamageRoll(title, expression, damageType, source)
+              }
             />
           </Section>
 
@@ -2536,6 +2583,21 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                           Current {effective > 0 ? "+" : ""}
                           {effective}
                         </p>
+                      )}
+                      {draft.id && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            queueDualityRoll(
+                              `${trait[0].toUpperCase() + trait.slice(1)} Roll`,
+                              effective,
+                              trait
+                            )
+                          }
+                          className="mt-2 min-h-8 w-full rounded-lg border border-[#5a3441] bg-[#211119] px-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#cdaeb8] transition hover:border-[#8c4a5d] hover:bg-[#311720]"
+                        >
+                          🎲 Roll {effective >= 0 ? `+${effective}` : effective}
+                        </button>
                       )}
                     </div>
                   );
@@ -3195,6 +3257,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
           </>
         )}
       </div>
+
+      {draft.id && canEdit && (
+        <DaggerheartSheetDiceOverlay
+          campaignId={campaignId}
+          currentUserId={currentUserId}
+          externalIntent={sheetRollIntent}
+          onExternalIntentConsumed={() => setSheetRollIntent(null)}
+        />
+      )}
     </div>
   );
 }
