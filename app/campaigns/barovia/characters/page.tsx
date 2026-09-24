@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { CharacterMiniaturesGallery } from "@/components/miniatures/CharacterMiniaturesGallery";
 import { DaggerheartCharacterSheets } from "@/components/daggerheart/DaggerheartCharacterSheets";
 import { CampaignWorkspace, WorkspaceLink } from "@/components/campaigns/CampaignWorkspace";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
+
+export const metadata: Metadata = { title: "Character Sheets" };
 
 export const dynamic = "force-dynamic";
 
