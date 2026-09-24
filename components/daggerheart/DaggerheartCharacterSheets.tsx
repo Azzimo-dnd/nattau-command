@@ -1498,15 +1498,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   function toggleEffects(effectKeys: string[]) {
-    if (!domainConfigurationValid) {
+    const active = new Set(draft.effect_state?.active_effect_ids ?? []);
+    const values = { ...(draft.effect_state?.active_effect_values ?? {}) };
+    const allActive = effectKeys.every((effectKey) => active.has(effectKey));
+    if (!allActive && !domainConfigurationValid) {
       setActionMessage(
         "Resolve the invalid Domain Loadout before activating sheet effects."
       );
       return;
     }
-    const active = new Set(draft.effect_state?.active_effect_ids ?? []);
-    const values = { ...(draft.effect_state?.active_effect_values ?? {}) };
-    const allActive = effectKeys.every((effectKey) => active.has(effectKey));
     const toggleDefinitions = effectResult.toggles.filter((toggle) =>
       effectKeys.includes(toggle.key)
     );
