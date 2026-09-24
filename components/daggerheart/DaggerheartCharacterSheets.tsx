@@ -105,7 +105,7 @@ type NotesState = { notes?: string; options?: ClassOptionRef[]; [key: string]: u
 type CharacterRow = {
   id: string;
   campaign_id: string;
-  player_id: string;
+  player_id: string | null;
   is_active: boolean;
   name: string;
   pronouns: string;
@@ -172,7 +172,7 @@ const inputClass =
 const smallButton =
   "inline-flex min-h-10 items-center justify-center rounded-xl border border-[#5a3441] bg-[#221219] px-3 text-sm font-semibold text-[#ddbdc6] transition hover:border-[#8b465a] hover:bg-[#321721] disabled:cursor-not-allowed disabled:opacity-50";
 
-function emptyCharacter(campaignId: string, playerId: string): CharacterRow {
+function emptyCharacter(campaignId: string, playerId: string | null): CharacterRow {
   return {
     id: "",
     campaign_id: campaignId,
@@ -362,7 +362,7 @@ function validCharacterRow(value: unknown): value is CharacterRow {
   return (
     typeof value.id === "string" &&
     typeof value.campaign_id === "string" &&
-    typeof value.player_id === "string"
+    (typeof value.player_id === "string" || value.player_id === null)
   );
 }
 
@@ -890,7 +890,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [characters, setCharacters] = useState<CharacterRow[]>([]);
   const [intrinsicCatalog, setIntrinsicCatalog] = useState<DaggerheartCompendiumEntry[]>([]);
-  const [selectedPlayerId, setSelectedPlayerId] = useState(currentUserId);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(currentUserId);
   const [draft, setDraft] = useState<CharacterRow>(() => emptyCharacter(campaignId, currentUserId));
   const draftRef = useRef(draft);
   const revisionRef = useRef<Map<string, number>>(new Map());
@@ -1019,26 +1019,46 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId, currentUserId]);
 
-  function choosePlayer(playerId: string) {
-    if (
-      dirty &&
-      typeof window !== "undefined" &&
-      !window.confirm("Discard unsaved character-sheet changes and switch players?")
-    ) {
-      return;
-    }
+  function resetEditor(next: CharacterRow, playerId: string | null) {
     setSelectedPlayerId(playerId);
     setMessage(null);
     setAdvancedCreation(false);
     setFreeLoadoutEditing(false);
     setActionMessage(null);
-    const next =
-      characters.find((row) => row.player_id === playerId) ??
-      emptyCharacter(campaignId, playerId);
     draftRef.current = next;
     editGenerationRef.current = 0;
     setDraft(next);
     setDirty(false);
+  }
+
+  function confirmDiscardUnsaved() {
+    return (
+      !dirty ||
+      typeof window === "undefined" ||
+      window.confirm("Discard unsaved character-sheet changes and switch sheets?")
+    );
+  }
+
+  function choosePlayer(playerId: string) {
+    if (!confirmDiscardUnsaved()) return;
+    const next =
+      characters.find((row) => row.player_id === playerId) ??
+      emptyCharacter(campaignId, playerId);
+    resetEditor(next, playerId);
+  }
+
+  function chooseUnassigned(characterId: string) {
+    if (!isDm || !confirmDiscardUnsaved()) return;
+    const next = characters.find(
+      (row) => row.id === characterId && row.player_id === null
+    );
+    if (!next) return;
+    resetEditor(next, null);
+  }
+
+  function startUnassignedCharacter() {
+    if (!isDm || !confirmDiscardUnsaved()) return;
+    resetEditor(emptyCharacter(campaignId, null), null);
   }
 
   const patch = useCallback((patchValue: Partial<CharacterRow>) => {
