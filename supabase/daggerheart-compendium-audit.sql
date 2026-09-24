@@ -10,7 +10,7 @@ where is_active = true
     rules_text ~* 'ROLL[[:space:]]+LOOT[[:space:]]+description'
     or rules_text ~* 'Daggerheart[[:space:]]*©|DH Core[[:space:]]+[0-9]+/[0-9]+'
     or rules_text ~* 'Chapter[[:space:]]+[0-9]+:'
-    or rules_text ~* 'TIER[[:space:]]+[1-4][[:space:]]*\\(LEVEL'
+    or rules_text ~* 'TIER[[:space:]]+[1-4][[:space:]]*[(]LEVEL'
     or rules_text ~* 'PRIMARY WEAPON TABLES|SECONDARY WEAPON TABLES|ARMOR TABLES'
   )
 order by category, name;
@@ -25,7 +25,7 @@ with first_fx as (
     e.category,
     e.rules_text,
     e.effects->0->>'label' as effect_label,
-    trim((regexp_match(e.rules_text, '^([^:\\n]{1,80}):'))[1]) as rules_feature
+    trim((regexp_match(e.rules_text, '^([^:]{1,80}):'))[1]) as rules_feature
   from public.daggerheart_compendium_entries e
   where e.is_active = true
     and e.category in ('weapon_primary','weapon_secondary','armor')
