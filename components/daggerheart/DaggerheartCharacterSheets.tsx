@@ -1052,6 +1052,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     setSelectedPlayerId(playerId);
     setMessage(null);
     setAdvancedCreation(false);
+    setFreeLoadoutEditing(false);
     setActionMessage(null);
     const next =
       characters.find((row) => row.player_id === playerId) ??
