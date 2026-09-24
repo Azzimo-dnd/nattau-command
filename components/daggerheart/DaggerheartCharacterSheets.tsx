@@ -2010,6 +2010,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               onManualModifierChange={setManualModifier}
               onToggleEffects={toggleEffects}
               actionControlledEffectKeys={actionControlledEffectKeys}
+              allowManualCorrections={isDm}
             />
           </Section>
 
