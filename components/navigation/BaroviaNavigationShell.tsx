@@ -70,6 +70,7 @@ const desktopItems: NavigationItem[] = [
 ];
 
 const sessionItems: NavigationItem[] = [
+  { label: "Daggerheart Archive", href: "/campaigns/barovia/compendium", icon: "spark" },
   { label: "Tabletop of the Mists", href: "/campaigns/barovia/vtt", icon: "war-room" },
   { label: "Sealed Relics", href: "/campaigns/barovia/puzzles", icon: "spark" },
 ];
@@ -366,6 +367,14 @@ function MobileMoreSheet({
               <span className="mt-3 text-sm font-semibold">{item.label}</span>
             </Link>
           ))}
+          <Link
+            href="/campaigns/barovia/compendium"
+            className="flex min-h-20 flex-col justify-between rounded-2xl border border-[#432832] bg-black/20 p-3 text-[#d1b6be]"
+          >
+            <NavIcon name="spark" className="h-5 w-5" />
+            <span className="mt-3 text-sm font-semibold">Compendium</span>
+          </Link>
+
           <Link
             href="/campaigns/barovia/whispers"
             className="relative flex min-h-20 flex-col justify-between rounded-2xl border border-[#432832] bg-black/20 p-3 text-[#d1b6be]"
