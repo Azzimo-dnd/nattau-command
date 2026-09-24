@@ -426,15 +426,13 @@ function conditionActive(
     );
   }
   if (condition.type === "stress_full") {
-    const manualStress = numberValue(
-      character.manual_stat_modifiers?.stress_max,
-      0
-    );
-    const effectiveStressMax = Math.max(0, stats.stress_max + manualStress);
-    return (
-      effectiveStressMax > 0 &&
-      character.stress_current >= effectiveStressMax
-    );
+    return stats.stress_max > 0 && character.stress_current >= stats.stress_max;
+  }
+  if (condition.type === "stress_empty") {
+    return character.stress_current <= 0;
+  }
+  if (condition.type === "stress_marked") {
+    return character.stress_current > 0;
   }
   if (condition.type === "domain_count") {
     const count = character.domain_cards.filter(
