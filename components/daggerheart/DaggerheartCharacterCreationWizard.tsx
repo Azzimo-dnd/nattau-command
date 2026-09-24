@@ -15,6 +15,7 @@ import {
   compendiumEntryDetails,
 } from "@/components/daggerheart/DaggerheartCompendiumPicker";
 import {
+  compendiumDefinitionRevision,
   compendiumEffectiveMetadata,
   type DaggerheartCompendiumEntry,
 } from "@/lib/daggerheart/compendium";
@@ -46,6 +47,7 @@ type DomainCard = {
   slug?: string;
   source_key?: string;
   details?: string;
+  definition_revision?: string;
   metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
@@ -59,6 +61,7 @@ type GearItem = {
   slug?: string;
   source_key?: string;
   tier?: number | null;
+  definition_revision?: string;
   metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
@@ -73,6 +76,7 @@ type ClassOptionRef = {
   category: "beastform" | "martial_stance";
   tier: number | null;
   details: string;
+  definition_revision?: string;
   metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
@@ -158,6 +162,7 @@ function gearFromEntry(entry: DaggerheartCompendiumEntry): GearItem {
     slug: entry.slug,
     source_key: entry.source_key,
     tier: entry.tier,
+    definition_revision: compendiumDefinitionRevision(entry),
     metadata: compendiumEffectiveMetadata(entry),
     effects: entry.effects ?? [],
     actions: entry.actions ?? [],
@@ -723,6 +728,7 @@ export function DaggerheartCharacterCreationWizard({
                                 category: "martial_stance",
                                 tier: entry.tier,
                                 details: compendiumEntryDetails(entry),
+                                definition_revision: compendiumDefinitionRevision(entry),
                                 metadata: compendiumEffectiveMetadata(entry),
                                 effects: entry.effects ?? [],
                                 actions: entry.actions ?? [],
@@ -1232,6 +1238,7 @@ export function DaggerheartCharacterCreationWizard({
                       slug: entry.slug,
                       source_key: entry.source_key,
                       details: compendiumEntryDetails(entry),
+                      definition_revision: compendiumDefinitionRevision(entry),
                       metadata: compendiumEffectiveMetadata(entry),
                       effects: entry.effects ?? [],
                       actions: entry.actions ?? [],
