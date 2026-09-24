@@ -4,12 +4,14 @@ import {
   baseStatsForClass,
   clearDaggerheartSourceEffects,
   deriveDaggerheartStats,
+  prepareDaggerheartDomainCardsForRuntime,
   type DaggerheartEffect,
   type DaggerheartEffectCharacter,
 } from "../lib/daggerheart/effects";
 import {
   actionAvailable,
   collectDaggerheartActions,
+  normalizeDaggerheartSpecialResources,
   resetDaggerheartActionUses,
   resolveDaggerheartAction,
   type DaggerheartActionCharacter,
@@ -715,6 +717,56 @@ test("domain-count action conditions follow the current Loadout", () => {
     })),
   });
   assert.equal(actionAvailable(four, source).ok, true);
+});
+
+test("invalid Domain Loadout runtime deduplicates cards and suspends loadout-scoped sources", () => {
+  const cards = [
+    {
+      compendium_id: "fortified",
+      name: "Fortified Armor",
+      domain: "Valor",
+      state: "loadout" as const,
+      effects: [],
+    },
+    {
+      compendium_id: "fortified",
+      name: "Fortified Armor",
+      domain: "Valor",
+      state: "loadout" as const,
+      effects: [],
+    },
+    {
+      compendium_id: "bone",
+      name: "Bone Card",
+      domain: "Bone",
+      state: "loadout" as const,
+      effects: [],
+    },
+  ];
+
+  const prepared = prepareDaggerheartDomainCardsForRuntime(cards, 2);
+  assert.equal(prepared.loadoutCount, 3);
+  assert.equal(prepared.exceedsLoadout, true);
+  assert.deepEqual(prepared.duplicateCompendiumIds, ["fortified"]);
+  assert.equal(prepared.cards.length, 2);
+  assert.ok(prepared.cards.every((card) => card.state === "vault"));
+});
+
+test("Favor and Focus are clamped to the rules maximum while custom resources remain configurable", () => {
+  const normalized = normalizeDaggerheartSpecialResources([
+    { name: "Favor", current: 99, max: 99, notes: "" },
+    { name: "focus", current: -4, max: 2, notes: "" },
+    { name: "Momentum", current: 9, max: 10, notes: "" },
+  ]);
+
+  assert.deepEqual(
+    normalized.map(({ name, current, max }) => ({ name, current, max })),
+    [
+      { name: "Favor", current: 6, max: 6 },
+      { name: "focus", current: 0, max: 6 },
+      { name: "Momentum", current: 9, max: 10 },
+    ]
+  );
 });
 
 test("Brawler unarmed Evasion bonus is disabled by a secondary active weapon", () => {
