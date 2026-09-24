@@ -121,6 +121,37 @@ export type DaggerheartIntrinsicSource = {
   effects?: DaggerheartEffect[];
 };
 
+export function prepareDaggerheartDomainCardsForRuntime<
+  T extends DaggerheartEffectDomainCard
+>(cards: T[], loadoutMax: number) {
+  const seen = new Set<string>();
+  const duplicateCompendiumIds = new Set<string>();
+  const deduplicated = cards.filter((card) => {
+    if (!card.compendium_id) return true;
+    if (seen.has(card.compendium_id)) {
+      duplicateCompendiumIds.add(card.compendium_id);
+      return false;
+    }
+    seen.add(card.compendium_id);
+    return true;
+  });
+  const loadoutCount = cards.filter((card) => card.state === "loadout").length;
+  const exceedsLoadout = loadoutCount > Math.max(0, loadoutMax);
+
+  return {
+    cards: exceedsLoadout
+      ? deduplicated.map((card) =>
+          card.state === "loadout"
+            ? ({ ...card, state: "vault" } as T)
+            : card
+        )
+      : deduplicated,
+    loadoutCount,
+    exceedsLoadout,
+    duplicateCompendiumIds: [...duplicateCompendiumIds],
+  };
+}
+
 type HeritageFeature = { ancestry?: string; name?: string } | null | undefined;
 
 export type DaggerheartEffectCharacter = {
