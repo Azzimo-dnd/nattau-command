@@ -87,7 +87,7 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
   select exists (
     select 1
@@ -121,7 +121,7 @@ grant select on public.daggerheart_compendium_entries to authenticated;
 create or replace function public.set_daggerheart_compendium_updated_at()
 returns trigger
 language plpgsql
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 begin
   new.updated_at = now();
@@ -135,6 +135,9 @@ drop trigger if exists daggerheart_compendium_set_updated_at
 create trigger daggerheart_compendium_set_updated_at
 before update on public.daggerheart_compendium_entries
 for each row execute function public.set_daggerheart_compendium_updated_at();
+
+revoke all on function public.set_daggerheart_compendium_updated_at()
+  from public, anon, authenticated;
 
 create or replace function public.search_daggerheart_compendium(
   p_query text default null,
