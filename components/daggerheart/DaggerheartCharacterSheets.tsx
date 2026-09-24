@@ -2101,6 +2101,58 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
           })}
           {roster.length === 0 && <p className="p-3 text-sm text-[#8d7a80]">No active players in Barovia yet.</p>}
         </div>
+
+        {isDm && (
+          <div className="mt-5 border-t border-[#342129] pt-4">
+            <div className="flex items-center justify-between gap-2 px-2 pb-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#875765]">
+                Unassigned sheets
+              </p>
+              <span className="text-[10px] text-[#6f5c63]">
+                {unassignedCharacters.length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {unassignedCharacters.map((character) => {
+                const active =
+                  selectedPlayerId === null && draft.id === character.id;
+                const option = classOption(character.class_key);
+                return (
+                  <button
+                    key={character.id}
+                    type="button"
+                    onClick={() => chooseUnassigned(character.id)}
+                    className={`w-full rounded-xl border p-3 text-left transition ${
+                      active
+                        ? "border-[#8b465a] bg-[#421824]/65"
+                        : "border-[#352129] bg-black/15 hover:border-[#5d3442]"
+                    }`}
+                  >
+                    <div className="font-semibold text-[#ead7dc]">
+                      {character.name || "Unnamed Wanderer"}
+                    </div>
+                    <div className="mt-1 text-xs text-[#9b858c]">
+                      Lv. {character.level}
+                      {option ? ` · ${option.label}` : ""} · not assigned
+                    </div>
+                  </button>
+                );
+              })}
+              {unassignedCharacters.length === 0 && (
+                <p className="px-2 py-1 text-xs leading-5 text-[#78666c]">
+                  No unassigned sheets yet.
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={startUnassignedCharacter}
+                className="w-full rounded-xl border border-dashed border-[#6f4050] bg-[#1a0f14] px-3 py-3 text-left text-sm font-bold text-[#d6b7c0] transition hover:border-[#a0556b] hover:bg-[#26131a]"
+              >
+                + New unassigned sheet
+              </button>
+            </div>
+          </div>
+        )}
       </aside>
 
       <div className="min-w-0 space-y-4">
@@ -2110,13 +2162,21 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
           </p>
         )}
         {!draft.id && canEdit && !advancedCreation && (
-          <DaggerheartCharacterCreationWizard
-            draft={draft}
-            patch={patch}
-            onFinish={save}
-            onAdvanced={() => setAdvancedCreation(true)}
-            saving={saving}
-          />
+          <>
+            {isDm && draft.player_id === null && (
+              <div className="rounded-xl border border-[#6b4250] bg-[#211118] px-4 py-3 text-sm text-[#d2b7c0]">
+                <strong className="text-[#f0d6de]">Unassigned GM sheet.</strong>{" "}
+                Create it now and assign it to a player later from the sheet header.
+              </div>
+            )}
+            <DaggerheartCharacterCreationWizard
+              draft={draft}
+              patch={patch}
+              onFinish={save}
+              onAdvanced={() => setAdvancedCreation(true)}
+              saving={saving}
+            />
+          </>
         )}
 
         {(draft.id || !canEdit || advancedCreation) && (
@@ -2131,6 +2191,43 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               <p className="mt-2 text-sm text-[#a58f96]">
                 {selectedClass ? `${selectedClass.label} · ${selectedClass.domains.join(" + ")}` : "Choose a class to begin."}
               </p>
+              {isDm && (
+                <label className="mt-4 block max-w-sm">
+                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f707a]">
+                    Assigned to
+                  </span>
+                  <select
+                    className={inputClass}
+                    value={draft.player_id ?? ""}
+                    disabled={saving}
+                    onChange={(event) =>
+                      void assignCharacter(event.target.value || null)
+                    }
+                  >
+                    <option value="">Unassigned · GM workspace</option>
+                    {roster.map((player) => {
+                      const occupied =
+                        player.character_id !== null &&
+                        player.character_id !== draft.id;
+                      return (
+                        <option
+                          key={player.player_id}
+                          value={player.player_id}
+                          disabled={occupied}
+                        >
+                          {player.display_name}
+                          {occupied ? " · already has a sheet" : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {draft.id && dirty && (
+                    <span className="mt-1 block text-[10px] text-amber-200/75">
+                      Save local edits before changing assignment.
+                    </span>
+                  )}
+                </label>
+              )}
             </div>
             {canEdit && (
               <div className="flex flex-wrap gap-2">
@@ -2143,7 +2240,17 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     Guided creation
                   </button>
                 )}
-                <button type="button" onClick={save} disabled={saving || roster.length === 0} className="min-h-11 rounded-xl border border-[#9b4b61] bg-[#6b2438] px-5 font-bold text-[#f6e4e9] transition hover:bg-[#7a2a40] disabled:opacity-50">
+                {isDm && draft.id && (
+                  <button
+                    type="button"
+                    onClick={() => void deleteCharacter()}
+                    disabled={saving}
+                    className="min-h-11 rounded-xl border border-red-900/70 bg-red-950/25 px-4 text-sm font-bold text-red-200 transition hover:border-red-700 hover:bg-red-950/45 disabled:opacity-50"
+                  >
+                    Delete sheet
+                  </button>
+                )}
+                <button type="button" onClick={save} disabled={saving} className="min-h-11 rounded-xl border border-[#9b4b61] bg-[#6b2438] px-5 font-bold text-[#f6e4e9] transition hover:bg-[#7a2a40] disabled:opacity-50">
                   {saving ? "Saving…" : draft.id ? "Save changes" : "Create character"}
                 </button>
               </div>
