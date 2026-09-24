@@ -334,9 +334,6 @@ export function DaggerheartCharacterCreationWizard({
       if (draft.class_key === "sorcerer" && draft.subclass_key === "elemental-origin" && !draft.subclass_state.element) {
         return "Elemental Origin must choose an element.";
       }
-      if (draft.class_key === "brawler" && !draft.class_state.brawler_strike_trait) {
-        return "Choose the trait used by Brawler’s Strike.";
-      }
       if (draft.class_key === "brawler" && draft.subclass_key === "martial-artist") {
         const stances = (draft.class_state.options ?? []).filter(
           (option) => option.category === "martial_stance"
@@ -689,13 +686,15 @@ export function DaggerheartCharacterCreationWizard({
             {draft.class_key === "brawler" && (
               <div className="space-y-4">
                 <label className="block">
-                  <span className="mb-1.5 block text-xs text-[#a48d95]">Brawler’s Strike trait</span>
+                  <span className="mb-1.5 block text-xs text-[#a48d95]">
+                    Preferred Brawler’s Strike trait · optional
+                  </span>
                   <select
                     className={fieldClass}
                     value={String(draft.class_state.brawler_strike_trait ?? "")}
                     onChange={(e) => patch({ class_state: { ...draft.class_state, brawler_strike_trait: e.target.value } })}
                   >
-                    <option value="">Choose trait</option>
+                    <option value="">Choose during each attack</option>
                     {daggerheartTraits.map((item) => <option key={item} value={item}>{item}</option>)}
                   </select>
                 </label>
