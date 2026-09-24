@@ -39,6 +39,15 @@ test("Daggerheart character SQL keeps browser roles on least privilege", () => {
   );
   assert.match(
     tail,
+    /create policy "Active Daggerheart campaign members can view characters"[\s\S]*?player_id = \(select auth\.uid\(\)\)[\s\S]*?public\.is_campaign_dm\(campaign_id\)/i
+  );
+  assert.match(
+    tail,
+    /create or replace function public\.list_daggerheart_character_roster\(p_campaign_id uuid\)[\s\S]*?public\.is_campaign_dm\(p_campaign_id\)[\s\S]*?cm\.user_id = \(select auth\.uid\(\)\)/i
+  );
+
+  assert.match(
+    tail,
     /new\.player_id is distinct from old\.player_id[\s\S]*?not public\.is_campaign_dm\(old\.campaign_id\)/i
   );
   assert.match(
