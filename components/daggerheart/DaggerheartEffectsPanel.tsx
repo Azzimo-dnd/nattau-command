@@ -278,18 +278,29 @@ export function DaggerheartEffectsPanel({
                   {actionControlled ? (
                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#2d1d23] pt-3">
                       <span className="rounded-lg border border-sky-900/40 bg-sky-950/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-200/85">
-                        Activate from Actions
+                        {active ? "Activated from Actions" : "Activate from Actions"}
                       </span>
-                      {allowManualCorrections && (
+                      {active ? (
                         <button
                           type="button"
-                          disabled={limitReached}
                           onClick={() => onToggleEffects(keys)}
-                          className="min-h-8 rounded-lg border border-[#54343f] bg-black/20 px-2.5 text-[10px] font-bold uppercase tracking-[0.11em] text-[#9b858c] transition hover:border-[#76505c] hover:text-[#ceb5bd] disabled:opacity-40"
-                          title="GM correction only: use after the cost/effect was resolved outside the app."
+                          className="min-h-8 rounded-lg border border-[#6b3f4d] bg-[#241219] px-2.5 text-[10px] font-bold uppercase tracking-[0.11em] text-[#c9adb6] transition hover:border-[#8a5264] hover:bg-[#321721]"
+                          title="End this already-paid effect when its triggering attack resolves or another listed end condition occurs."
                         >
-                          GM correction
+                          End active effect
                         </button>
+                      ) : (
+                        allowManualCorrections && (
+                          <button
+                            type="button"
+                            disabled={limitReached}
+                            onClick={() => onToggleEffects(keys)}
+                            className="min-h-8 rounded-lg border border-[#54343f] bg-black/20 px-2.5 text-[10px] font-bold uppercase tracking-[0.11em] text-[#9b858c] transition hover:border-[#76505c] hover:text-[#ceb5bd] disabled:opacity-40"
+                            title="GM correction only: use after the cost/effect was resolved outside the app."
+                          >
+                            GM correction
+                          </button>
+                        )
                       )}
                     </div>
                   ) : (
