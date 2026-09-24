@@ -19,6 +19,7 @@ import {
 } from "@/lib/daggerheart/actions";
 import {
   baseStatsForClass,
+  clearDaggerheartSourceEffects,
   deriveDaggerheartStats,
   spellcastTraitKey,
   effectiveSnapshot,
@@ -1569,7 +1570,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         typeof draft.class_state.active_beastform_id === "string"
           ? draft.class_state.active_beastform_id
           : null;
+      const cleanedEffectState = [current, option.id]
+        .filter((id): id is string => Boolean(id))
+        .reduce(
+          (state, id) =>
+            clearDaggerheartSourceEffects(state, `class-option:${id}`),
+          draft.effect_state
+        );
       void persistRuntimePatch({
+        effect_state: cleanedEffectState,
         class_state: {
           ...draft.class_state,
           active_beastform_id: current === option.id ? null : option.id,
@@ -1589,6 +1598,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         : null;
     if (current === option.id) {
       void persistRuntimePatch({
+        effect_state: clearDaggerheartSourceEffects(
+          draft.effect_state,
+          `class-option:${current}`
+        ),
         class_state: { ...draft.class_state, active_stance_id: null },
       });
       setActionMessage(`${option.name} stance dropped.`);
@@ -1608,8 +1621,16 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         ? { ...resource, current: Math.max(0, resource.current - 1) }
         : resource
     );
+    const cleanedEffectState = [current, option.id]
+      .filter((id): id is string => Boolean(id))
+      .reduce(
+        (state, id) =>
+          clearDaggerheartSourceEffects(state, `class-option:${id}`),
+        draft.effect_state
+      );
     void persistRuntimePatch({
       special_resources: resources,
+      effect_state: cleanedEffectState,
       class_state: { ...draft.class_state, active_stance_id: option.id },
     });
     setActionMessage(`Spent 1 Focus. ${option.name} is now your active stance.`);
@@ -1728,12 +1749,23 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   function resetResourceActions(
     reset: Parameters<typeof resetDaggerheartActionUses>[1]
   ) {
+    const resetEffectState = resetDaggerheartActionUses(
+      draft.effect_state,
+      reset,
+      actionSources
+    );
+    const activeStanceId =
+      typeof draft.class_state.active_stance_id === "string"
+        ? draft.class_state.active_stance_id
+        : null;
     void persistRuntimePatch({
-      effect_state: resetDaggerheartActionUses(
-        draft.effect_state,
-        reset,
-        actionSources
-      ),
+      effect_state:
+        reset === "session" || !activeStanceId
+          ? resetEffectState
+          : clearDaggerheartSourceEffects(
+              resetEffectState,
+              `class-option:${activeStanceId}`
+            ),
       class_state:
         reset === "session"
           ? draft.class_state
@@ -1913,9 +1945,24 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                   value={draft.subclass_key ?? ""}
                   onChange={(e) => {
                     const subclassKey = e.target.value || null;
+                    const stanceIds = (draft.class_state.options ?? [])
+                      .filter((option) => option.category === "martial_stance")
+                      .map((option) => option.id);
+                    const nextEffectState =
+                      draft.class_key === "brawler"
+                        ? stanceIds.reduce(
+                            (state, id) =>
+                              clearDaggerheartSourceEffects(
+                                state,
+                                `class-option:${id}`
+                              ),
+                            draft.effect_state
+                          )
+                        : draft.effect_state;
                     patch({
                       subclass_key: subclassKey,
                       subclass_state: {},
+                      effect_state: nextEffectState,
                       special_resources: managedSpecialResources(
                         draft.special_resources,
                         draft.class_key,
@@ -2117,20 +2164,36 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                   min={0}
                   max={effectResult.stats.hp_max}
                   value={draft.hp_current}
-                  onChange={(hp_current) =>
+                  onChange={(hp_current) => {
+                    const knockedOut =
+                      hp_current >= effectResult.stats.hp_max &&
+                      effectResult.stats.hp_max > 0;
+                    const activeOptionIds = knockedOut
+                      ? [
+                          draft.class_state.active_beastform_id,
+                          draft.class_state.active_stance_id,
+                        ].filter((id): id is string => typeof id === "string")
+                      : [];
+                    const nextEffectState = activeOptionIds.reduce(
+                      (state, id) =>
+                        clearDaggerheartSourceEffects(
+                          state,
+                          `class-option:${id}`
+                        ),
+                      draft.effect_state
+                    );
                     patch({
                       hp_current,
-                      class_state:
-                        hp_current >= effectResult.stats.hp_max &&
-                        effectResult.stats.hp_max > 0
-                          ? {
-                              ...draft.class_state,
-                              active_beastform_id: null,
-                              active_stance_id: null,
-                            }
-                          : draft.class_state,
-                    })
-                  }
+                      effect_state: nextEffectState,
+                      class_state: knockedOut
+                        ? {
+                            ...draft.class_state,
+                            active_beastform_id: null,
+                            active_stance_id: null,
+                          }
+                        : draft.class_state,
+                    });
+                  }}
                 />
                 <NumberField
                   label={`Stress marked · max ${effectResult.stats.stress_max}`}
@@ -2606,6 +2669,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                             className={smallButton}
                             onClick={() =>
                               patch({
+                                effect_state: clearDaggerheartSourceEffects(
+                                  draft.effect_state,
+                                  `class-option:${option.id}`
+                                ),
                                 class_state: {
                                   ...draft.class_state,
                                   options: (draft.class_state.options ?? []).filter(
