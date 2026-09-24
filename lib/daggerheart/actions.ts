@@ -342,7 +342,9 @@ export function actionAvailable(
     return { ok: false, reason: "Not enough unmarked Armor Slots." };
   }
   if (cost?.special_resource) {
-    const resource = character.special_resources.find(
+    const resource = normalizeDaggerheartSpecialResources(
+      character.special_resources
+    ).find(
       (item) =>
         item.name.toLowerCase() === cost.special_resource?.name.toLowerCase()
     );
@@ -389,7 +391,9 @@ export function resolveDaggerheartAction(
   let stress = character.stress_current + (cost.stress ?? 0);
   let hp = character.hp_current;
   let armor = character.armor_slots_current + (cost.armor ?? 0);
-  const specialResources = character.special_resources.map((item) => ({ ...item }));
+  const specialResources = normalizeDaggerheartSpecialResources(
+    character.special_resources
+  ).map((item) => ({ ...item }));
   if (cost.special_resource) {
     const index = specialResources.findIndex(
       (item) =>
