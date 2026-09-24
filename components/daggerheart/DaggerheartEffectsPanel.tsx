@@ -51,6 +51,7 @@ export function DaggerheartEffectsPanel({
   onManualModifierChange,
   onToggleEffects,
   actionControlledEffectKeys,
+  actionDeactivatedEffectKeys,
   allowManualCorrections,
 }: {
   result: DaggerheartEffectResult;
@@ -59,6 +60,7 @@ export function DaggerheartEffectsPanel({
   onManualModifierChange: (stat: DaggerheartEffectStat, value: number) => void;
   onToggleEffects: (effectKeys: string[]) => void;
   actionControlledEffectKeys: Set<string>;
+  actionDeactivatedEffectKeys: Set<string>;
   allowManualCorrections: boolean;
 }) {
   const activeIds = new Set(effectState.active_effect_ids ?? []);
@@ -231,6 +233,9 @@ export function DaggerheartEffectsPanel({
               const actionControlled = keys.some((key) =>
                 actionControlledEffectKeys.has(key)
               );
+              const actionDeactivationControlled = keys.some((key) =>
+                actionDeactivatedEffectKeys.has(key)
+              );
 
               return (
                 <div
@@ -280,7 +285,12 @@ export function DaggerheartEffectsPanel({
                       <span className="rounded-lg border border-sky-900/40 bg-sky-950/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-200/85">
                         {active ? "Activated from Actions" : "Activate from Actions"}
                       </span>
-                      {active ? (
+                      {active && actionDeactivationControlled && (
+                        <span className="rounded-lg border border-amber-900/40 bg-amber-950/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-200/85">
+                          End from Actions
+                        </span>
+                      )}
+                      {active && !actionDeactivationControlled && (
                         <button
                           type="button"
                           onClick={() => onToggleEffects(keys)}
@@ -289,18 +299,17 @@ export function DaggerheartEffectsPanel({
                         >
                           End active effect
                         </button>
-                      ) : (
-                        allowManualCorrections && (
-                          <button
-                            type="button"
-                            disabled={limitReached}
-                            onClick={() => onToggleEffects(keys)}
-                            className="min-h-8 rounded-lg border border-[#54343f] bg-black/20 px-2.5 text-[10px] font-bold uppercase tracking-[0.11em] text-[#9b858c] transition hover:border-[#76505c] hover:text-[#ceb5bd] disabled:opacity-40"
-                            title="GM correction only: use after the cost/effect was resolved outside the app."
-                          >
-                            GM correction
-                          </button>
-                        )
+                      )}
+                      {allowManualCorrections && (
+                        <button
+                          type="button"
+                          disabled={limitReached}
+                          onClick={() => onToggleEffects(keys)}
+                          className="min-h-8 rounded-lg border border-[#54343f] bg-black/20 px-2.5 text-[10px] font-bold uppercase tracking-[0.11em] text-[#9b858c] transition hover:border-[#76505c] hover:text-[#ceb5bd] disabled:opacity-40"
+                          title="GM correction only: use after the cost/effect was resolved outside the app."
+                        >
+                          GM correction
+                        </button>
                       )}
                     </div>
                   ) : (
