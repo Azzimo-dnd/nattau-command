@@ -34,6 +34,11 @@ import {
 import { DaggerheartCharacterCreationWizard } from "@/components/daggerheart/DaggerheartCharacterCreationWizard";
 import type { HeritageState } from "@/components/daggerheart/DaggerheartHeritageBuilder";
 import {
+  daggerheartEquipmentConfigurationError,
+  daggerheartIsTwoHanded,
+  daggerheartRelicNames,
+} from "@/lib/daggerheart/equipment";
+import {
   classOption,
   subclassCompendiumSlug,
   daggerheartAncestries,
@@ -485,70 +490,6 @@ function toNumber(value: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-const relicNames = new Set([
-  "Stride Relic",
-  "Bolster Relic",
-  "Control Relic",
-  "Attune Relic",
-  "Charm Relic",
-  "Enlighten Relic",
-]);
-
-function gearBurden(item: Pick<GearItem, "metadata">) {
-  return String(item.metadata?.burden ?? "").toLowerCase();
-}
-
-function isTwoHanded(item: Pick<GearItem, "metadata">) {
-  return gearBurden(item).includes("two");
-}
-
-function isMagicWeapon(item: Pick<GearItem, "metadata">) {
-  return String(item.metadata?.weapon_kind ?? "").toLowerCase() === "magic";
-}
-
-function equipmentConfigurationError(character: CharacterRow) {
-  const equippedPrimaries = character.weapons.filter(
-    (item) => item.category === "weapon_primary" && item.equipped !== false
-  );
-  const equippedSecondaries = character.weapons.filter(
-    (item) => item.category === "weapon_secondary" && item.equipped !== false
-  );
-  const equippedArmor = character.armor.filter(
-    (item) => item.category === "armor" && item.equipped !== false
-  );
-  if (equippedPrimaries.length > 1) {
-    return "Only one primary weapon can be equipped at a time.";
-  }
-  if (equippedSecondaries.length > 1) {
-    return "Only one secondary weapon can be equipped at a time.";
-  }
-  if (equippedArmor.length > 1) {
-    return "Only one armor set can be equipped at a time.";
-  }
-  const equippedPrimary = equippedPrimaries[0];
-  const equippedSecondary = equippedSecondaries[0];
-  if (equippedPrimary && isTwoHanded(equippedPrimary) && equippedSecondary) {
-    return "A two-handed primary weapon cannot be used with an equipped secondary weapon.";
-  }
-  const equippedRelics = character.inventory.filter(
-    (item) => relicNames.has(item.name) && item.equipped === true
-  );
-  if (equippedRelics.length > 1) {
-    return "Only one Relic can be equipped at a time.";
-  }
-  const spellcast = spellcastTraitKey(character);
-  const illegalMagic = character.weapons.find(
-    (item) =>
-      item.equipped !== false &&
-      isMagicWeapon(item) &&
-      !spellcast
-  );
-  if (illegalMagic) {
-    return `${illegalMagic.name} is a magic weapon and requires a Spellcast trait.`;
-  }
-  return null;
-}
-
 function gearFromCompendium(
   entry: DaggerheartCompendiumEntry,
   equipped: boolean
@@ -580,14 +521,14 @@ function addEquippedGear(
 ) {
   const added = gearFromCompendium(entry, true);
   const addedTwoHanded =
-    entry.category === "weapon_primary" && isTwoHanded(added);
+    entry.category === "weapon_primary" && daggerheartIsTwoHanded(added);
   const blockedSecondary =
     entry.category === "weapon_secondary" &&
     current.some(
       (item) =>
         item.category === "weapon_primary" &&
         item.equipped !== false &&
-        isTwoHanded(item)
+        daggerheartIsTwoHanded(item)
     );
 
   const next = current.map((item) => {
@@ -811,8 +752,8 @@ function GearEditor({
       }
       if (
         nextEquipped &&
-        relicNames.has(current.name) &&
-        relicNames.has(item.name)
+        daggerheartRelicNames.has(current.name) &&
+        daggerheartRelicNames.has(item.name)
       ) {
         return { ...item, equipped: false };
       }
@@ -1177,7 +1118,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   );
 
   const equipmentError = useMemo(
-    () => equipmentConfigurationError(draft),
+    () => daggerheartEquipmentConfigurationError({
+      weapons: draft.weapons,
+      armor: draft.armor,
+      inventory: draft.inventory,
+      hasSpellcastTrait: spellcastTraitKey(draft) !== null,
+    }),
     [draft]
   );
 
@@ -1366,7 +1312,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     patchValue: Partial<CharacterRow>
   ) {
     const preview = { ...draftRef.current, ...patchValue };
-    const previewEquipmentError = equipmentConfigurationError(preview);
+    const previewEquipmentError = daggerheartEquipmentConfigurationError({
+      weapons: preview.weapons,
+      armor: preview.armor,
+      inventory: preview.inventory,
+      hasSpellcastTrait: spellcastTraitKey(preview) !== null,
+    });
     if (previewEquipmentError) {
       setActionMessage(previewEquipmentError);
       return;
@@ -1445,7 +1396,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       setMessage("Give the character a name before saving.");
       return;
     }
-    const currentEquipmentError = equipmentConfigurationError(currentDraft);
+    const currentEquipmentError = daggerheartEquipmentConfigurationError({
+      weapons: currentDraft.weapons,
+      armor: currentDraft.armor,
+      inventory: currentDraft.inventory,
+      hasSpellcastTrait: spellcastTraitKey(currentDraft) !== null,
+    });
     if (currentEquipmentError) {
       setMessage(currentEquipmentError);
       return;
