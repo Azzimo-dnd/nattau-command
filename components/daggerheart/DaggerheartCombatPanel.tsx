@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { DaggerheartDerivedStats } from "@/lib/daggerheart/effects";
+import { daggerheartTraits } from "@/lib/daggerheart/catalog";
 import { effectiveDamage } from "@/lib/daggerheart/combat";
 
 type Weapon = {
@@ -63,6 +65,25 @@ export function DaggerheartCombatPanel({
     source: string;
   }) => void;
 }) {
+  const [brawlerTrait, setBrawlerTrait] = useState<string>("");
+
+  const configuredBrawlerTrait =
+    weapons.find((weapon) => weapon.category === "brawler_strike")
+      ?.metadata?.trait;
+  const configuredBrawlerTraitText =
+    typeof configuredBrawlerTrait === "string" ? configuredBrawlerTrait : "";
+
+  useEffect(() => {
+    if (
+      configuredBrawlerTraitText &&
+      daggerheartTraits.includes(
+        configuredBrawlerTraitText.toLowerCase() as (typeof daggerheartTraits)[number]
+      )
+    ) {
+      setBrawlerTrait(configuredBrawlerTraitText.toLowerCase());
+    }
+  }, [configuredBrawlerTraitText]);
+
   const equipped = weapons.filter((weapon) => {
     if (
       weapon.equipped === false ||
@@ -89,7 +110,11 @@ export function DaggerheartCombatPanel({
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {equipped.map((weapon) => {
-        const trait = text(weapon.metadata?.trait);
+        const configuredTrait = text(weapon.metadata?.trait);
+        const trait =
+          weapon.category === "brawler_strike"
+            ? brawlerTrait || configuredTrait
+            : configuredTrait;
         const range = text(weapon.metadata?.range);
         const damage = text(weapon.metadata?.damage);
         const burden = text(weapon.metadata?.burden);
@@ -134,27 +159,66 @@ export function DaggerheartCombatPanel({
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <button
-                type="button"
-                disabled={!trait || !onRollAttack}
-                onClick={() =>
-                  onRollAttack?.({
-                    title: `${weapon.name} · Attack`,
-                    trait,
-                    modifier,
-                    source: weapon.name,
-                  })
-                }
-                className="rounded-lg border border-[#35242b] bg-black/20 p-2.5 text-left transition enabled:hover:border-[#925067] enabled:hover:bg-[#311621] disabled:cursor-default"
-                title={trait && onRollAttack ? `Roll ${trait} attack` : undefined}
-              >
-                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#78666c]">
-                  Attack trait
-                </p>
-                <p className="mt-1 text-sm font-black text-[#d4c0c6]">
-                  {trait || "—"} {trait ? signed(modifier) : ""} {trait && onRollAttack ? "🎲" : ""}
-                </p>
-              </button>
+              {weapon.category === "brawler_strike" ? (
+                <div className="rounded-lg border border-[#35242b] bg-black/20 p-2.5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#78666c]">
+                    Attack trait · choose for this strike
+                  </p>
+                  <div className="mt-1.5 flex gap-2">
+                    <select
+                      value={trait}
+                      onChange={(event) => setBrawlerTrait(event.target.value)}
+                      className="min-h-9 min-w-0 flex-1 rounded-lg border border-[#50313c] bg-[#120b0f] px-2 text-xs font-black capitalize text-[#d4c0c6] outline-none focus:border-[#925067]"
+                      aria-label="Brawler's Strike attack trait"
+                    >
+                      <option value="">Choose trait</option>
+                      {daggerheartTraits.map((entry) => (
+                        <option key={entry} value={entry}>
+                          {entry[0].toUpperCase() + entry.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={!trait || !onRollAttack}
+                      onClick={() =>
+                        onRollAttack?.({
+                          title: `${weapon.name} · Attack`,
+                          trait,
+                          modifier,
+                          source: weapon.name,
+                        })
+                      }
+                      className="min-h-9 shrink-0 rounded-lg border border-[#925067] bg-[#481827] px-3 text-xs font-black text-[#eed8de] transition hover:bg-[#5a2031] disabled:cursor-not-allowed disabled:border-[#3b2a30] disabled:bg-[#171015] disabled:text-[#6f5f64]"
+                      title={trait ? `Roll ${trait} attack` : "Choose a trait first"}
+                    >
+                      🎲 {trait ? signed(modifier) : "Roll"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!trait || !onRollAttack}
+                  onClick={() =>
+                    onRollAttack?.({
+                      title: `${weapon.name} · Attack`,
+                      trait,
+                      modifier,
+                      source: weapon.name,
+                    })
+                  }
+                  className="rounded-lg border border-[#35242b] bg-black/20 p-2.5 text-left transition enabled:hover:border-[#925067] enabled:hover:bg-[#311621] disabled:cursor-default"
+                  title={trait && onRollAttack ? `Roll ${trait} attack` : undefined}
+                >
+                  <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#78666c]">
+                    Attack trait
+                  </p>
+                  <p className="mt-1 text-sm font-black capitalize text-[#d4c0c6]">
+                    {trait || "—"} {trait ? signed(modifier) : ""} {trait && onRollAttack ? "🎲" : ""}
+                  </p>
+                </button>
+              )}
               <div className="rounded-lg border border-[#35242b] bg-black/20 p-2.5">
                 <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#78666c]">
                   Range
