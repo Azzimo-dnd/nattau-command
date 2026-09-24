@@ -126,8 +126,8 @@ export function DaggerheartSheetDiceOverlay({
   const [latest, setLatest] = useState<LatestResult | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const pendingRef = useRef<PendingRoll | null>(null);
-  const clearDiceTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-  const clearResultTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const clearDiceTimerRef = useRef<number | null>(null);
+  const clearResultTimerRef = useRef<number | null>(null);
 
   const configuration = useCampaignDiceConfiguration({ campaignId, currentUserId });
   const diceLog = useCampaignDiceLog({ campaignId, currentUserId });
