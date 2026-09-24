@@ -121,7 +121,7 @@ returns table (
   player_id uuid, display_name text, member_role text, character_id uuid,
   character_name text, character_level integer, character_class text
 )
-language plpgsql security definer set search_path = '' as $
+language plpgsql security definer set search_path = '' as $$
 begin
   if not public.is_campaign_member(p_campaign_id) then
     raise exception 'Campaign membership required';
@@ -295,7 +295,7 @@ returns table (
   player_id uuid, display_name text, member_role text, character_id uuid,
   character_name text, character_level integer, character_class text
 )
-language plpgsql security definer set search_path = '' as $
+language plpgsql security definer set search_path = '' as $$
 begin
   if not (select private.is_active_daggerheart_campaign_member(p_campaign_id)) then
     raise exception 'Active Daggerheart campaign membership required';
