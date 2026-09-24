@@ -300,7 +300,7 @@ export function DaggerheartCharacterCreationWizard({
   function selectSubclass(key: string) {
     let resources = classManagedResources(draft.special_resources);
     if (draft.class_key === "warlock") {
-      resources = [...resources, { name: "Favor", current: 3, max: 0, notes: "Patron Die d6 (d8 at level 5)" }];
+      resources = [...resources, { name: "Favor", current: 3, max: 6, notes: "Patron Die d6 (d8 at level 5)" }];
     }
     if (draft.class_key === "brawler" && key === "martial-artist") {
       resources = [...resources, { name: "Focus", current: 0, max: 6, notes: "Spend Focus to shift stances." }];
@@ -377,6 +377,9 @@ export function DaggerheartCharacterCreationWizard({
         const primaryBurden = burden(primary);
         if (primaryBurden.includes("two") && secondary) {
           return "A two-handed primary weapon can’t be paired with a secondary weapon.";
+        }
+        if (primaryBurden.includes("one") && !secondary) {
+          return "At character creation, a one-handed primary weapon is paired with a one-handed secondary weapon.";
         }
       }
       if (draft.armor.length > 1) return "Choose at most one starting armor.";
@@ -481,12 +484,31 @@ export function DaggerheartCharacterCreationWizard({
   }
 
   function replaceWeapon(category: "weapon_primary" | "weapon_secondary", entry: DaggerheartCompendiumEntry) {
-    patch({
-      weapons: [
-        ...draft.weapons.filter((item) => item.category !== category),
-        gearFromEntry(entry),
-      ],
-    });
+    const next = draft.weapons.filter((item) => item.category !== category);
+    const added = gearFromEntry(entry);
+
+    if (category === "weapon_primary" && burden(added).includes("two")) {
+      patch({
+        weapons: [
+          ...next.filter((item) => item.category !== "weapon_secondary"),
+          added,
+        ],
+      });
+      return;
+    }
+
+    if (
+      category === "weapon_secondary" &&
+      draft.weapons.some(
+        (item) =>
+          item.category === "weapon_primary" &&
+          burden(item).includes("two")
+      )
+    ) {
+      return;
+    }
+
+    patch({ weapons: [...next, added] });
   }
 
   function finish() {
@@ -887,7 +909,7 @@ export function DaggerheartCharacterCreationWizard({
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9c6172]">Step 5</p>
               <h3 className="mt-2 font-serif text-2xl font-black text-[#ead7dc]">Choose starting equipment</h3>
-              <p className="mt-2 text-sm text-[#97848b]">Tier 1 only. A two-handed primary excludes a secondary; a one-handed secondary is optional. You may leave armor empty if your final build takes Bare Bones.</p>
+              <p className="mt-2 text-sm text-[#97848b]">Tier 1 only. Choose either a two-handed primary, or a one-handed primary plus a one-handed secondary. You may leave armor empty if your final build takes Bare Bones.</p>
             </div>
 
             <div>
