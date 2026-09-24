@@ -718,3 +718,34 @@ test("damage parser scales mixed types, NBSP and multi-die Brawler profiles", ()
   assert.equal(effectiveDamage("d12+10\u00a0phy", 4), "4d12+10 physical");
   assert.equal(effectiveDamage("d8+d6 phy", 2), "2d8+2d6 physical");
 });
+
+
+test("stress-full conditions use the already adjusted Stress maximum exactly once", () => {
+  const result = deriveDaggerheartStats(
+    effectCharacter({
+      stress_current: 7,
+      manual_stat_modifiers: { stress_max: 1 },
+      intrinsic_sources: [
+        {
+          id: "stress-check",
+          name: "Stress Check",
+          effects: [
+            {
+              id: "full-stress-evasion",
+              label: "Full Stress",
+              stat: "evasion",
+              operation: "add",
+              value: 2,
+              scope: "owned",
+              mode: "passive",
+              condition: { type: "stress_full" },
+            },
+          ],
+        },
+      ],
+    })
+  );
+
+  assert.equal(result.stats.stress_max, 7);
+  assert.equal(result.stats.evasion, 12);
+});
