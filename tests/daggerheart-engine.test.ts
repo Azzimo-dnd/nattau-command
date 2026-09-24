@@ -20,6 +20,7 @@ import {
 } from "../lib/daggerheart/actions";
 import { subclassCompendiumSlug, daggerheartClasses } from "../lib/daggerheart/catalog";
 import { effectiveDamage } from "../lib/daggerheart/combat";
+import { daggerheartEquipmentConfigurationError } from "../lib/daggerheart/equipment";
 import { compendiumDefinitionRevision } from "../lib/daggerheart/compendium";
 
 function effectCharacter(
@@ -719,6 +720,99 @@ test("domain-count action conditions follow the current Loadout", () => {
     })),
   });
   assert.equal(actionAvailable(four, source).ok, true);
+});
+
+test("equipment rules reject impossible active combinations independent of the UI", () => {
+  const oneHanded = {
+    name: "Broadsword",
+    category: "weapon_primary",
+    equipped: true,
+    metadata: { burden: "One-Handed", weapon_kind: "physical" },
+  };
+  const secondPrimary = {
+    ...oneHanded,
+    name: "Mace",
+  };
+  assert.match(
+    daggerheartEquipmentConfigurationError({
+      weapons: [oneHanded, secondPrimary],
+      armor: [],
+      inventory: [],
+      hasSpellcastTrait: false,
+    }) ?? "",
+    /one primary weapon/i
+  );
+
+  assert.match(
+    daggerheartEquipmentConfigurationError({
+      weapons: [
+        {
+          name: "Greatsword",
+          category: "weapon_primary",
+          equipped: true,
+          metadata: { burden: "Two-Handed", weapon_kind: "physical" },
+        },
+        {
+          name: "Round Shield",
+          category: "weapon_secondary",
+          equipped: true,
+          metadata: { burden: "One-Handed", weapon_kind: "physical" },
+        },
+      ],
+      armor: [],
+      inventory: [],
+      hasSpellcastTrait: false,
+    }) ?? "",
+    /two-handed primary/i
+  );
+
+  assert.match(
+    daggerheartEquipmentConfigurationError({
+      weapons: [],
+      armor: [],
+      inventory: [
+        { name: "Stride Relic", equipped: true },
+        { name: "Bolster Relic", equipped: true },
+      ],
+      hasSpellcastTrait: false,
+    }) ?? "",
+    /one Relic/i
+  );
+
+  assert.match(
+    daggerheartEquipmentConfigurationError({
+      weapons: [
+        {
+          name: "Wand",
+          category: "weapon_primary",
+          equipped: true,
+          metadata: { burden: "One-Handed", weapon_kind: "magic" },
+        },
+      ],
+      armor: [],
+      inventory: [],
+      hasSpellcastTrait: false,
+    }) ?? "",
+    /requires a Spellcast trait/i
+  );
+
+  assert.equal(
+    daggerheartEquipmentConfigurationError({
+      weapons: [
+        oneHanded,
+        {
+          name: "Round Shield",
+          category: "weapon_secondary",
+          equipped: true,
+          metadata: { burden: "One-Handed", weapon_kind: "physical" },
+        },
+      ],
+      armor: [{ name: "Leather Armor", category: "armor", equipped: true }],
+      inventory: [{ name: "Stride Relic", equipped: true }],
+      hasSpellcastTrait: false,
+    }),
+    null
+  );
 });
 
 test("compendium snapshots prefer explicit errata revision and otherwise keep updated-at traceability", () => {
