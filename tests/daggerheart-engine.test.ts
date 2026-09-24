@@ -19,6 +19,7 @@ import {
 } from "../lib/daggerheart/actions";
 import { subclassCompendiumSlug, daggerheartClasses } from "../lib/daggerheart/catalog";
 import { effectiveDamage } from "../lib/daggerheart/combat";
+import { compendiumDefinitionRevision } from "../lib/daggerheart/compendium";
 
 function effectCharacter(
   overrides: Partial<DaggerheartEffectCharacter> = {}
@@ -717,6 +718,42 @@ test("domain-count action conditions follow the current Loadout", () => {
     })),
   });
   assert.equal(actionAvailable(four, source).ok, true);
+});
+
+test("compendium snapshots prefer explicit errata revision and otherwise keep updated-at traceability", () => {
+  const base = {
+    id: "entry",
+    source_key: "core" as const,
+    category: "domain_card" as const,
+    slug: "sample",
+    name: "Sample",
+    parent_slug: null,
+    domain: "Blade",
+    level: 1,
+    tier: null,
+    summary: "",
+    rules_text: "",
+    metadata: {},
+    effects: [],
+    actions: [],
+    errata: {},
+    source_page_start: null,
+    source_page_end: null,
+    sort_order: 0,
+    updated_at: "2026-09-24T10:00:00Z",
+  };
+
+  assert.equal(
+    compendiumDefinitionRevision(base),
+    "2026-09-24T10:00:00Z"
+  );
+  assert.equal(
+    compendiumDefinitionRevision({
+      ...base,
+      errata: { revision: "Core Errata 2026-09" },
+    }),
+    "Core Errata 2026-09"
+  );
 });
 
 test("invalid Domain Loadout runtime deduplicates cards and suspends loadout-scoped sources", () => {
