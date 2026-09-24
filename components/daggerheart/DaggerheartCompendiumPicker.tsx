@@ -147,9 +147,9 @@ export function DaggerheartCompendiumPicker({
                 )}
               </div>
 
-              {selected.rules_text && (
-                <p className="mt-2 line-clamp-4 whitespace-pre-line text-xs leading-5 text-[#a9959c]">
-                  {selected.rules_text}
+              {compendiumEntryDetails(selected) && (
+                <p className="mt-2 line-clamp-6 whitespace-pre-line text-xs leading-5 text-[#a9959c]">
+                  {compendiumEntryDetails(selected)}
                 </p>
               )}
 
