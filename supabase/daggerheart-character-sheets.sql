@@ -346,7 +346,13 @@ begin
   join public.profiles p on p.id = cm.user_id
   left join public.daggerheart_characters dc
     on dc.campaign_id = cm.campaign_id and dc.player_id = cm.user_id and dc.is_active = true
-  where cm.campaign_id = p_campaign_id and cm.is_active = true and cm.role = 'player'
+  where cm.campaign_id = p_campaign_id
+    and cm.is_active = true
+    and cm.role = 'player'
+    and (
+      public.is_campaign_dm(p_campaign_id)
+      or cm.user_id = (select auth.uid())
+    )
   order by lower(coalesce(p.display_name, ''));
 end;
 $$;
