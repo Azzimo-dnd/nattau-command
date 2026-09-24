@@ -1528,7 +1528,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       return saved;
     });
     setCharacters((current) => [
-      ...current.filter((row) => row.player_id !== saved.player_id),
+      ...current.filter((row) => row.id !== saved.id),
       saved,
     ]);
     setRoster((current) =>
@@ -1555,8 +1555,200 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     setSaving(false);
   }
 
+  async function assignCharacter(nextPlayerId: string | null) {
+    if (!isDm) return;
+
+    const currentDraft = draftRef.current;
+    if (nextPlayerId === currentDraft.player_id) return;
+
+    if (
+      nextPlayerId &&
+      roster.some(
+        (row) =>
+          row.player_id === nextPlayerId &&
+          row.character_id !== null &&
+          row.character_id !== currentDraft.id
+      )
+    ) {
+      setMessage("That player already has an active character sheet.");
+      return;
+    }
+
+    if (!currentDraft.id) {
+      patch({ player_id: nextPlayerId });
+      setSelectedPlayerId(nextPlayerId);
+      setMessage(
+        nextPlayerId
+          ? "This new sheet will be assigned to the selected player when created."
+          : "This new sheet will remain unassigned."
+      );
+      return;
+    }
+
+    if (dirty) {
+      setMessage("Save or discard local edits before changing the assigned player.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    const expectedRevision =
+      revisionRef.current.get(currentDraft.id) ??
+      currentDraft.state_revision ??
+      0;
+    const result = await supabase
+      .from("daggerheart_characters")
+      .update({ player_id: nextPlayerId })
+      .eq("id", currentDraft.id)
+      .eq("state_revision", expectedRevision)
+      .select("*")
+      .maybeSingle();
+
+    if (result.error) {
+      setMessage(result.error.message);
+      setSaving(false);
+      return;
+    }
+    if (!result.data) {
+      runtimeConflictRef.current.add(currentDraft.id);
+      setMessage(
+        "Assignment conflict: this sheet changed in another tab/session. Reload before assigning it."
+      );
+      setSaving(false);
+      return;
+    }
+
+    const oldPlayerId = currentDraft.player_id;
+    const savedRevision = Number(
+      result.data.state_revision ?? expectedRevision + 1
+    );
+    const updated: CharacterRow = {
+      ...currentDraft,
+      player_id: nextPlayerId,
+      state_revision: savedRevision,
+    };
+
+    revisionRef.current.set(updated.id, savedRevision);
+    runtimeConflictRef.current.delete(updated.id);
+    setCharacters((current) =>
+      current.map((row) => (row.id === updated.id ? updated : row))
+    );
+    setRoster((current) =>
+      current.map((row) => {
+        if (row.player_id === oldPlayerId) {
+          return {
+            ...row,
+            character_id: null,
+            character_name: null,
+            character_level: null,
+            character_class: null,
+          };
+        }
+        if (row.player_id === nextPlayerId) {
+          return {
+            ...row,
+            character_id: updated.id,
+            character_name: updated.name,
+            character_level: updated.level,
+            character_class: updated.class_key,
+          };
+        }
+        return row;
+      })
+    );
+    draftRef.current = updated;
+    setDraft(updated);
+    setSelectedPlayerId(nextPlayerId);
+    setDirty(false);
+    setMessage(
+      nextPlayerId
+        ? "Character sheet assigned to the selected player."
+        : "Character sheet is now unassigned."
+    );
+    setSaving(false);
+  }
+
+  async function deleteCharacter() {
+    const currentDraft = draftRef.current;
+    if (!currentDraft.id) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Delete ${currentDraft.name || "this character sheet"} permanently? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+    const expectedRevision =
+      revisionRef.current.get(currentDraft.id) ??
+      currentDraft.state_revision ??
+      0;
+    const result = await supabase
+      .from("daggerheart_characters")
+      .delete()
+      .eq("id", currentDraft.id)
+      .eq("state_revision", expectedRevision)
+      .select("id")
+      .maybeSingle();
+
+    if (result.error) {
+      setMessage(result.error.message);
+      setSaving(false);
+      return;
+    }
+    if (!result.data) {
+      setMessage(
+        "Delete conflict: this sheet changed in another tab/session. Reload before deleting it."
+      );
+      setSaving(false);
+      return;
+    }
+
+    const deletedId = currentDraft.id;
+    const deletedPlayerId = currentDraft.player_id;
+    revisionRef.current.delete(deletedId);
+    runtimeConflictRef.current.delete(deletedId);
+    setCharacters((current) => current.filter((row) => row.id !== deletedId));
+    if (deletedPlayerId) {
+      setRoster((current) =>
+        current.map((row) =>
+          row.player_id === deletedPlayerId
+            ? {
+                ...row,
+                character_id: null,
+                character_name: null,
+                character_level: null,
+                character_class: null,
+              }
+            : row
+        )
+      );
+    }
+
+    const next = emptyCharacter(campaignId, deletedPlayerId);
+    draftRef.current = next;
+    editGenerationRef.current = 0;
+    setDraft(next);
+    setSelectedPlayerId(deletedPlayerId);
+    setAdvancedCreation(false);
+    setFreeLoadoutEditing(false);
+    setActionMessage(null);
+    setDirty(false);
+    setMessage("Character sheet deleted.");
+    setSaving(false);
+  }
+
+  const unassignedCharacters = useMemo(
+    () => characters.filter((row) => row.player_id === null),
+    [characters]
+  );
   const selectedClass = classOption(draft.class_key);
-  const canEdit = isDm || selectedPlayerId === currentUserId;
+  const canEdit =
+    isDm || (selectedPlayerId !== null && selectedPlayerId === currentUserId);
 
   function setManualModifier(stat: keyof DaggerheartManualStatModifiers, value: number) {
     patch({
