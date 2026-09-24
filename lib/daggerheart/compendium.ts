@@ -45,6 +45,7 @@ export type DaggerheartCompendiumEntry = {
   source_page_start: number | null;
   source_page_end: number | null;
   sort_order: number;
+  updated_at?: string;
 };
 
 export const daggerheartCompendiumCategories: {
@@ -105,4 +106,12 @@ export function compendiumEffectiveMetadata(entry: DaggerheartCompendiumEntry) {
     ...(entry.metadata ?? {}),
     ...(entry.errata?.metadata ?? {}),
   } as Record<string, unknown>;
+}
+
+export function compendiumDefinitionRevision(entry: DaggerheartCompendiumEntry) {
+  return (
+    entry.errata?.revision ??
+    entry.updated_at ??
+    `${entry.source_key}:${entry.slug}`
+  );
 }
