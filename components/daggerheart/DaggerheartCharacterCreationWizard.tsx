@@ -375,8 +375,8 @@ export function DaggerheartCharacterCreationWizard({
         if (
           featureOne.ancestry !== ancestryOne ||
           featureTwo.ancestry !== ancestryTwo ||
-          (featureOne.position !== undefined && featureOne.position !== 1) ||
-          (featureTwo.position !== undefined && featureTwo.position !== 2)
+          featureOne.position !== 1 ||
+          featureTwo.position !== 2
         ) {
           return "Mixed ancestry features no longer match their required lineage positions. Re-select both ancestry features.";
         }
