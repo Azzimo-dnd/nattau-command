@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DaggerheartCompendiumPicker, compendiumEntryDetails } from "@/components/daggerheart/DaggerheartCompendiumPicker";
 import {
+  compendiumDefinitionRevision,
   compendiumEffectiveMetadata,
   type DaggerheartCompendiumEntry,
 } from "@/lib/daggerheart/compendium";
@@ -56,6 +57,7 @@ type DomainCard = {
   slug?: string;
   source_key?: string;
   details?: string;
+  definition_revision?: string;
   metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
@@ -69,6 +71,7 @@ type GearItem = {
   slug?: string;
   source_key?: string;
   tier?: number | null;
+  definition_revision?: string;
   metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
@@ -87,6 +90,7 @@ type ClassOptionRef = {
   category: "beastform" | "martial_stance";
   tier: number | null;
   details: string;
+  definition_revision?: string;
   metadata?: Record<string, unknown>;
   effects?: DaggerheartEffect[];
   actions?: DaggerheartAction[];
@@ -637,6 +641,7 @@ function hydrateCharacterCompendium(
       category: entry.category as ClassOptionRef["category"],
       tier: entry.tier,
       details: compendiumEntryDetails(entry),
+      definition_revision: compendiumDefinitionRevision(entry),
       metadata: compendiumEffectiveMetadata(entry),
       effects: entry.effects ?? [],
       actions: entry.actions ?? [],
@@ -655,6 +660,7 @@ function hydrateCharacterCompendium(
       slug: entry.slug,
       source_key: entry.source_key,
       details: compendiumEntryDetails(entry),
+      definition_revision: compendiumDefinitionRevision(entry),
       metadata: compendiumEffectiveMetadata(entry),
       effects: entry.effects ?? [],
       actions: entry.actions ?? [],
@@ -885,8 +891,15 @@ function GearEditor({
               </span>
             )}
             {item.compendium_id && (
-              <span className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63]">
-                Compendium-linked
+              <span
+                className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63]"
+                title={
+                  item.definition_revision
+                    ? `Definition revision: ${item.definition_revision}`
+                    : "Cached compendium snapshot; revision unknown until the next successful refresh."
+                }
+              >
+                Compendium-linked · {item.definition_revision ? "versioned" : "cached"}
               </span>
             )}
           </div>
@@ -2428,6 +2441,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         slug: entry.slug,
                         source_key: entry.source_key,
                         details: compendiumEntryDetails(entry),
+                        definition_revision: compendiumDefinitionRevision(entry),
                         metadata: compendiumEffectiveMetadata(entry),
                         effects: entry.effects ?? [],
                         actions: entry.actions ?? [],
@@ -2655,6 +2669,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                               category: "beastform",
                               tier: entry.tier,
                               details: compendiumEntryDetails(entry),
+                              definition_revision: compendiumDefinitionRevision(entry),
                               metadata: compendiumEffectiveMetadata(entry),
                               effects: entry.effects ?? [],
                               actions: entry.actions ?? [],
@@ -2685,6 +2700,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                                 category: "martial_stance",
                                 tier: entry.tier,
                                 details: compendiumEntryDetails(entry),
+                                definition_revision: compendiumDefinitionRevision(entry),
                                 metadata: compendiumEffectiveMetadata(entry),
                                 effects: entry.effects ?? [],
                                 actions: entry.actions ?? [],
