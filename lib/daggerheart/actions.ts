@@ -92,6 +92,31 @@ export type DaggerheartActionSpecialResource = {
   notes: string;
 };
 
+export function normalizeDaggerheartSpecialResources<
+  T extends DaggerheartActionSpecialResource
+>(resources: T[]): T[] {
+  return resources.map((resource) => {
+    const name = resource.name.trim().toLowerCase();
+    const rulesBounded = name === "favor" || name === "focus";
+    const max = rulesBounded
+      ? 6
+      : Math.max(0, Number.isFinite(resource.max) ? resource.max : 0);
+    const current = Math.max(
+      0,
+      Math.min(
+        Number.isFinite(resource.current) ? resource.current : 0,
+        max > 0 || rulesBounded ? max : Number.POSITIVE_INFINITY
+      )
+    );
+
+    return {
+      ...resource,
+      current,
+      max,
+    };
+  });
+}
+
 export type DaggerheartActionCharacter = {
   weapons: DaggerheartActionGearItem[];
   armor: DaggerheartActionGearItem[];
