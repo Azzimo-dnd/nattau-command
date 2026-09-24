@@ -11,6 +11,7 @@ import {
 import { DaggerheartEffectsPanel } from "@/components/daggerheart/DaggerheartEffectsPanel";
 import { DaggerheartActionsPanel } from "@/components/daggerheart/DaggerheartActionsPanel";
 import { DaggerheartCombatPanel } from "@/components/daggerheart/DaggerheartCombatPanel";
+import { DaggerheartActiveArmorPanel } from "@/components/daggerheart/DaggerheartActiveArmorPanel";
 import { DaggerheartActiveRulesPanel } from "@/components/daggerheart/DaggerheartActiveRulesPanel";
 import {
   type DaggerheartAction,
@@ -2457,6 +2458,26 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               }
               stats={effectResult.stats}
               level={draft.level}
+            />
+          </Section>
+
+          <Section
+            title="Active Armor"
+            subtitle="Your currently equipped armor, live thresholds and marked Armor Slots."
+          >
+            <DaggerheartActiveArmorPanel
+              armor={equipmentError ? [] : draft.armor}
+              stats={effectResult.stats}
+              markedSlots={draft.armor_slots_current}
+              onMarkedSlotsChange={(armor_slots_current) =>
+                void persistRuntimePatch({
+                  armor_slots_current,
+                  armor: syncEquippedArmorMarks(
+                    draftRef.current.armor,
+                    armor_slots_current
+                  ),
+                })
+              }
             />
           </Section>
 
