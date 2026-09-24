@@ -21,6 +21,7 @@ type Props = {
   maxLevel?: number;
   maxTier?: number;
   allowMagicWeapons?: boolean;
+  actionLabel?: string;
   onSelect: (entry: DaggerheartCompendiumEntry) => void;
 };
 
@@ -35,6 +36,7 @@ export function DaggerheartCompendiumPicker({
   maxLevel,
   maxTier,
   allowMagicWeapons = true,
+  actionLabel,
   onSelect,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -87,6 +89,15 @@ export function DaggerheartCompendiumPicker({
   }, [allowMagicWeapons, categories.join("|"), domains?.join("|"), names?.join("|"), maxLevel, maxTier, supabase]);
 
   const selected = entries.find((entry) => entry.id === selectedId) ?? null;
+  const resolvedActionLabel =
+    actionLabel ??
+    (categories.length === 1 && categories[0] === "armor"
+      ? "Add & equip armor"
+      : categories.some((category) =>
+          ["weapon_primary", "weapon_secondary"].includes(category)
+        )
+        ? "Add & equip weapon"
+        : "Add from compendium");
 
   return (
     <div className="rounded-xl border border-[#39232c] bg-black/15 p-3">
@@ -119,7 +130,7 @@ export function DaggerheartCompendiumPicker({
           }}
           className="min-h-10 shrink-0 rounded-xl border border-[#774052] bg-[#35141f] px-4 text-sm font-bold text-[#e8cbd3] transition hover:bg-[#48202c] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Add from compendium
+          {resolvedActionLabel}
         </button>
       </div>
 
@@ -130,6 +141,9 @@ export function DaggerheartCompendiumPicker({
               <DaggerheartCategoryIcon category={selected.category} className="size-5" />
             </div>
             <div className="min-w-0 flex-1">
+              <div className="mb-2 inline-flex rounded-full border border-amber-900/45 bg-amber-950/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-amber-200/85">
+                Preview only · not added yet
+              </div>
               <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9b6978]">
                 <span>{selected.source_key === "hope-fear" ? "Hope & Fear" : "Core"}</span>
                 {selected.domain && (
