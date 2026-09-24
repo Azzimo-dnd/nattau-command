@@ -7,6 +7,7 @@ import {
   prepareDaggerheartDomainCardsForRuntime,
   type DaggerheartEffect,
   type DaggerheartEffectCharacter,
+  type DaggerheartEffectDomainCard,
 } from "../lib/daggerheart/effects";
 import {
   actionAvailable,
@@ -757,7 +758,7 @@ test("compendium snapshots prefer explicit errata revision and otherwise keep up
 });
 
 test("invalid Domain Loadout runtime deduplicates cards and suspends loadout-scoped sources", () => {
-  const cards = [
+  const cards: DaggerheartEffectDomainCard[] = [
     {
       compendium_id: "fortified",
       name: "Fortified Armor",
