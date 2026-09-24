@@ -2308,18 +2308,43 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               />
               {draft.domain_cards.map((card, index) => (
                 <div key={index} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1.5fr_1fr_90px_120px_auto]">
-                  <input className={inputClass} placeholder="Card name" value={card.name} onChange={(e) => {
-                    const next = [...draft.domain_cards]; next[index] = { ...card, name: e.target.value }; patch({ domain_cards: next });
-                  }} />
-                  <select className={inputClass} value={card.domain} onChange={(e) => {
-                    const next = [...draft.domain_cards]; next[index] = { ...card, domain: e.target.value }; patch({ domain_cards: next });
-                  }}>
+                  <input
+                    className={inputClass}
+                    placeholder="Card name"
+                    value={card.name}
+                    readOnly={Boolean(card.compendium_id)}
+                    onChange={(e) => {
+                      const next = [...draft.domain_cards];
+                      next[index] = { ...card, name: e.target.value };
+                      patch({ domain_cards: next });
+                    }}
+                  />
+                  <select
+                    className={inputClass}
+                    value={card.domain}
+                    disabled={Boolean(card.compendium_id)}
+                    onChange={(e) => {
+                      const next = [...draft.domain_cards];
+                      next[index] = { ...card, domain: e.target.value };
+                      patch({ domain_cards: next });
+                    }}
+                  >
                     <option value="">Domain</option>
                     {daggerheartDomains.map((domain) => <option key={domain} value={domain}>{domain}</option>)}
                   </select>
-                  <input type="number" min={1} max={10} className={inputClass} value={card.level} onChange={(e) => {
-                    const next = [...draft.domain_cards]; next[index] = { ...card, level: toNumber(e.target.value, 1) }; patch({ domain_cards: next });
-                  }} />
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    className={inputClass}
+                    value={card.level}
+                    readOnly={Boolean(card.compendium_id)}
+                    onChange={(e) => {
+                      const next = [...draft.domain_cards];
+                      next[index] = { ...card, level: toNumber(e.target.value, 1) };
+                      patch({ domain_cards: next });
+                    }}
+                  />
                   <select
                     className={inputClass}
                     value={card.state}
@@ -2337,7 +2362,25 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                       {card.permanent_vault ? "Permanent Vault" : "Vault"}
                     </option>
                   </select>
-                  <button type="button" className={smallButton} onClick={() => patch({ domain_cards: draft.domain_cards.filter((_, i) => i !== index) })}>×</button>
+                  <button
+                    type="button"
+                    className={smallButton}
+                    disabled={card.permanent_vault}
+                    title={
+                      card.permanent_vault
+                        ? "This card was placed in the Vault permanently and is removed from normal card-management choices."
+                        : "Remove card"
+                    }
+                    onClick={() =>
+                      patch({
+                        domain_cards: draft.domain_cards.filter(
+                          (_, i) => i !== index
+                        ),
+                      })
+                    }
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
               <button
