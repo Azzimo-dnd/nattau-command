@@ -14,6 +14,7 @@ type AncestryEntry = {
 export type HeritageFeature = {
   ancestry: string;
   name: string;
+  position?: 1 | 2;
 };
 
 export type HeritageState = {
@@ -220,7 +221,7 @@ export function DaggerheartHeritageBuilder({
                   onChange={(event) =>
                     updateMixed({
                       feature_one: event.target.value
-                        ? { ancestry: first, name: event.target.value }
+                        ? { ancestry: first, name: event.target.value, position: 1 }
                         : null,
                     })
                   }
@@ -263,7 +264,7 @@ export function DaggerheartHeritageBuilder({
                   onChange={(event) =>
                     updateMixed({
                       feature_two: event.target.value
-                        ? { ancestry: second, name: event.target.value }
+                        ? { ancestry: second, name: event.target.value, position: 2 }
                         : null,
                     })
                   }
