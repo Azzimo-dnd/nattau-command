@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Nattau Command",
-  description: "Campaign command center for Nattau and Beyond the Mists.",
+  description: "Campaign command center for Nattau and Barovia — Beyond the Mists.",
 };
 
 type RootLayoutProps = {
