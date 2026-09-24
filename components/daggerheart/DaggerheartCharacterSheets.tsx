@@ -257,17 +257,72 @@ function validCharacterRow(value: unknown): value is CharacterRow {
   }
   if (objectKeys.some((key) => !isRecord(value[key]))) return false;
 
-  for (const key of ["weapons", "armor", "inventory", "domain_cards"] as const) {
+  for (const key of ["weapons", "armor", "inventory"] as const) {
     const array = value[key] as Record<string, unknown>[];
     if (
       array.some(
         (item) =>
+          typeof item.name !== "string" ||
+          typeof item.details !== "string" ||
+          ("category" in item &&
+            item.category !== undefined &&
+            typeof item.category !== "string") ||
+          ("metadata" in item &&
+            item.metadata !== undefined &&
+            !isRecord(item.metadata)) ||
           ("effects" in item && !Array.isArray(item.effects)) ||
-          ("actions" in item && !Array.isArray(item.actions))
+          ("actions" in item && !Array.isArray(item.actions)) ||
+          ("equipped" in item &&
+            item.equipped !== undefined &&
+            typeof item.equipped !== "boolean") ||
+          ("quantity" in item &&
+            item.quantity !== undefined &&
+            typeof item.quantity !== "number")
       )
     ) {
       return false;
     }
+  }
+
+  const domainCards = value.domain_cards as Record<string, unknown>[];
+  if (
+    domainCards.some(
+      (card) =>
+        typeof card.name !== "string" ||
+        typeof card.domain !== "string" ||
+        typeof card.level !== "number" ||
+        !["loadout", "vault"].includes(String(card.state)) ||
+        ("metadata" in card &&
+          card.metadata !== undefined &&
+          !isRecord(card.metadata)) ||
+        ("effects" in card && !Array.isArray(card.effects)) ||
+        ("actions" in card && !Array.isArray(card.actions))
+    )
+  ) {
+    return false;
+  }
+
+  const experiences = value.experiences as Record<string, unknown>[];
+  if (
+    experiences.some(
+      (item) =>
+        typeof item.name !== "string" || typeof item.modifier !== "number"
+    )
+  ) {
+    return false;
+  }
+
+  const resources = value.special_resources as Record<string, unknown>[];
+  if (
+    resources.some(
+      (item) =>
+        typeof item.name !== "string" ||
+        typeof item.current !== "number" ||
+        typeof item.max !== "number" ||
+        typeof item.notes !== "string"
+    )
+  ) {
+    return false;
   }
 
   const classState = value.class_state as Record<string, unknown>;
@@ -277,6 +332,13 @@ function validCharacterRow(value: unknown): value is CharacterRow {
       classState.options.some(
         (item) =>
           !isRecord(item) ||
+          typeof item.id !== "string" ||
+          typeof item.name !== "string" ||
+          !["beastform", "martial_stance"].includes(String(item.category)) ||
+          typeof item.details !== "string" ||
+          ("metadata" in item &&
+            item.metadata !== undefined &&
+            !isRecord(item.metadata)) ||
           ("effects" in item && !Array.isArray(item.effects)) ||
           ("actions" in item && !Array.isArray(item.actions))
       )
