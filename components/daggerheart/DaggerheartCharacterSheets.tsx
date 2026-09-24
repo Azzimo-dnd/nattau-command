@@ -507,12 +507,26 @@ function isMagicWeapon(item: Pick<GearItem, "metadata">) {
 }
 
 function equipmentConfigurationError(character: CharacterRow) {
-  const equippedPrimary = character.weapons.find(
+  const equippedPrimaries = character.weapons.filter(
     (item) => item.category === "weapon_primary" && item.equipped !== false
   );
-  const equippedSecondary = character.weapons.find(
+  const equippedSecondaries = character.weapons.filter(
     (item) => item.category === "weapon_secondary" && item.equipped !== false
   );
+  const equippedArmor = character.armor.filter(
+    (item) => item.category === "armor" && item.equipped !== false
+  );
+  if (equippedPrimaries.length > 1) {
+    return "Only one primary weapon can be equipped at a time.";
+  }
+  if (equippedSecondaries.length > 1) {
+    return "Only one secondary weapon can be equipped at a time.";
+  }
+  if (equippedArmor.length > 1) {
+    return "Only one armor set can be equipped at a time.";
+  }
+  const equippedPrimary = equippedPrimaries[0];
+  const equippedSecondary = equippedSecondaries[0];
   if (equippedPrimary && isTwoHanded(equippedPrimary) && equippedSecondary) {
     return "A two-handed primary weapon cannot be used with an equipped secondary weapon.";
   }
