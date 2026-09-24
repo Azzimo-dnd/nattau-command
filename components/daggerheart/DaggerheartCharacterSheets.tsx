@@ -2530,6 +2530,18 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                   >
                     ×
                   </button>
+                  {card.compendium_id && (
+                    <span
+                      className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63] md:col-span-5"
+                      title={
+                        card.definition_revision
+                          ? `Definition revision: ${card.definition_revision}`
+                          : "Cached compendium snapshot; revision unknown until the next successful refresh."
+                      }
+                    >
+                      Compendium-linked · {card.definition_revision ? "versioned" : "cached"}
+                    </span>
+                  )}
                 </div>
               ))}
               <button
@@ -2732,6 +2744,16 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                                 Tier {option.tier}
                               </span>
                             )}
+                            <span
+                              className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63]"
+                              title={
+                                option.definition_revision
+                                  ? `Definition revision: ${option.definition_revision}`
+                                  : "Cached compendium snapshot; revision unknown until the next successful refresh."
+                              }
+                            >
+                              {option.definition_revision ? "Versioned" : "Cached"}
+                            </span>
                           </div>
                           <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-5 text-[#967f87]">
                             {option.details}
