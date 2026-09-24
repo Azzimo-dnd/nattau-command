@@ -44,10 +44,24 @@ export function DaggerheartCombatPanel({
   weapons,
   stats,
   level,
+  onRollAttack,
+  onRollDamage,
 }: {
   weapons: Weapon[];
   stats: DaggerheartDerivedStats;
   level: number;
+  onRollAttack?: (roll: {
+    title: string;
+    trait: string;
+    modifier: number;
+    source: string;
+  }) => void;
+  onRollDamage?: (roll: {
+    title: string;
+    expression: string;
+    damageType?: string;
+    source: string;
+  }) => void;
 }) {
   const equipped = weapons.filter((weapon) => {
     if (
@@ -87,6 +101,12 @@ export function DaggerheartCombatPanel({
           (weapon.category === "weapon_primary"
             ? stats.primary_damage_proficiency_bonus
             : 0);
+        const currentDamage = effectiveDamage(damage, damageProficiency, damageBonus);
+        const damageTypeMatch = currentDamage.match(/\s+(physical\/magic|physical|magic)$/i);
+        const damageType = damageTypeMatch?.[1]?.toLowerCase();
+        const damageExpression = damageTypeMatch
+          ? currentDamage.slice(0, -damageTypeMatch[0].length)
+          : currentDamage;
 
         return (
           <div
@@ -114,14 +134,27 @@ export function DaggerheartCombatPanel({
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-lg border border-[#35242b] bg-black/20 p-2.5">
+              <button
+                type="button"
+                disabled={!trait || !onRollAttack}
+                onClick={() =>
+                  onRollAttack?.({
+                    title: `${weapon.name} · Attack`,
+                    trait,
+                    modifier,
+                    source: weapon.name,
+                  })
+                }
+                className="rounded-lg border border-[#35242b] bg-black/20 p-2.5 text-left transition enabled:hover:border-[#925067] enabled:hover:bg-[#311621] disabled:cursor-default"
+                title={trait && onRollAttack ? `Roll ${trait} attack` : undefined}
+              >
                 <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#78666c]">
                   Attack trait
                 </p>
                 <p className="mt-1 text-sm font-black text-[#d4c0c6]">
-                  {trait || "—"} {trait ? signed(modifier) : ""}
+                  {trait || "—"} {trait ? signed(modifier) : ""} {trait && onRollAttack ? "🎲" : ""}
                 </p>
-              </div>
+              </button>
               <div className="rounded-lg border border-[#35242b] bg-black/20 p-2.5">
                 <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#78666c]">
                   Range
@@ -130,14 +163,27 @@ export function DaggerheartCombatPanel({
                   {range || "—"}
                 </p>
               </div>
-              <div className="rounded-lg border border-[#35242b] bg-black/20 p-2.5 sm:col-span-2">
+              <button
+                type="button"
+                disabled={!damageExpression || damageExpression === "—" || !onRollDamage}
+                onClick={() =>
+                  onRollDamage?.({
+                    title: `${weapon.name} · Damage`,
+                    expression: damageExpression,
+                    damageType,
+                    source: weapon.name,
+                  })
+                }
+                className="rounded-lg border border-[#35242b] bg-black/20 p-2.5 text-left transition enabled:hover:border-[#925067] enabled:hover:bg-[#311621] disabled:cursor-default sm:col-span-2"
+                title={onRollDamage ? `Roll ${weapon.name} damage` : undefined}
+              >
                 <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#78666c]">
                   Current damage · Proficiency {damageProficiency}
                 </p>
                 <p className="mt-1 text-sm font-black text-[#e3cbd2]">
-                  {effectiveDamage(damage, damageProficiency, damageBonus)}
+                  {currentDamage} {onRollDamage && damageExpression !== "—" ? "🎲" : ""}
                 </p>
-              </div>
+              </button>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[#806d74]">
