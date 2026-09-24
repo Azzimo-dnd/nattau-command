@@ -1700,10 +1700,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     }
     if (
       nextState === "loadout" &&
-      domainLoadoutCount >= effectResult.stats.domain_loadout_max
+      domainLoadoutCount >= configurationEffectResult.stats.domain_loadout_max
     ) {
       setActionMessage(
-        `Loadout is full (${effectResult.stats.domain_loadout_max} cards).`
+        `Loadout is full (${configurationEffectResult.stats.domain_loadout_max} cards).`
       );
       return;
     }
