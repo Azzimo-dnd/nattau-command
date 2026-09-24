@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { CampaignWorkspace, WorkspaceLink } from "@/components/campaigns/CampaignWorkspace";
 import { DaggerheartCompendium } from "@/components/daggerheart/DaggerheartCompendium";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
+
+export const metadata: Metadata = { title: "Compendium" };
 
 export const dynamic = "force-dynamic";
 
