@@ -100,7 +100,7 @@ using (player_id = (select auth.uid()) or public.is_campaign_dm(campaign_id));
 grant select, insert, update, delete on public.daggerheart_characters to authenticated;
 
 create or replace function public.set_daggerheart_character_updated_at()
-returns trigger language plpgsql set search_path = public, pg_temp as $$
+returns trigger language plpgsql set search_path = '' as $$
 begin
   new.updated_at = now();
   new.state_revision = old.state_revision + 1;
@@ -113,12 +113,15 @@ create trigger daggerheart_characters_set_updated_at
 before update on public.daggerheart_characters
 for each row execute function public.set_daggerheart_character_updated_at();
 
+revoke all on function public.set_daggerheart_character_updated_at()
+  from public, anon, authenticated;
+
 create or replace function public.list_daggerheart_character_roster(p_campaign_id uuid)
 returns table (
   player_id uuid, display_name text, member_role text, character_id uuid,
   character_name text, character_level integer, character_class text
 )
-language plpgsql security definer set search_path = public, pg_temp as $$
+language plpgsql security definer set search_path = '' as $
 begin
   if not public.is_campaign_member(p_campaign_id) then
     raise exception 'Campaign membership required';
@@ -268,7 +271,7 @@ using (
 create or replace function public.prevent_daggerheart_character_reassignment()
 returns trigger
 language plpgsql
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 begin
   if new.campaign_id is distinct from old.campaign_id
@@ -284,12 +287,15 @@ create trigger prevent_daggerheart_character_reassignment
 before update on public.daggerheart_characters
 for each row execute function public.prevent_daggerheart_character_reassignment();
 
+revoke all on function public.prevent_daggerheart_character_reassignment()
+  from public, anon, authenticated;
+
 create or replace function public.list_daggerheart_character_roster(p_campaign_id uuid)
 returns table (
   player_id uuid, display_name text, member_role text, character_id uuid,
   character_name text, character_level integer, character_class text
 )
-language plpgsql security definer set search_path = public, pg_temp as $$
+language plpgsql security definer set search_path = '' as $
 begin
   if not (select private.is_active_daggerheart_campaign_member(p_campaign_id)) then
     raise exception 'Active Daggerheart campaign membership required';
