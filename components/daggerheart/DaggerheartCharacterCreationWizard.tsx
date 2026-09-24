@@ -181,7 +181,10 @@ function burden(item: GearItem | undefined) {
 }
 
 function classManagedResources(resources: Resource[]) {
-  return resources.filter((resource) => !["Favor", "Focus"].includes(resource.name));
+  return resources.filter(
+    (resource) =>
+      !["favor", "focus"].includes(resource.name.trim().toLowerCase())
+  );
 }
 
 function hasAncestryFeature(
@@ -351,16 +354,27 @@ export function DaggerheartCharacterCreationWizard({
       if (!draft.ancestry_key || !draft.community_key) {
         return "Choose both an ancestry and a community.";
       }
-      if (
-        draft.heritage_state?.mixed &&
-        (
-          !draft.heritage_state.ancestry_one ||
-          !draft.heritage_state.ancestry_two ||
-          !draft.heritage_state.feature_one ||
-          !draft.heritage_state.feature_two
-        )
-      ) {
-        return "Mixed ancestry requires two different lineages and one feature from each.";
+      if (draft.heritage_state?.mixed) {
+        const {
+          ancestry_one: ancestryOne,
+          ancestry_two: ancestryTwo,
+          feature_one: featureOne,
+          feature_two: featureTwo,
+        } = draft.heritage_state;
+        if (!ancestryOne || !ancestryTwo || !featureOne || !featureTwo) {
+          return "Mixed ancestry requires two different lineages and one feature from each.";
+        }
+        if (ancestryOne === ancestryTwo) {
+          return "Mixed ancestry requires two different lineages.";
+        }
+        if (
+          featureOne.ancestry !== ancestryOne ||
+          featureTwo.ancestry !== ancestryTwo ||
+          (featureOne.position !== undefined && featureOne.position !== 1) ||
+          (featureTwo.position !== undefined && featureTwo.position !== 2)
+        ) {
+          return "Mixed ancestry features no longer match their required lineage positions. Re-select both ancestry features.";
+        }
       }
     }
 
