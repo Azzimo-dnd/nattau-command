@@ -2075,7 +2075,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   return (
     <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="self-start rounded-2xl border border-[#402630] bg-[#100a0e]/90 p-3 xl:sticky xl:top-6">
-        <p className="px-2 pb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-[#875765]">Party roster</p>
+        <p className="px-2 pb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-[#875765]">
+          {isDm ? "Party roster" : "Your character"}
+        </p>
         <div className="space-y-2">
           {roster.map((player) => {
             const active = selectedPlayerId === player.player_id;
