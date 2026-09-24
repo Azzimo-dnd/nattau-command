@@ -22,6 +22,7 @@ import {
   baseStatsForClass,
   clearDaggerheartSourceEffects,
   deriveDaggerheartStats,
+  prepareDaggerheartDomainCardsForRuntime,
   spellcastTraitKey,
   effectiveSnapshot,
   type DaggerheartBaseStats,
@@ -1143,20 +1144,6 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     [activeClassOptions]
   );
 
-  const domainLoadoutCount = useMemo(
-    () => draft.domain_cards.filter((card) => card.state === "loadout").length,
-    [draft.domain_cards]
-  );
-  const duplicateDomainCardIds = useMemo(() => {
-    const seen = new Set<string>();
-    const duplicates = new Set<string>();
-    for (const card of draft.domain_cards) {
-      if (!card.compendium_id) continue;
-      if (seen.has(card.compendium_id)) duplicates.add(card.compendium_id);
-      seen.add(card.compendium_id);
-    }
-    return duplicates;
-  }, [draft.domain_cards]);
   const equipmentError = useMemo(
     () => equipmentConfigurationError(draft),
     [draft]
@@ -1174,32 +1161,26 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     () => deriveDaggerheartStats(configurationRuntimeCharacter),
     [configurationRuntimeCharacter]
   );
+  const domainRuntime = useMemo(
+    () =>
+      prepareDaggerheartDomainCardsForRuntime(
+        draft.domain_cards,
+        configurationEffectResult.stats.domain_loadout_max
+      ),
+    [
+      draft.domain_cards,
+      configurationEffectResult.stats.domain_loadout_max,
+    ]
+  );
+  const domainLoadoutCount = domainRuntime.loadoutCount;
+  const duplicateDomainCardIds = useMemo(
+    () => new Set(domainRuntime.duplicateCompendiumIds),
+    [domainRuntime.duplicateCompendiumIds]
+  );
   const domainConfigurationValid =
-    domainLoadoutCount <= configurationEffectResult.stats.domain_loadout_max &&
-    duplicateDomainCardIds.size === 0;
+    !domainRuntime.exceedsLoadout && duplicateDomainCardIds.size === 0;
   const liveConfigurationValid = domainConfigurationValid && !equipmentError;
-
-  const runtimeDomainCards = useMemo(() => {
-    const seen = new Set<string>();
-    const deduplicated = draft.domain_cards.filter((card) => {
-      if (!card.compendium_id) return true;
-      if (seen.has(card.compendium_id)) return false;
-      seen.add(card.compendium_id);
-      return true;
-    });
-    if (
-      domainLoadoutCount <= configurationEffectResult.stats.domain_loadout_max
-    ) {
-      return deduplicated;
-    }
-    return deduplicated.map((card) =>
-      card.state === "loadout" ? { ...card, state: "vault" as const } : card
-    );
-  }, [
-    draft.domain_cards,
-    domainLoadoutCount,
-    configurationEffectResult.stats.domain_loadout_max,
-  ]);
+  const runtimeDomainCards = domainRuntime.cards;
 
   const runtimeCharacter = useMemo(() => {
     const suspendEquipment = Boolean(equipmentError);
