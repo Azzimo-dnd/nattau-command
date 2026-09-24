@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   baseStatsForClass,
+  clearDaggerheartSourceEffects,
   deriveDaggerheartStats,
   type DaggerheartEffect,
   type DaggerheartEffectCharacter,
@@ -432,6 +433,50 @@ test("Beastform disables spell-card actions but keeps ability-card actions", () 
   assert.equal(
     actions.find((source) => source.source_name === "Ability Card")?.active,
     true
+  );
+});
+
+test("clearing a class-option source removes stale temporary effects without resetting action uses", () => {
+  const state = {
+    active_effect_ids: [
+      "class-option:stance-1:honed",
+      "class-option:stance-1:vigilant",
+      "card:other:keep",
+    ],
+    active_effect_values: {
+      "class-option:stance-1:vigilant": 4,
+      "card:other:keep": 2,
+    },
+    action_uses: {
+      "class-option:stance-1:action:honed": 1,
+      "card:other:action": 1,
+    },
+    action_resets: {
+      "class-option:stance-1:action:honed": "scene" as const,
+      "card:other:action": "rest" as const,
+    },
+    effect_resets: {
+      "class-option:stance-1:honed": "scene" as const,
+      "class-option:stance-1:vigilant": "scene" as const,
+      "card:other:keep": "rest" as const,
+    },
+  };
+
+  const cleared = clearDaggerheartSourceEffects(
+    state,
+    "class-option:stance-1"
+  );
+
+  assert.deepEqual(cleared.active_effect_ids, ["card:other:keep"]);
+  assert.deepEqual(cleared.active_effect_values, { "card:other:keep": 2 });
+  assert.deepEqual(cleared.effect_resets, { "card:other:keep": "rest" });
+  assert.equal(
+    cleared.action_uses?.["class-option:stance-1:action:honed"],
+    1
+  );
+  assert.equal(
+    cleared.action_resets?.["class-option:stance-1:action:honed"],
+    "scene"
   );
 });
 
