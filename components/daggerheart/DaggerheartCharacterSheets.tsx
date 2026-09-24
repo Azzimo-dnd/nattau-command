@@ -14,6 +14,7 @@ import { DaggerheartActiveRulesPanel } from "@/components/daggerheart/Daggerhear
 import {
   type DaggerheartAction,
   collectDaggerheartActions,
+  normalizeDaggerheartSpecialResources,
   resetDaggerheartActionUses,
   resolveDaggerheartAction,
 } from "@/lib/daggerheart/actions";
@@ -393,7 +394,9 @@ function mutableCharacterPayload(character: CharacterRow) {
     background_answers: character.background_answers,
     connections: character.connections,
     advancements: character.advancements,
-    special_resources: character.special_resources,
+    special_resources: normalizeDaggerheartSpecialResources(
+      character.special_resources
+    ),
     class_state: character.class_state,
     subclass_state: character.subclass_state,
     transformation_notes: character.transformation_notes,
@@ -1065,9 +1068,18 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   const patch = useCallback((patchValue: Partial<CharacterRow>) => {
+    const normalizedPatch =
+      patchValue.special_resources !== undefined
+        ? {
+            ...patchValue,
+            special_resources: normalizeDaggerheartSpecialResources(
+              patchValue.special_resources
+            ),
+          }
+        : patchValue;
     editGenerationRef.current += 1;
     setDraft((current) => {
-      const next = { ...current, ...patchValue };
+      const next = { ...current, ...normalizedPatch };
       draftRef.current = next;
       return next;
     });
@@ -1131,7 +1143,26 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     [activeClassOptions]
   );
 
-  const runtimeCharacter = useMemo(
+  const domainLoadoutCount = useMemo(
+    () => draft.domain_cards.filter((card) => card.state === "loadout").length,
+    [draft.domain_cards]
+  );
+  const duplicateDomainCardIds = useMemo(() => {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const card of draft.domain_cards) {
+      if (!card.compendium_id) continue;
+      if (seen.has(card.compendium_id)) duplicates.add(card.compendium_id);
+      seen.add(card.compendium_id);
+    }
+    return duplicates;
+  }, [draft.domain_cards]);
+  const equipmentError = useMemo(
+    () => equipmentConfigurationError(draft),
+    [draft]
+  );
+
+  const configurationRuntimeCharacter = useMemo(
     () => ({
       ...draft,
       weapons: activeBeastform ? [] : draft.weapons,
@@ -1139,6 +1170,62 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     }),
     [draft, selectedIntrinsicSources, activeClassOptions, activeBeastform]
   );
+  const configurationEffectResult = useMemo(
+    () => deriveDaggerheartStats(configurationRuntimeCharacter),
+    [configurationRuntimeCharacter]
+  );
+  const domainConfigurationValid =
+    domainLoadoutCount <= configurationEffectResult.stats.domain_loadout_max &&
+    duplicateDomainCardIds.size === 0;
+  const liveConfigurationValid = domainConfigurationValid && !equipmentError;
+
+  const runtimeDomainCards = useMemo(() => {
+    const seen = new Set<string>();
+    const deduplicated = draft.domain_cards.filter((card) => {
+      if (!card.compendium_id) return true;
+      if (seen.has(card.compendium_id)) return false;
+      seen.add(card.compendium_id);
+      return true;
+    });
+    if (
+      domainLoadoutCount <= configurationEffectResult.stats.domain_loadout_max
+    ) {
+      return deduplicated;
+    }
+    return deduplicated.map((card) =>
+      card.state === "loadout" ? { ...card, state: "vault" as const } : card
+    );
+  }, [
+    draft.domain_cards,
+    domainLoadoutCount,
+    configurationEffectResult.stats.domain_loadout_max,
+  ]);
+
+  const runtimeCharacter = useMemo(() => {
+    const suspendEquipment = Boolean(equipmentError);
+    return {
+      ...draft,
+      domain_cards: runtimeDomainCards,
+      weapons:
+        activeBeastform || suspendEquipment
+          ? []
+          : draft.weapons,
+      armor: suspendEquipment
+        ? draft.armor.map((item) => ({ ...item, equipped: false }))
+        : draft.armor,
+      inventory: suspendEquipment
+        ? draft.inventory.map((item) => ({ ...item, equipped: false }))
+        : draft.inventory,
+      intrinsic_sources: [...selectedIntrinsicSources, ...activeClassOptions],
+    };
+  }, [
+    draft,
+    runtimeDomainCards,
+    selectedIntrinsicSources,
+    activeClassOptions,
+    activeBeastform,
+    equipmentError,
+  ]);
   const effectResult = useMemo(
     () => deriveDaggerheartStats(runtimeCharacter),
     [runtimeCharacter]
@@ -1150,7 +1237,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       consumable_clear_bonus: effectResult.stats.consumable_clear_bonus,
       beastform_active: Boolean(activeBeastform),
     }),
-    [runtimeCharacter, effectResult]
+    [runtimeCharacter, effectResult, activeBeastform]
   );
   const actionSources = useMemo(
     () => collectDaggerheartActions(actionCharacter),
@@ -1184,29 +1271,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     }
     return keys;
   }, [actionSources]);
-  const domainLoadoutCount = useMemo(
-    () => draft.domain_cards.filter((card) => card.state === "loadout").length,
-    [draft.domain_cards]
-  );
-  const duplicateDomainCardIds = useMemo(() => {
-    const seen = new Set<string>();
-    const duplicates = new Set<string>();
-    for (const card of draft.domain_cards) {
-      if (!card.compendium_id) continue;
-      if (seen.has(card.compendium_id)) duplicates.add(card.compendium_id);
-      seen.add(card.compendium_id);
-    }
-    return duplicates;
-  }, [draft.domain_cards]);
-  const equipmentError = useMemo(
-    () => equipmentConfigurationError(draft),
-    [draft]
-  );
-  const domainConfigurationValid =
-    domainLoadoutCount <= effectResult.stats.domain_loadout_max &&
-    duplicateDomainCardIds.size === 0;
 
   useEffect(() => {
+    if (!liveConfigurationValid) return;
     const snapshot = effectiveSnapshot(effectResult);
     const nextHp = Math.min(draft.hp_current, snapshot.hp_max);
     const nextStress = Math.min(draft.stress_current, snapshot.stress_max);
@@ -1239,7 +1306,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         armor_slots_current: nextArmorSlots,
       });
     }
-  }, [draft, effectResult, patch]);
+  }, [draft, effectResult, liveConfigurationValid, patch]);
 
   function normalizeRuntimePatch(
     patchValue: Partial<CharacterRow>
@@ -1515,9 +1582,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const active = new Set(draft.effect_state?.active_effect_ids ?? []);
     const values = { ...(draft.effect_state?.active_effect_values ?? {}) };
     const allActive = effectKeys.every((effectKey) => active.has(effectKey));
-    if (!allActive && !domainConfigurationValid) {
+    if (!allActive && !liveConfigurationValid) {
       setActionMessage(
-        "Resolve the invalid Domain Loadout before activating sheet effects."
+        equipmentError ??
+          "Resolve the invalid Domain Loadout before activating sheet effects."
       );
       return;
     }
@@ -1564,9 +1632,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   function setActiveClassOption(option: ClassOptionRef) {
-    if (!domainConfigurationValid) {
+    if (!liveConfigurationValid) {
       setActionMessage(
-        "Resolve the invalid Domain Loadout before changing live combat state."
+        equipmentError ??
+          "Resolve the invalid Domain Loadout before changing live combat state."
       );
       return;
     }
@@ -1708,9 +1777,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   function useResourceAction(source: (typeof actionSources)[number]) {
-    if (!domainConfigurationValid) {
+    if (!liveConfigurationValid) {
       setActionMessage(
-        "Resolve the invalid Domain Loadout before using gameplay actions."
+        equipmentError ??
+          "Resolve the invalid Domain Loadout before using gameplay actions."
       );
       return;
     }
@@ -2335,13 +2405,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               </div>
               {duplicateDomainCardIds.size > 0 && (
                 <div className="rounded-xl border border-red-800/55 bg-red-950/20 px-3 py-2 text-xs leading-5 text-red-100/90">
-                  Duplicate compendium Domain Cards are not allowed. Remove the duplicate before saving or using gameplay actions.
+                  Duplicate compendium Domain Cards are not allowed. Duplicate definitions are deduplicated for live calculations, and gameplay actions stay blocked until you remove the duplicate.
                 </div>
               )}
-              {domainLoadoutCount > effectResult.stats.domain_loadout_max && (
+              {domainLoadoutCount > configurationEffectResult.stats.domain_loadout_max && (
                 <div className="rounded-xl border border-amber-800/55 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-100/90">
                   Loadout exceeds the current limit by{" "}
-                  {domainLoadoutCount - effectResult.stats.domain_loadout_max}. Move a card to the Vault before saving.
+                  {domainLoadoutCount - configurationEffectResult.stats.domain_loadout_max}. Loadout-scoped card effects and actions are suspended until you move enough cards to the Vault.
                 </div>
               )}
               <DaggerheartCompendiumPicker
@@ -2714,23 +2784,28 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             )}
 
             <div className="mt-5 space-y-3">
-              {draft.special_resources.map((resource, index) => (
-                <div key={index} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1fr_90px_90px_2fr_auto]">
-                  <input className={inputClass} placeholder="Favor / Focus / Tokens…" value={resource.name} onChange={(e) => {
-                    const next = [...draft.special_resources]; next[index] = { ...resource, name: e.target.value }; patch({ special_resources: next });
-                  }} />
-                  <input type="number" className={inputClass} value={resource.current} onChange={(e) => {
-                    const next = [...draft.special_resources]; next[index] = { ...resource, current: toNumber(e.target.value) }; patch({ special_resources: next });
-                  }} />
-                  <input type="number" className={inputClass} value={resource.max} onChange={(e) => {
-                    const next = [...draft.special_resources]; next[index] = { ...resource, max: toNumber(e.target.value) }; patch({ special_resources: next });
-                  }} />
-                  <input className={inputClass} placeholder="Patron die, active stance, rules reminder…" value={resource.notes} onChange={(e) => {
-                    const next = [...draft.special_resources]; next[index] = { ...resource, notes: e.target.value }; patch({ special_resources: next });
-                  }} />
-                  <button type="button" className={smallButton} onClick={() => patch({ special_resources: draft.special_resources.filter((_, i) => i !== index) })}>×</button>
-                </div>
-              ))}
+              {draft.special_resources.map((resource, index) => {
+                const rulesBounded = ["favor", "focus"].includes(
+                  resource.name.trim().toLowerCase()
+                );
+                return (
+                  <div key={index} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1fr_90px_90px_2fr_auto]">
+                    <input className={inputClass} placeholder="Favor / Focus / Tokens…" value={resource.name} onChange={(e) => {
+                      const next = [...draft.special_resources]; next[index] = { ...resource, name: e.target.value }; patch({ special_resources: next });
+                    }} />
+                    <input type="number" min={0} max={rulesBounded ? 6 : undefined} className={inputClass} value={resource.current} onChange={(e) => {
+                      const next = [...draft.special_resources]; next[index] = { ...resource, current: toNumber(e.target.value) }; patch({ special_resources: next });
+                    }} />
+                    <input type="number" min={0} max={rulesBounded ? 6 : undefined} readOnly={rulesBounded} className={inputClass} value={resource.max} onChange={(e) => {
+                      const next = [...draft.special_resources]; next[index] = { ...resource, max: toNumber(e.target.value) }; patch({ special_resources: next });
+                    }} />
+                    <input className={inputClass} placeholder="Patron die, active stance, rules reminder…" value={resource.notes} onChange={(e) => {
+                      const next = [...draft.special_resources]; next[index] = { ...resource, notes: e.target.value }; patch({ special_resources: next });
+                    }} />
+                    <button type="button" className={smallButton} onClick={() => patch({ special_resources: draft.special_resources.filter((_, i) => i !== index) })}>×</button>
+                  </div>
+                );
+              })}
               <button type="button" className={smallButton} onClick={() => patch({ special_resources: [...draft.special_resources, { name: "", current: 0, max: 0, notes: "" }] })}>+ Special resource</button>
             </div>
           </Section>
