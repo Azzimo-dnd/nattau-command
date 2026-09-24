@@ -192,6 +192,29 @@ export type DaggerheartEffectResult = {
   equippedArmor: DaggerheartEffectGearItem | null;
 };
 
+export function clearDaggerheartSourceEffects(
+  effectState: DaggerheartEffectState,
+  sourceKey: string
+): DaggerheartEffectState {
+  const prefix = `${sourceKey}:`;
+  return {
+    ...effectState,
+    active_effect_ids: (effectState.active_effect_ids ?? []).filter(
+      (key) => !key.startsWith(prefix)
+    ),
+    active_effect_values: Object.fromEntries(
+      Object.entries(effectState.active_effect_values ?? {}).filter(
+        ([key]) => !key.startsWith(prefix)
+      )
+    ),
+    effect_resets: Object.fromEntries(
+      Object.entries(effectState.effect_resets ?? {}).filter(
+        ([key]) => !key.startsWith(prefix)
+      )
+    ),
+  };
+}
+
 const traitKeys = [
   "agility",
   "strength",
