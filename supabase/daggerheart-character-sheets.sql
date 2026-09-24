@@ -6,7 +6,7 @@
 create table if not exists public.daggerheart_characters (
   id uuid primary key default gen_random_uuid(),
   campaign_id uuid not null references public.campaigns(id) on delete cascade,
-  player_id uuid not null references public.profiles(id) on delete cascade,
+  player_id uuid references public.profiles(id) on delete cascade,
   created_by uuid not null default auth.uid() references public.profiles(id) on delete restrict,
   is_active boolean not null default true,
   name text not null default '',
@@ -201,6 +201,10 @@ alter table public.daggerheart_characters
 
 
 -- Final access hardening: character sheets exist only inside active Daggerheart campaigns.
+-- DMs may keep character sheets unassigned until the intended player is known.
+alter table public.daggerheart_characters
+  alter column player_id drop not null;
+
 create schema if not exists private;
 
 create or replace function private.is_active_daggerheart_campaign_member(
@@ -245,8 +249,17 @@ create policy "Active Daggerheart players and DMs can create characters"
 on public.daggerheart_characters for insert to authenticated
 with check (
   (select private.is_active_daggerheart_campaign_member(campaign_id))
-  and public.is_active_campaign_player(campaign_id, player_id)
-  and (player_id = (select auth.uid()) or public.is_campaign_dm(campaign_id))
+  and (
+    (
+      player_id is null
+      and public.is_campaign_dm(campaign_id)
+    )
+    or (
+      player_id is not null
+      and public.is_active_campaign_player(campaign_id, player_id)
+      and (player_id = (select auth.uid()) or public.is_campaign_dm(campaign_id))
+    )
+  )
 );
 
 create policy "Active Daggerheart players and DMs can update characters"
@@ -257,8 +270,17 @@ using (
 )
 with check (
   (select private.is_active_daggerheart_campaign_member(campaign_id))
-  and public.is_active_campaign_player(campaign_id, player_id)
-  and (player_id = (select auth.uid()) or public.is_campaign_dm(campaign_id))
+  and (
+    (
+      player_id is null
+      and public.is_campaign_dm(campaign_id)
+    )
+    or (
+      player_id is not null
+      and public.is_active_campaign_player(campaign_id, player_id)
+      and (player_id = (select auth.uid()) or public.is_campaign_dm(campaign_id))
+    )
+  )
 );
 
 create policy "Active Daggerheart players and DMs can delete characters"
@@ -274,10 +296,15 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if new.campaign_id is distinct from old.campaign_id
-     or new.player_id is distinct from old.player_id then
-    raise exception 'Character ownership and campaign cannot be changed by UPDATE';
+  if new.campaign_id is distinct from old.campaign_id then
+    raise exception 'Character campaign cannot be changed by UPDATE';
   end if;
+
+  if new.player_id is distinct from old.player_id
+     and not public.is_campaign_dm(old.campaign_id) then
+    raise exception 'Only the campaign DM can assign or reassign a character sheet';
+  end if;
+
   return new;
 end;
 $$;
