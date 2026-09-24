@@ -30,6 +30,18 @@ test("Daggerheart character SQL keeps browser roles on least privilege", () => {
     /grant select, insert, update, delete on table public\.daggerheart_characters to authenticated;/i
   );
   assert.match(
+    sql,
+    /alter table public\.daggerheart_characters[\s\S]*?alter column player_id drop not null;/i
+  );
+  assert.match(
+    tail,
+    /player_id is null[\s\S]*?public\.is_campaign_dm\(campaign_id\)/i
+  );
+  assert.match(
+    tail,
+    /new\.player_id is distinct from old\.player_id[\s\S]*?not public\.is_campaign_dm\(old\.campaign_id\)/i
+  );
+  assert.match(
     tail,
     /revoke all on function public\.list_daggerheart_character_roster\(uuid\) from public;/i
   );
