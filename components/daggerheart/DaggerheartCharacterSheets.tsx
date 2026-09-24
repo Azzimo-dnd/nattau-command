@@ -2389,7 +2389,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                 <span>Active Loadout</span>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-black text-[#dfc5cd]">
-                    {domainLoadoutCount} / {effectResult.stats.domain_loadout_max}
+                    {domainLoadoutCount} / {configurationEffectResult.stats.domain_loadout_max}
                   </span>
                   <button
                     type="button"
@@ -2438,7 +2438,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                         state: permanentVault
                           ? "vault"
                           : domainLoadoutCount <
-                              effectResult.stats.domain_loadout_max
+                              configurationEffectResult.stats.domain_loadout_max
                             ? "loadout"
                             : "vault",
                         permanent_vault: permanentVault,
