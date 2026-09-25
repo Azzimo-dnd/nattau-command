@@ -22,11 +22,13 @@ export function DaggerheartActiveArmorPanel({
   stats,
   markedSlots,
   onMarkedSlotsChange,
+  compact = false,
 }: {
   armor: Armor[];
   stats: DaggerheartDerivedStats;
   markedSlots: number;
   onMarkedSlotsChange: (next: number) => void;
+  compact?: boolean;
 }) {
   const equipped =
     armor.find(
@@ -65,6 +67,27 @@ export function DaggerheartActiveArmorPanel({
         </span>
       </div>
 
+      {compact && (
+        <>
+          <p className="mt-3 text-sm text-[#a88f97]">
+            Armor Score {stats.armor_score} · Major {stats.major_threshold} · Severe{" "}
+            {stats.severe_threshold} · {currentMarked}/{maxSlots} slots marked
+          </p>
+          {equipped.details?.trim() && equipped.details.trim() !== "—" && (
+            <details className="mt-3 rounded-xl border border-[#35242b] bg-black/20">
+              <summary className="cursor-pointer list-none px-3 py-2.5 text-xs font-bold text-[#a88f97]">
+                Armor rule
+              </summary>
+              <p className="border-t border-[#2d2026] px-3 py-3 whitespace-pre-line text-sm leading-6 text-[#bca8ae]">
+                {equipped.details}
+              </p>
+            </details>
+          )}
+        </>
+      )}
+
+      {!compact && (
+        <>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="rounded-lg border border-[#35242b] bg-black/20 p-2.5">
           <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#78666c]">
@@ -141,6 +164,8 @@ export function DaggerheartActiveArmorPanel({
             {equipped.details}
           </p>
         </div>
+      )}
+        </>
       )}
     </div>
   );
