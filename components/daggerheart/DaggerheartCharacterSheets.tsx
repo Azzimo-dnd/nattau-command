@@ -911,6 +911,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const revisionRef = useRef<Map<string, number>>(new Map());
   const runtimeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const runtimeConflictRef = useRef<Set<string>>(new Set());
+  const runtimePendingCountRef = useRef(0);
   const editGenerationRef = useRef(0);
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -922,6 +923,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const [sheetRollIntent, setSheetRollIntent] =
     useState<DaggerheartSheetRollIntent | null>(null);
   const [sheetRollBusy, setSheetRollBusy] = useState(false);
+  const [runtimeSaving, setRuntimeSaving] = useState(false);
   const [activeSheetArea, setActiveSheetArea] = useState<SheetArea>("play");
 
   const load = useCallback(async () => {
@@ -1376,12 +1378,16 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
     if (!base.id) return;
 
+    runtimePendingCountRef.current += 1;
+    setRuntimeSaving(true);
+
     const characterId = base.id;
     const playerId = base.player_id;
     const payload = mutableCharacterPayload(optimistic);
 
     runtimeQueueRef.current = runtimeQueueRef.current.then(async () => {
-      if (runtimeConflictRef.current.has(characterId)) return;
+      try {
+        if (runtimeConflictRef.current.has(characterId)) return;
 
       const expectedRevision =
         revisionRef.current.get(characterId) ?? base.state_revision ?? 0;
@@ -1426,6 +1432,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       });
       if (editGenerationRef.current === persistedGeneration) {
         setDirty(false);
+      }
+      } finally {
+        runtimePendingCountRef.current = Math.max(
+          0,
+          runtimePendingCountRef.current - 1
+        );
+        setRuntimeSaving(runtimePendingCountRef.current > 0);
       }
     });
   }
@@ -1809,9 +1822,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     if (nextArea === activeSheetArea) return;
     if (
       activeSheetArea === "play" &&
-      (sheetRollBusy || Boolean(sheetRollIntent))
+      (sheetRollBusy || Boolean(sheetRollIntent) || runtimeSaving)
     ) {
-      setMessage("Finish the current dice roll before leaving Play.");
+      setMessage(
+        runtimeSaving
+          ? "Session state is still saving. Wait for confirmation before leaving Play."
+          : "Finish the current dice roll before leaving Play."
+      );
       return;
     }
     if (nextArea === "play" && dirty) {
@@ -1829,6 +1846,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     nextValue: number
   ) {
     if (!draft.id || !canEdit) return;
+    if (runtimeSaving) {
+      setActionMessage("Saving the previous session change…");
+      return;
+    }
 
     if (key === "hope") {
       persistRuntimePatch({ hope_current: nextValue });
@@ -1938,6 +1959,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   function setActiveClassOption(option: ClassOptionRef) {
+    if (runtimeSaving) {
+      setActionMessage("Saving the previous session change…");
+      return;
+    }
     if (!liveConfigurationValid) {
       setActionMessage(
         equipmentError ??
@@ -2029,6 +2054,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     index: number,
     nextState: DomainCard["state"]
   ) {
+    if (runtimeSaving) {
+      setActionMessage("Saving the previous session change…");
+      return;
+    }
     const card = draft.domain_cards[index];
     if (!card || card.state === nextState) return;
     if (card.permanent_vault && nextState === "loadout") {
@@ -2100,6 +2129,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   function useResourceAction(source: (typeof actionSources)[number]) {
+    if (runtimeSaving) {
+      setActionMessage("Saving the previous session change…");
+      return;
+    }
     if (!liveConfigurationValid) {
       setActionMessage(
         equipmentError ??
@@ -2156,6 +2189,10 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   function resetResourceActions(
     reset: Parameters<typeof resetDaggerheartActionUses>[1]
   ) {
+    if (runtimeSaving) {
+      setActionMessage("Saving the previous session change…");
+      return;
+    }
     const resetEffectState = resetDaggerheartActionUses(
       draft.effect_state,
       reset,
@@ -2578,6 +2615,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
           </nav>
         )}
 
+        {runtimeSaving && draft.id && (
+          <div
+            role="status"
+            className="rounded-xl border border-sky-900/35 bg-sky-950/15 px-3 py-2 text-xs font-semibold text-sky-100/80"
+          >
+            Saving session state…
+          </div>
+        )}
+
         {actionMessage && draft.id && (
           <div
             role="status"
@@ -2642,7 +2688,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     value: `${resource.current}/${resource.max}`,
                   })),
               ]}
-              disabled={sheetRollBusy || Boolean(sheetRollIntent)}
+              disabled={
+                runtimeSaving || sheetRollBusy || Boolean(sheetRollIntent)
+              }
               onTrackChange={updatePlayTrack}
             />
               </div>
