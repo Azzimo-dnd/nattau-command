@@ -25,17 +25,12 @@ alter table public.campaign_members
   add constraint campaign_members_display_name_length_check
   check (display_name is null or char_length(trim(display_name)) between 1 and 80);
 
-create or replace function private.campaign_display_name(
-  p_campaign_id uuid,
-  p_user_id uuid,
-  p_fallback text default 'Campaign member'
-)
-returns text
-language sql
-stable
-security definer
-set search_path = ''
-as $
+CREATE OR REPLACE FUNCTION private.campaign_display_name(p_campaign_id uuid, p_user_id uuid, p_fallback text DEFAULT 'Campaign member'::text)
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
   select coalesce(
     (
       select nullif(trim(cm.display_name), '')
@@ -52,14 +47,14 @@ as $
     ),
     p_fallback
   );
-$;
+$function$;
 
-create or replace function private.ensure_campaign_member_display_name()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $
+CREATE OR REPLACE FUNCTION private.ensure_campaign_member_display_name()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 begin
   if nullif(trim(new.display_name), '') is null then
     select nullif(trim(p.display_name), '')
@@ -75,7 +70,7 @@ begin
 
   return new;
 end;
-$;
+$function$;
 
 CREATE OR REPLACE FUNCTION public.get_campaign_chat_messages(p_thread_id uuid)
  RETURNS TABLE(id uuid, campaign_id uuid, thread_id uuid, sender_id uuid, sender_name text, sender_role text, content text, created_at timestamp with time zone)
@@ -919,39 +914,6 @@ begin
 end;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.set_campaign_member_display_name(p_campaign_id uuid, p_user_id uuid, p_display_name text)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare
-  v_name text := nullif(trim(coalesce(p_display_name, '')), '');
-begin
-  if not public.is_campaign_dm(p_campaign_id) then
-    raise exception 'Only a Game Master can edit campaign member names.';
-  end if;
-
-  if v_name is null then
-    raise exception 'Campaign display name cannot be empty.';
-  end if;
-
-  if char_length(v_name) > 80 then
-    raise exception 'Campaign display name must be 80 characters or fewer.';
-  end if;
-
-  update public.campaign_members
-  set display_name = v_name,
-      updated_at = now()
-  where campaign_id = p_campaign_id
-    and user_id = p_user_id;
-
-  if not found then
-    raise exception 'Campaign member not found.';
-  end if;
-end;
-$function$;
-
 CREATE OR REPLACE FUNCTION public.update_campaign_member_admin(p_campaign_id uuid, p_user_id uuid, p_role text, p_planning_enabled boolean, p_counts_toward_progress boolean, p_is_test_account boolean, p_is_active boolean, p_display_name text)
  RETURNS void
  LANGUAGE plpgsql
@@ -1024,11 +986,20 @@ before insert on public.campaign_members
 for each row
 execute function private.ensure_campaign_member_display_name();
 
-revoke all on function private.campaign_display_name(uuid, uuid, text) from public;
-revoke all on function public.set_campaign_member_display_name(uuid, uuid, text) from public;
-revoke all on function public.update_campaign_member_admin(uuid, uuid, text, boolean, boolean, boolean, boolean, text) from public;
+revoke all on function public.update_campaign_member_admin(
+  uuid, uuid, text, boolean, boolean, boolean, boolean
+) from public, anon;
 
-grant execute on function public.set_campaign_member_display_name(uuid, uuid, text) to authenticated;
-grant execute on function public.update_campaign_member_admin(uuid, uuid, text, boolean, boolean, boolean, boolean, text) to authenticated;
+revoke all on function public.update_campaign_member_admin(
+  uuid, uuid, text, boolean, boolean, boolean, boolean, text
+) from public, anon;
+
+grant execute on function public.update_campaign_member_admin(
+  uuid, uuid, text, boolean, boolean, boolean, boolean
+) to authenticated;
+
+grant execute on function public.update_campaign_member_admin(
+  uuid, uuid, text, boolean, boolean, boolean, boolean, text
+) to authenticated;
 
 commit;
