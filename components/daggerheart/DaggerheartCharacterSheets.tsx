@@ -1807,6 +1807,13 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
   function changeSheetArea(nextArea: SheetArea) {
     if (nextArea === activeSheetArea) return;
+    if (
+      activeSheetArea === "play" &&
+      (sheetRollBusy || Boolean(sheetRollIntent))
+    ) {
+      setMessage("Finish the current dice roll before leaving Play.");
+      return;
+    }
     if (nextArea === "play" && dirty) {
       setMessage(
         "Save character changes before returning to Play. This keeps session actions from persisting unfinished edits."
@@ -2453,9 +2460,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                 </label>
               )}
 
-              {isDm && (
+              {isDm && activeSheetArea === "character" && (
                 <label className="mt-4 block max-w-sm">
-                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f707a]">
+                  <span className="mb-1.5 block text-xs font-bold text-[#b398a2]">
                     Assigned to
                   </span>
                   <select
@@ -2502,7 +2509,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     Guided creation
                   </button>
                 )}
-                {isDm && draft.id && (
+                {isDm && draft.id && activeSheetArea === "character" && (
                   <button
                     type="button"
                     onClick={() => void deleteCharacter()}
@@ -2512,9 +2519,11 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     Delete sheet
                   </button>
                 )}
-                <button type="button" onClick={save} disabled={saving} className="min-h-11 rounded-xl border border-[#9b4b61] bg-[#6b2438] px-5 font-bold text-[#f6e4e9] transition hover:bg-[#7a2a40] disabled:opacity-50">
-                  {saving ? "Saving…" : draft.id ? "Save changes" : "Create character"}
-                </button>
+                {(!draft.id || activeSheetArea !== "play") && (
+                  <button type="button" onClick={save} disabled={saving} className="min-h-11 rounded-xl border border-[#9b4b61] bg-[#6b2438] px-5 font-bold text-[#f6e4e9] transition hover:bg-[#7a2a40] disabled:opacity-50">
+                    {saving ? "Saving…" : draft.id ? "Save changes" : "Create character"}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -2580,7 +2589,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
         <fieldset disabled={!canEdit} className="space-y-4 disabled:opacity-80">
         {activeSheetArea === "play" && (
-          <div className="space-y-4">
+          <div className="grid gap-4 min-[1180px]:grid-cols-[320px_minmax(0,1fr)]">
+            <div>
+              <div className="min-[1180px]:sticky min-[1180px]:top-24">
             <DaggerheartPlaySummary
               tracks={[
                 {
@@ -2634,6 +2645,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               disabled={sheetRollBusy || Boolean(sheetRollIntent)}
               onTrackChange={updatePlayTrack}
             />
+              </div>
+            </div>
+            <div className="space-y-4">
           <section className="rounded-2xl border border-[#422934] bg-[#120c10]/88 p-4 sm:p-5">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
@@ -2859,7 +2873,14 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             />
           </Section>
 
-          
+            <button
+              type="button"
+              onClick={() => changeSheetArea("equipment")}
+              className="min-h-11 w-full rounded-xl border border-[#4b303a] bg-black/15 px-4 text-sm font-bold text-[#aa9099] transition hover:border-[#744253] hover:text-[#dbc3ca]"
+            >
+              Manage weapons, armor & inventory
+            </button>
+            </div>
           </div>
         )}
 
@@ -3604,7 +3625,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
         </fieldset>
 
-        {canEdit && (
+        {canEdit && activeSheetArea !== "play" && (
           <div className="flex justify-end pb-6">
             <button type="button" onClick={save} disabled={saving || roster.length === 0} className="min-h-12 rounded-xl border border-[#9b4b61] bg-[#6b2438] px-6 font-bold text-[#f6e4e9] transition hover:bg-[#7a2a40] disabled:opacity-50">
               {saving ? "Saving…" : draft.id ? "Save character sheet" : "Create character sheet"}
