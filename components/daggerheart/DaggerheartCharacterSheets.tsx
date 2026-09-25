@@ -2400,7 +2400,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   return (
-    <div className="pb-28">
+    <div className="pb-[calc(11rem+env(safe-area-inset-bottom))] lg:pb-28">
       <div className="mx-auto min-w-0 max-w-[1440px] space-y-4">
 
         {message && (
@@ -2696,6 +2696,27 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               </div>
             </div>
             <div className="space-y-4">
+              <div className="sticky top-[8.25rem] z-20 grid grid-cols-4 gap-1 rounded-xl border border-[#4a2f39] bg-[#0f0a0d]/96 p-1.5 shadow-lg backdrop-blur-xl min-[1180px]:hidden">
+                {[
+                  ["Hope", draft.hope_current, effectResult.stats.hope_max],
+                  ["HP", draft.hp_current, effectResult.stats.hp_max],
+                  ["Stress", draft.stress_current, effectResult.stats.stress_max],
+                  ["Armor", draft.armor_slots_current, effectResult.stats.armor_slots_max],
+                ].map(([label, current, max]) => (
+                  <div
+                    key={String(label)}
+                    className="rounded-lg bg-black/20 px-1.5 py-1.5 text-center"
+                  >
+                    <p className="text-[10px] font-bold text-[#8f7880]">
+                      {label}
+                    </p>
+                    <p className="text-sm font-black tabular-nums text-[#ead6dc]">
+                      {current}/{max}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
           <section className="rounded-2xl border border-[#422934] bg-[#120c10]/88 p-4 sm:p-5">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
