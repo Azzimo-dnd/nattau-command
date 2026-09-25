@@ -38,6 +38,7 @@ import {
   type DaggerheartManualStatModifiers,
 } from "@/lib/daggerheart/effects";
 import { DaggerheartCharacterCreationWizard } from "@/components/daggerheart/DaggerheartCharacterCreationWizard";
+import { CharacterMiniaturesGallery } from "@/components/miniatures/CharacterMiniaturesGallery";
 import type { HeritageState } from "@/components/daggerheart/DaggerheartHeritageBuilder";
 import {
   daggerheartEquipmentConfigurationError,
@@ -1906,6 +1907,16 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   function toggleEffects(effectKeys: string[]) {
+    if (runtimeSaving) {
+      setActionMessage("Saving the previous session change…");
+      return;
+    }
+    if (dirty && draft.id) {
+      setActionMessage(
+        "Save character changes before changing a live effect. This prevents the effect toggle from persisting unfinished edits."
+      );
+      return;
+    }
     const active = new Set(draft.effect_state?.active_effect_ids ?? []);
     const values = { ...(draft.effect_state?.active_effect_values ?? {}) };
     const allActive = effectKeys.every((effectKey) => active.has(effectKey));
@@ -1961,6 +1972,12 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   function setActiveClassOption(option: ClassOptionRef) {
     if (runtimeSaving) {
       setActionMessage("Saving the previous session change…");
+      return;
+    }
+    if (dirty && draft.id && activeSheetArea !== "play") {
+      setActionMessage(
+        "Save character changes before changing the live class state."
+      );
       return;
     }
     if (!liveConfigurationValid) {
@@ -3694,6 +3711,27 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         )}
 
         </fieldset>
+
+        {draft.id && activeSheetArea === "character" && (
+          <section className="rounded-2xl border border-[#3f2831] bg-[#120c10]/82 p-4 sm:p-5">
+            <div className="mb-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#9f6878]">
+                Tabletop appearance
+              </p>
+              <h3 className="mt-1 font-serif text-xl font-black text-[#ead7dc]">
+                Miniature
+              </h3>
+            </div>
+            <CharacterMiniaturesGallery
+              key={campaignId}
+              campaignId={campaignId}
+              campaignSlug="barovia"
+              currentUserId={currentUserId}
+              isDm={isDm}
+              preferredPlayerId={isDm ? null : currentUserId}
+            />
+          </section>
+        )}
 
         {canEdit && activeSheetArea !== "play" && (
           <div className="flex justify-end pb-6">
