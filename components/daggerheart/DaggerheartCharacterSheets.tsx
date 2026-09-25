@@ -911,6 +911,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [sheetRollIntent, setSheetRollIntent] =
     useState<DaggerheartSheetRollIntent | null>(null);
+  const [sheetRollBusy, setSheetRollBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1765,7 +1766,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   function queueDualityRoll(title: string, modifier: number, source?: string) {
-    if (!draft.id || !canEdit) return;
+    if (!draft.id || !canEdit || sheetRollBusy || sheetRollIntent) return;
     setSheetRollIntent({
       id: nextSheetRollId(),
       kind: "duality",
@@ -1781,7 +1782,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     damageType?: string,
     source?: string
   ) {
-    if (!draft.id || !canEdit) return;
+    if (!draft.id || !canEdit || sheetRollBusy || sheetRollIntent) return;
     setSheetRollIntent({
       id: nextSheetRollId(),
       kind: "damage",
@@ -2501,6 +2502,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               }
               stats={effectResult.stats}
               level={draft.level}
+              rolling={sheetRollBusy || Boolean(sheetRollIntent)}
               onRollAttack={({ title, modifier, source }) =>
                 queueDualityRoll(title, modifier, source)
               }
@@ -2587,6 +2589,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                       {draft.id && (
                         <button
                           type="button"
+                          disabled={sheetRollBusy || Boolean(sheetRollIntent)}
                           onClick={() =>
                             queueDualityRoll(
                               `${trait[0].toUpperCase() + trait.slice(1)} Roll`,
@@ -2594,9 +2597,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                               trait
                             )
                           }
-                          className="mt-2 min-h-8 w-full rounded-lg border border-[#5a3441] bg-[#211119] px-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#cdaeb8] transition hover:border-[#8c4a5d] hover:bg-[#311720]"
+                          className="mt-2 min-h-11 w-full rounded-xl border border-[#784255] bg-[#3b1724] px-3 text-xs font-black text-[#e4c4ce] transition hover:border-[#a75a70] hover:bg-[#4a1c2c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b75e76] disabled:cursor-not-allowed disabled:opacity-45"
                         >
-                          🎲 Roll {effective >= 0 ? `+${effective}` : effective}
+                          {sheetRollBusy || sheetRollIntent ? "Rolling…" : "🎲 Roll"} {effective >= 0 ? `+${effective}` : effective}
                         </button>
                       )}
                     </div>
@@ -3264,6 +3267,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
           currentUserId={currentUserId}
           externalIntent={sheetRollIntent}
           onExternalIntentConsumed={() => setSheetRollIntent(null)}
+          onBusyChange={setSheetRollBusy}
         />
       )}
     </div>
