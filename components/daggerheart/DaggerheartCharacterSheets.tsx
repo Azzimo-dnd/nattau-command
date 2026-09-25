@@ -2202,6 +2202,155 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         }
       : null;
 
+  function renderDomainCardEditor(card: DomainCard, index: number) {
+    const recallCost = Math.max(
+      0,
+      Number(card.metadata?.recall_cost ?? 0) || 0
+    );
+    const liveChangeBlocked = Boolean(draft.id && dirty && !freeLoadoutEditing);
+
+    return (
+      <article
+        key={card.compendium_id ?? `${card.name}:${index}`}
+        className="rounded-xl border border-[#3b2830] bg-black/18 p-3"
+      >
+        {card.compendium_id ? (
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h5 className="break-words font-semibold text-[#dfcbd1]">
+                {card.name}
+              </h5>
+              <p className="mt-1 text-xs text-[#8d7880]">
+                {card.domain || "Domain"} · Level {card.level}
+              </p>
+            </div>
+            <span className="rounded-full border border-[#453039] bg-[#1b1016] px-2.5 py-1 text-[11px] font-semibold text-[#8f7981]">
+              Compendium
+            </span>
+          </div>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-[1.5fr_1fr_100px]">
+            <input
+              className={inputClass}
+              placeholder="Card name"
+              value={card.name}
+              onChange={(event) => {
+                const next = [...draft.domain_cards];
+                next[index] = { ...card, name: event.target.value };
+                patch({ domain_cards: next });
+              }}
+            />
+            <select
+              className={inputClass}
+              value={card.domain}
+              onChange={(event) => {
+                const next = [...draft.domain_cards];
+                next[index] = { ...card, domain: event.target.value };
+                patch({ domain_cards: next });
+              }}
+            >
+              <option value="">Domain</option>
+              {daggerheartDomains.map((domainName) => (
+                <option key={domainName} value={domainName}>
+                  {domainName}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              className={inputClass}
+              value={card.level}
+              aria-label={`${card.name || "Custom card"} level`}
+              onChange={(event) => {
+                const next = [...draft.domain_cards];
+                next[index] = {
+                  ...card,
+                  level: toNumber(event.target.value, 1),
+                };
+                patch({ domain_cards: next });
+              }}
+            />
+          </div>
+        )}
+
+        {card.details && (
+          <details className="mt-2 rounded-lg border border-[#302229] bg-black/15">
+            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-bold text-[#a58a93]">
+              Card details
+            </summary>
+            <p className="border-t border-[#2b1e24] px-3 py-2.5 whitespace-pre-line text-sm leading-6 text-[#aa949b]">
+              {card.details}
+            </p>
+          </details>
+        )}
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {card.state === "vault" ? (
+            card.permanent_vault ? (
+              <span className="min-h-11 inline-flex items-center rounded-xl border border-[#58404a] bg-[#1d1519] px-3 text-xs font-black text-[#a78e96]">
+                Permanent Vault
+              </span>
+            ) : (
+              <button
+                type="button"
+                disabled={liveChangeBlocked}
+                onClick={() => changeDomainCardState(index, "loadout")}
+                className="min-h-11 rounded-xl border border-[#925067] bg-[#481827] px-4 text-sm font-black text-[#edd2db] transition hover:bg-[#5a2031] disabled:cursor-not-allowed disabled:opacity-40"
+                title={
+                  liveChangeBlocked
+                    ? "Save unfinished character edits before a live Recall."
+                    : undefined
+                }
+              >
+                {freeLoadoutEditing
+                  ? "Move to Loadout · free"
+                  : `Recall · ${recallCost} Stress`}
+              </button>
+            )
+          ) : (
+            <button
+              type="button"
+              disabled={liveChangeBlocked}
+              onClick={() => changeDomainCardState(index, "vault")}
+              className="min-h-11 rounded-xl border border-[#5b3a46] bg-[#211219] px-4 text-sm font-bold text-[#c9adb6] transition hover:border-[#865064] disabled:cursor-not-allowed disabled:opacity-40"
+              title={
+                liveChangeBlocked
+                  ? "Save unfinished character edits before changing the live Loadout."
+                  : undefined
+              }
+            >
+              Move to Vault
+            </button>
+          )}
+
+          {!card.permanent_vault && (
+            <button
+              type="button"
+              className="min-h-11 rounded-xl border border-[#49313a] px-3 text-xs font-bold text-[#957d85] transition hover:border-red-900/60 hover:text-red-200"
+              onClick={() =>
+                patch({
+                  domain_cards: draft.domain_cards.filter(
+                    (_, cardIndex) => cardIndex !== index
+                  ),
+                })
+              }
+            >
+              Remove
+            </button>
+          )}
+
+          {card.definition_revision && (
+            <span className="ml-auto text-[11px] text-[#6f5d64]">
+              rev. {card.definition_revision.slice(0, 8)}
+            </span>
+          )}
+        </div>
+      </article>
+    );
+  }
+
   if (loading) {
     return <div className="rounded-2xl border border-[#402630] bg-[#120c10]/80 p-6 text-sm text-[#a9969d]">Reading the names written in the Mists…</div>;
   }
@@ -2418,6 +2567,15 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               </div>
             )}
           </nav>
+        )}
+
+        {actionMessage && draft.id && (
+          <div
+            role="status"
+            className="rounded-xl border border-[#5b3743] bg-[#1a1015] px-3 py-2.5 text-sm text-[#d3b8c0]"
+          >
+            {actionMessage}
+          </div>
         )}
 
         <fieldset disabled={!canEdit} className="space-y-4 disabled:opacity-80">
@@ -2794,96 +2952,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     {draft.domain_cards
                       .map((card, index) => ({ card, index }))
                       .filter(({ card }) => card.state === "loadout")
-                      .map(({ card, index }) => (
-                        <div key={card.compendium_id ?? `${card.name}:${index}`} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1.5fr_1fr_90px_120px_auto]">
-                  <input
-                    className={inputClass}
-                    placeholder="Card name"
-                    value={card.name}
-                    readOnly={Boolean(card.compendium_id)}
-                    onChange={(e) => {
-                      const next = [...draft.domain_cards];
-                      next[index] = { ...card, name: e.target.value };
-                      patch({ domain_cards: next });
-                    }}
-                  />
-                  <select
-                    className={inputClass}
-                    value={card.domain}
-                    disabled={Boolean(card.compendium_id)}
-                    onChange={(e) => {
-                      const next = [...draft.domain_cards];
-                      next[index] = { ...card, domain: e.target.value };
-                      patch({ domain_cards: next });
-                    }}
-                  >
-                    <option value="">Domain</option>
-                    {daggerheartDomains.map((domain) => <option key={domain} value={domain}>{domain}</option>)}
-                  </select>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    className={inputClass}
-                    value={card.level}
-                    readOnly={Boolean(card.compendium_id)}
-                    onChange={(e) => {
-                      const next = [...draft.domain_cards];
-                      next[index] = { ...card, level: toNumber(e.target.value, 1) };
-                      patch({ domain_cards: next });
-                    }}
-                  />
-                  <select
-                    className={inputClass}
-                    value={card.state}
-                    onChange={(e) =>
-                      changeDomainCardState(
-                        index,
-                        e.target.value as DomainCard["state"]
-                      )
-                    }
-                  >
-                    <option value="loadout" disabled={card.permanent_vault}>
-                      Loadout
-                    </option>
-                    <option value="vault">
-                      {card.permanent_vault ? "Permanent Vault" : "Vault"}
-                    </option>
-                  </select>
-                  <button
-                    type="button"
-                    className={smallButton}
-                    disabled={card.permanent_vault}
-                    title={
-                      card.permanent_vault
-                        ? "This card was placed in the Vault permanently and is removed from normal card-management choices."
-                        : "Remove card"
-                    }
-                    onClick={() =>
-                      patch({
-                        domain_cards: draft.domain_cards.filter(
-                          (_, i) => i !== index
-                        ),
-                      })
-                    }
-                  >
-                    ×
-                  </button>
-                  {card.compendium_id && (
-                    <span
-                      className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63] md:col-span-5"
-                      title={
-                        card.definition_revision
-                          ? `Definition revision: ${card.definition_revision}`
-                          : "Cached compendium snapshot; revision unknown until the next successful refresh."
-                      }
-                    >
-                      Compendium-linked · {card.definition_revision ? "versioned" : "cached"}
-                    </span>
-                  )}
-                </div>
-
-                      ))}
+                      .map(({ card, index }) => renderDomainCardEditor(card, index))}
                     {draft.domain_cards.every((card) => card.state !== "loadout") && (
                       <p className="rounded-xl border border-dashed border-[#3d2930] px-3 py-4 text-center text-sm text-[#7e6a71]">
                         No cards in the active Loadout.
@@ -2903,96 +2972,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                     {draft.domain_cards
                       .map((card, index) => ({ card, index }))
                       .filter(({ card }) => card.state === "vault")
-                      .map(({ card, index }) => (
-                        <div key={card.compendium_id ?? `${card.name}:${index}`} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1.5fr_1fr_90px_120px_auto]">
-                  <input
-                    className={inputClass}
-                    placeholder="Card name"
-                    value={card.name}
-                    readOnly={Boolean(card.compendium_id)}
-                    onChange={(e) => {
-                      const next = [...draft.domain_cards];
-                      next[index] = { ...card, name: e.target.value };
-                      patch({ domain_cards: next });
-                    }}
-                  />
-                  <select
-                    className={inputClass}
-                    value={card.domain}
-                    disabled={Boolean(card.compendium_id)}
-                    onChange={(e) => {
-                      const next = [...draft.domain_cards];
-                      next[index] = { ...card, domain: e.target.value };
-                      patch({ domain_cards: next });
-                    }}
-                  >
-                    <option value="">Domain</option>
-                    {daggerheartDomains.map((domain) => <option key={domain} value={domain}>{domain}</option>)}
-                  </select>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    className={inputClass}
-                    value={card.level}
-                    readOnly={Boolean(card.compendium_id)}
-                    onChange={(e) => {
-                      const next = [...draft.domain_cards];
-                      next[index] = { ...card, level: toNumber(e.target.value, 1) };
-                      patch({ domain_cards: next });
-                    }}
-                  />
-                  <select
-                    className={inputClass}
-                    value={card.state}
-                    onChange={(e) =>
-                      changeDomainCardState(
-                        index,
-                        e.target.value as DomainCard["state"]
-                      )
-                    }
-                  >
-                    <option value="loadout" disabled={card.permanent_vault}>
-                      Loadout
-                    </option>
-                    <option value="vault">
-                      {card.permanent_vault ? "Permanent Vault" : "Vault"}
-                    </option>
-                  </select>
-                  <button
-                    type="button"
-                    className={smallButton}
-                    disabled={card.permanent_vault}
-                    title={
-                      card.permanent_vault
-                        ? "This card was placed in the Vault permanently and is removed from normal card-management choices."
-                        : "Remove card"
-                    }
-                    onClick={() =>
-                      patch({
-                        domain_cards: draft.domain_cards.filter(
-                          (_, i) => i !== index
-                        ),
-                      })
-                    }
-                  >
-                    ×
-                  </button>
-                  {card.compendium_id && (
-                    <span
-                      className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63] md:col-span-5"
-                      title={
-                        card.definition_revision
-                          ? `Definition revision: ${card.definition_revision}`
-                          : "Cached compendium snapshot; revision unknown until the next successful refresh."
-                      }
-                    >
-                      Compendium-linked · {card.definition_revision ? "versioned" : "cached"}
-                    </span>
-                  )}
-                </div>
-
-                      ))}
+                      .map(({ card, index }) => renderDomainCardEditor(card, index))}
                     {draft.domain_cards.every((card) => card.state !== "vault") && (
                       <p className="rounded-xl border border-dashed border-[#34262c] px-3 py-4 text-center text-sm text-[#746269]">
                         Vault is empty.
