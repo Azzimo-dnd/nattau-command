@@ -2041,10 +2041,24 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     const nextCards = [...draft.domain_cards];
     nextCards[index] = { ...card, state: nextState };
 
+    if (freeLoadoutEditing) {
+      patch({ domain_cards: nextCards });
+      setActionMessage(
+        `${card.name} moved to ${nextState === "loadout" ? "Loadout" : "Vault"} in rest / level-up edit. Save the sheet to confirm the change.`
+      );
+      return;
+    }
+
+    if (dirty && draft.id) {
+      setActionMessage(
+        "Save character changes before changing the live Loadout. This prevents Recall from persisting unfinished edits."
+      );
+      return;
+    }
+
     if (
       nextState === "loadout" &&
-      card.state === "vault" &&
-      !freeLoadoutEditing
+      card.state === "vault"
     ) {
       const recallCost = Math.max(
         0,
@@ -2070,6 +2084,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
     if (draft.id) {
       persistRuntimePatch({ domain_cards: nextCards });
+      setActionMessage(
+        `${card.name} moved to ${nextState === "loadout" ? "Loadout" : "Vault"}.`
+      );
     } else {
       patch({ domain_cards: nextCards });
     }
