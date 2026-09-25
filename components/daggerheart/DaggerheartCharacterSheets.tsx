@@ -2190,92 +2190,9 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }
 
   return (
-    <div className="grid gap-6 pb-24 xl:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="self-start rounded-2xl border border-[#402630] bg-[#100a0e]/90 p-3 xl:sticky xl:top-6">
-        <p className="px-2 pb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-[#875765]">
-          {isDm ? "Party roster" : "Your character"}
-        </p>
-        <div className="space-y-2">
-          {roster.map((player) => {
-            const active = selectedPlayerId === player.player_id;
-            const option = classOption(player.character_class);
-            return (
-              <button
-                key={player.player_id}
-                type="button"
-                onClick={() => choosePlayer(player.player_id)}
-                className={`w-full rounded-xl border p-3 text-left transition ${
-                  active
-                    ? "border-[#8b465a] bg-[#421824]/65"
-                    : "border-[#352129] bg-black/15 hover:border-[#5d3442]"
-                }`}
-              >
-                <div className="font-semibold text-[#ead7dc]">{player.display_name}</div>
-                <div className="mt-1 text-xs text-[#9b858c]">
-                  {player.character_name
-                    ? `${player.character_name} · Lv. ${player.character_level ?? 1}${option ? ` ${option.label}` : ""}`
-                    : "No character sheet yet"}
-                </div>
-              </button>
-            );
-          })}
-          {roster.length === 0 && <p className="p-3 text-sm text-[#8d7a80]">No active players in Barovia yet.</p>}
-        </div>
+    <div className="pb-28">
+      <div className="mx-auto min-w-0 max-w-[1440px] space-y-4">
 
-        {isDm && (
-          <div className="mt-5 border-t border-[#342129] pt-4">
-            <div className="flex items-center justify-between gap-2 px-2 pb-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#875765]">
-                Unassigned sheets
-              </p>
-              <span className="text-[10px] text-[#6f5c63]">
-                {unassignedCharacters.length}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {unassignedCharacters.map((character) => {
-                const active =
-                  selectedPlayerId === null && draft.id === character.id;
-                const option = classOption(character.class_key);
-                return (
-                  <button
-                    key={character.id}
-                    type="button"
-                    onClick={() => chooseUnassigned(character.id)}
-                    className={`w-full rounded-xl border p-3 text-left transition ${
-                      active
-                        ? "border-[#8b465a] bg-[#421824]/65"
-                        : "border-[#352129] bg-black/15 hover:border-[#5d3442]"
-                    }`}
-                  >
-                    <div className="font-semibold text-[#ead7dc]">
-                      {character.name || "Unnamed Wanderer"}
-                    </div>
-                    <div className="mt-1 text-xs text-[#9b858c]">
-                      Lv. {character.level}
-                      {option ? ` · ${option.label}` : ""} · not assigned
-                    </div>
-                  </button>
-                );
-              })}
-              {unassignedCharacters.length === 0 && (
-                <p className="px-2 py-1 text-xs leading-5 text-[#78666c]">
-                  No unassigned sheets yet.
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={startUnassignedCharacter}
-                className="w-full rounded-xl border border-dashed border-[#6f4050] bg-[#1a0f14] px-3 py-3 text-left text-sm font-bold text-[#d6b7c0] transition hover:border-[#a0556b] hover:bg-[#26131a]"
-              >
-                + New unassigned sheet
-              </button>
-            </div>
-          </div>
-        )}
-      </aside>
-
-      <div className="min-w-0 space-y-4">
         {message && (
           <p className="rounded-xl border border-[#55303d] bg-black/20 px-3 py-2 text-sm text-[#d8bbc3]">
             {message}
@@ -2311,6 +2228,65 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               <p className="mt-2 text-sm text-[#a58f96]">
                 {selectedClass ? `${selectedClass.label} · ${selectedClass.domains.join(" + ")}` : "Choose a class to begin."}
               </p>
+              {isDm && (
+                <label className="mt-4 block max-w-md">
+                  <span className="mb-1.5 block text-xs font-bold text-[#b398a2]">
+                    Viewing character
+                  </span>
+                  <select
+                    className={inputClass}
+                    value={
+                      selectedPlayerId !== null
+                        ? `player:${selectedPlayerId}`
+                        : draft.id
+                          ? `unassigned:${draft.id}`
+                          : "new-unassigned"
+                    }
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === "new-unassigned") {
+                        startUnassignedCharacter();
+                        return;
+                      }
+                      if (value.startsWith("player:")) {
+                        choosePlayer(value.slice("player:".length));
+                        return;
+                      }
+                      if (value.startsWith("unassigned:")) {
+                        chooseUnassigned(value.slice("unassigned:".length));
+                      }
+                    }}
+                  >
+                    <optgroup label="Players">
+                      {roster.map((player) => (
+                        <option
+                          key={player.player_id}
+                          value={`player:${player.player_id}`}
+                        >
+                          {player.display_name}
+                          {player.character_name
+                            ? ` · ${player.character_name}`
+                            : " · no sheet yet"}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {unassignedCharacters.length > 0 && (
+                      <optgroup label="Unassigned sheets">
+                        {unassignedCharacters.map((character) => (
+                          <option
+                            key={character.id}
+                            value={`unassigned:${character.id}`}
+                          >
+                            {character.name || "Unnamed Wanderer"} · Lv. {character.level}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <option value="new-unassigned">+ New unassigned sheet</option>
+                  </select>
+                </label>
+              )}
+
               {isDm && (
                 <label className="mt-4 block max-w-sm">
                   <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-[#8f707a]">
@@ -2378,6 +2354,54 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
           </div>
           {!canEdit && <p className="mt-4 text-xs text-[#88747b]">You can inspect this sheet, but only its player and the Game Master can edit it.</p>}
         </header>
+
+        {draft.id && (
+          <nav
+            className="sticky top-16 z-30 rounded-2xl border border-[#3f2831] bg-[#0f0a0d]/95 p-1.5 shadow-lg backdrop-blur-xl lg:top-4"
+            aria-label="Character sheet areas"
+          >
+            <div className="grid grid-cols-4 gap-1.5">
+              {SHEET_AREAS.map((area) => {
+                const active = activeSheetArea === area.id;
+                return (
+                  <button
+                    key={area.id}
+                    type="button"
+                    onClick={() => changeSheetArea(area.id)}
+                    aria-current={active ? "page" : undefined}
+                    className={`min-h-12 rounded-xl px-2 py-2 text-center transition sm:px-3 ${
+                      active
+                        ? "border border-[#8d4b60] bg-[#4a1928] text-[#f0dbe1]"
+                        : "border border-transparent text-[#907981] hover:bg-[#211219] hover:text-[#d6c0c7]"
+                    }`}
+                  >
+                    <span className="block text-xs font-black sm:text-sm">
+                      {area.label}
+                    </span>
+                    <span className="mt-0.5 hidden text-[10px] text-[#8e747d] md:block">
+                      {area.hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {dirty && activeSheetArea !== "play" && (
+              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-900/40 bg-amber-950/15 px-3 py-2">
+                <span className="text-xs font-semibold text-amber-100/85">
+                  Unsaved character changes
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void save()}
+                  disabled={saving}
+                  className="min-h-10 rounded-lg border border-amber-800/55 bg-amber-950/30 px-3 text-xs font-black text-amber-100 disabled:opacity-45"
+                >
+                  {saving ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            )}
+          </nav>
+        )}
 
         <fieldset disabled={!canEdit} className="space-y-4 disabled:opacity-80">
           <Section title="Identity & Heritage" subtitle="Class, subclass, ancestry, community and Hope & Fear transformations." open>
@@ -3336,7 +3360,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         )}
       </div>
 
-      {draft.id && canEdit && (
+      {draft.id && canEdit && activeSheetArea === "play" && (
         <DaggerheartSheetDiceOverlay
           campaignId={campaignId}
           currentUserId={currentUserId}
