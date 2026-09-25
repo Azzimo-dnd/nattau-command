@@ -25,6 +25,7 @@ import {
   type ParsedExpression,
   type SupportedDie,
 } from "@/components/dice/diceUtils";
+import type { NewCampaignDiceRoll } from "@/components/dice/diceTypes";
 
 const ScreenDiceCanvas = dynamic(
   () =>
@@ -89,7 +90,11 @@ function emptyCounts(): Record<SupportedDie, number> {
   return { 4: 0, 6: 0, 8: 0, 10: 0, 12: 0, 20: 0, 100: 0 };
 }
 
-function physicsMetadata(result: PhysicsRollResult, cosmeticId: string, numberSize: string) {
+function physicsMetadata(
+  result: PhysicsRollResult,
+  cosmeticId: string,
+  numberSize: string
+) {
   return {
     engine: "rapier",
     presentation: "character_sheet_overlay",
@@ -114,38 +119,51 @@ export function DaggerheartSheetDiceOverlay({
   currentUserId,
   externalIntent,
   onExternalIntentConsumed,
+  onBusyChange,
 }: {
   campaignId: string;
   currentUserId: string;
   externalIntent: DaggerheartSheetRollIntent | null;
   onExternalIntentConsumed: () => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [request, setRequest] = useState<PhysicsRollRequest | null>(null);
   const [counts, setCounts] = useState<Record<SupportedDie, number>>(emptyCounts);
   const [modifier, setModifier] = useState(0);
   const [latest, setLatest] = useState<LatestResult | null>(null);
+  const [showResultToast, setShowResultToast] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const pendingRef = useRef<PendingRoll | null>(null);
   const clearDiceTimerRef = useRef<number | null>(null);
-  const clearResultTimerRef = useRef<number | null>(null);
+  const hideToastTimerRef = useRef<number | null>(null);
 
   const configuration = useCampaignDiceConfiguration({ campaignId, currentUserId });
   const diceLog = useCampaignDiceLog({ campaignId, currentUserId });
   const soundEngine = useMemo(() => getSharedDiceSoundEngine(), []);
 
+  useEffect(() => {
+    setExpanded(window.matchMedia("(min-width: 640px)").matches);
+  }, []);
+
+  useEffect(() => {
+    onBusyChange?.(Boolean(request));
+  }, [onBusyChange, request]);
+
   useEffect(
     () => () => {
       if (clearDiceTimerRef.current) window.clearTimeout(clearDiceTimerRef.current);
-      if (clearResultTimerRef.current) window.clearTimeout(clearResultTimerRef.current);
+      if (hideToastTimerRef.current) window.clearTimeout(hideToastTimerRef.current);
+      onBusyChange?.(false);
     },
-    []
+    [onBusyChange]
   );
 
   const beginPhysicalRoll = useCallback(
     async (pending: PendingRoll, dice: PhysicsDieRequest[]) => {
       if (request || configuration.loading || dice.length === 0) return false;
       setLocalError(null);
-      setLatest(null);
+      setShowResultToast(false);
       pendingRef.current = pending;
 
       if (configuration.appearance.sound) {
@@ -234,7 +252,11 @@ export function DaggerheartSheetDiceOverlay({
           buildPhysicsDiceFromGroups(parsed.groups, `sheet-${rollId}`)
         );
       } catch (error) {
-        setLocalError(error instanceof Error ? error.message : "Could not prepare the physical roll.");
+        setLocalError(
+          error instanceof Error
+            ? error.message
+            : "Could not prepare the physical roll."
+        );
         return false;
       }
     },
@@ -292,21 +314,37 @@ export function DaggerheartSheetDiceOverlay({
   }, [manualGroups, modifier]);
 
   const handlePhysicsComplete = useCallback(
-    async (physics: PhysicsRollResult) => {
+    (physics: PhysicsRollResult) => {
       const pending = pendingRef.current;
       if (!pending || pending.rollId !== physics.rollId) return;
 
       let result: LatestResult;
+      let roll: NewCampaignDiceRoll;
 
       if (pending.kind === "duality") {
         const hope = physics.dice.find((die) => die.tone === "hope")?.value ?? 0;
         const fear = physics.dice.find((die) => die.tone === "fear")?.value ?? 0;
         const total = hope + fear + pending.modifier;
         const outcome =
-          hope === fear ? "Critical Success" : hope > fear ? "Roll with Hope" : "Roll with Fear";
+          hope === fear
+            ? "Critical Success"
+            : hope > fear
+              ? "Roll with Hope"
+              : "Roll with Fear";
         const expression = `Hope d12 + Fear d12 ${formatModifier(pending.modifier)}`;
 
-        await diceLog.saveRoll({
+        result = {
+          title: pending.title,
+          total,
+          outcome,
+          detail: `Hope ${hope} · Fear ${fear}${
+            pending.modifier === 0
+              ? ""
+              : ` · ${formatModifier(pending.modifier)}`
+          }`,
+        };
+
+        roll = {
           roll_kind: "daggerheart_action",
           title: pending.title,
           expression,
@@ -325,15 +363,6 @@ export function DaggerheartSheetDiceOverlay({
               configuration.appearance.numberSize
             ),
           },
-        });
-
-        result = {
-          title: pending.title,
-          total,
-          outcome,
-          detail: `Hope ${hope} · Fear ${fear}${
-            pending.modifier === 0 ? "" : ` · ${formatModifier(pending.modifier)}`
-          }`,
         };
       } else {
         const groups = physicsResultToGroups(pending.parsed.groups, physics);
@@ -343,7 +372,14 @@ export function DaggerheartSheetDiceOverlay({
             ? `Damage${pending.damageType ? ` · ${pending.damageType}` : ""}`
             : "Manual Roll";
 
-        await diceLog.saveRoll({
+        result = {
+          title: pending.title,
+          total,
+          outcome,
+          detail: pending.parsed.normalizedExpression,
+        };
+
+        roll = {
           roll_kind: pending.rollKind,
           title: pending.title,
           expression: pending.parsed.normalizedExpression,
@@ -361,24 +397,25 @@ export function DaggerheartSheetDiceOverlay({
               configuration.appearance.numberSize
             ),
           },
-        });
-
-        result = {
-          title: pending.title,
-          total,
-          outcome,
-          detail: pending.parsed.normalizedExpression,
         };
       }
 
       pendingRef.current = null;
       setLatest(result);
+      setShowResultToast(true);
 
       if (clearDiceTimerRef.current) window.clearTimeout(clearDiceTimerRef.current);
-      clearDiceTimerRef.current = window.setTimeout(() => setRequest(null), 1800);
+      clearDiceTimerRef.current = window.setTimeout(() => setRequest(null), 1400);
 
-      if (clearResultTimerRef.current) window.clearTimeout(clearResultTimerRef.current);
-      clearResultTimerRef.current = window.setTimeout(() => setLatest(null), 5600);
+      if (hideToastTimerRef.current) window.clearTimeout(hideToastTimerRef.current);
+      hideToastTimerRef.current = window.setTimeout(
+        () => setShowResultToast(false),
+        4600
+      );
+
+      // The physical result is authoritative and is shown immediately.
+      // Logging is deliberately decoupled so slow network cannot hide the result.
+      void diceLog.saveRoll(roll);
     },
     [
       configuration.appearance.cosmeticId,
@@ -413,7 +450,13 @@ export function DaggerheartSheetDiceOverlay({
   }
 
   async function rollManual() {
-    if (request || manualGroups.length === 0 || manualPhysicalCount > MAX_PHYSICAL_DICE) return;
+    if (
+      request ||
+      manualGroups.length === 0 ||
+      manualPhysicalCount > MAX_PHYSICAL_DICE
+    ) {
+      return;
+    }
     await beginFormula("Manual Roll", manualExpression, "generic");
   }
 
@@ -439,112 +482,191 @@ export function DaggerheartSheetDiceOverlay({
         </div>
       )}
 
-      {latest && (
-        <div className="pointer-events-none fixed inset-x-3 top-4 z-[90] flex justify-center sm:top-6">
+      {latest && showResultToast && (
+        <div
+          className="pointer-events-none fixed inset-x-3 top-[4.75rem] z-[90] flex justify-center lg:top-6"
+          role="status"
+          aria-live="polite"
+        >
           <div className="max-w-[min(92vw,520px)] rounded-2xl border border-[#a6536b]/55 bg-[#10090e]/94 px-5 py-3 text-center shadow-2xl backdrop-blur-xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#c77b90]">
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-[#c77b90]">
               {latest.outcome}
             </p>
             <p className="mt-1 font-serif text-lg font-black text-[#f1dce2]">
               {latest.title}
             </p>
-            <p className="mt-1 text-3xl font-black text-white">{latest.total}</p>
-            <p className="mt-1 text-xs text-[#b99da6]">{latest.detail}</p>
+            <p className="mt-1 text-3xl font-black tabular-nums text-white">
+              {latest.total}
+            </p>
+            <p className="mt-1 text-sm text-[#b99da6]">{latest.detail}</p>
           </div>
         </div>
       )}
 
-      <div className="fixed inset-x-2 bottom-3 z-[70] flex justify-center sm:bottom-4">
-        <div className="w-full max-w-[980px] rounded-2xl border border-[#5a3441]/90 bg-[#100a0e]/94 p-2 shadow-[0_18px_70px_rgba(0,0,0,0.58)] backdrop-blur-xl sm:p-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            <button
-              type="button"
-              disabled={busy || configuration.loading}
-              onClick={() => void rollManualDuality()}
-              className="min-h-10 shrink-0 rounded-xl border border-[#a25067]/55 bg-[#521928]/45 px-3 text-[11px] font-black text-[#f0ced8] disabled:opacity-35"
-              title="Roll Hope & Fear using the current modifier"
-            >
-              Hope/Fear
-            </button>
-
-            {QUICK_DICE.map((sides) => {
-              const count = counts[sides];
-              return (
-                <div
-                  key={sides}
-                  className={`flex shrink-0 overflow-hidden rounded-xl border ${
-                    count > 0
-                      ? "border-[#b55b73]/55 bg-[#6b2437]/25"
-                      : "border-[#3c2730] bg-black/25"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    disabled={busy || configuration.loading}
-                    onClick={() => addDie(sides)}
-                    className="min-h-10 min-w-12 px-2.5 text-xs font-black text-[#dfc6ce] disabled:opacity-35"
-                    title={`Add d${sides}`}
-                  >
-                    d{sides}
-                    {count > 0 && (
-                      <span className="ml-1 text-[9px] text-[#e58da5]">×{count}</span>
-                    )}
-                  </button>
-                  {count > 0 && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => removeDie(sides)}
-                      className="min-h-10 border-l border-[#6d3b4a] px-2 text-sm font-black text-[#c37a8e] disabled:opacity-35"
-                      title={`Remove d${sides}`}
-                    >
-                      −
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-
-            <div className="flex shrink-0 items-center overflow-hidden rounded-xl border border-[#3c2730] bg-black/25">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => setModifier((value) => Math.max(-99, value - 1))}
-                className="min-h-10 px-2.5 text-sm font-black text-[#a98d96] disabled:opacity-35"
-              >
-                −
-              </button>
-              <span className="min-w-12 border-x border-[#3c2730] px-2 text-center text-xs font-black text-[#ead8dd]">
-                {modifier >= 0 ? `+${modifier}` : modifier}
+      <div className="fixed inset-x-2 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[70] flex justify-center lg:bottom-4 lg:left-[17rem]">
+        {!expanded ? (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="flex min-h-12 w-full max-w-md items-center justify-between gap-3 rounded-2xl border border-[#6a3c4b] bg-[#100a0e]/96 px-4 py-2.5 text-left shadow-[0_18px_70px_rgba(0,0,0,0.58)] backdrop-blur-xl transition hover:border-[#9b5065] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b85f77]"
+            aria-expanded="false"
+            aria-label="Open dice controls"
+          >
+            <span className="flex items-center gap-2">
+              <span className="text-lg">🎲</span>
+              <span>
+                <span className="block text-sm font-black text-[#ead8dd]">
+                  Dice
+                </span>
+                <span className="block text-xs text-[#8f777f]">
+                  {busy ? "Rolling…" : manualExpression}
+                </span>
               </span>
+            </span>
+            {latest ? (
+              <span className="min-w-0 text-right">
+                <span className="block truncate text-xs text-[#ad8d97]">
+                  Last · {latest.outcome}
+                </span>
+                <span className="block text-lg font-black tabular-nums text-[#f0d8df]">
+                  {latest.total}
+                </span>
+              </span>
+            ) : (
+              <span className="text-xs font-bold text-[#a98792]">Open</span>
+            )}
+          </button>
+        ) : (
+          <section className="max-h-[min(58vh,520px)] w-full max-w-[980px] overflow-y-auto rounded-2xl border border-[#5a3441]/90 bg-[#100a0e]/96 p-3 shadow-[0_18px_70px_rgba(0,0,0,0.58)] backdrop-blur-xl sm:p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[#a96b7d]">
+                  Dice
+                </p>
+                <p className="mt-1 break-words text-sm font-bold text-[#ead8dd]">
+                  {manualExpression}
+                </p>
+                <p className="mt-0.5 text-xs text-[#78666d]">
+                  {manualPhysicalCount}/{MAX_PHYSICAL_DICE} physical dice
+                  {diceLog.saving ? " · Saving last roll…" : ""}
+                </p>
+              </div>
               <button
                 type="button"
-                disabled={busy}
-                onClick={() => setModifier((value) => Math.min(99, value + 1))}
-                className="min-h-10 px-2.5 text-sm font-black text-[#a98d96] disabled:opacity-35"
+                onClick={() => setExpanded(false)}
+                className="min-h-11 shrink-0 rounded-xl border border-[#45303a] px-3 text-xs font-bold text-[#a98e97] transition hover:border-[#724253] hover:text-[#dec6cd]"
+                aria-expanded="true"
+                aria-label="Minimize dice controls"
               >
-                +
+                Minimize
               </button>
             </div>
 
-            <button
-              type="button"
-              disabled={busy}
-              onClick={clearManualDice}
-              className="min-h-10 shrink-0 rounded-xl border border-[#3c2730] px-3 text-[10px] font-black uppercase tracking-[0.08em] text-[#8f777f] disabled:opacity-35"
-            >
-              Clear
-            </button>
-
-            <div className="ml-auto flex shrink-0 items-center gap-2">
-              <div className="hidden text-right sm:block">
-                <p className="max-w-44 truncate text-[11px] font-bold text-[#d5bdc5]">
-                  {manualExpression}
-                </p>
-                <p className="text-[9px] uppercase tracking-[0.1em] text-[#715d64]">
-                  {manualPhysicalCount}/{MAX_PHYSICAL_DICE} physical dice
-                </p>
+            {latest && (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#4b313a] bg-black/20 px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-[#d8bec6]">
+                    Last · {latest.title}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-[#91777f]">
+                    {latest.outcome} · {latest.detail}
+                  </p>
+                </div>
+                <span className="shrink-0 text-2xl font-black tabular-nums text-[#f0d8df]">
+                  {latest.total}
+                </span>
               </div>
+            )}
+
+            <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-7">
+              {QUICK_DICE.map((sides) => {
+                const count = counts[sides];
+                return (
+                  <div
+                    key={sides}
+                    className={`overflow-hidden rounded-xl border ${
+                      count > 0
+                        ? "border-[#a45168]/65 bg-[#5d2032]/30"
+                        : "border-[#3c2730] bg-black/25"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      disabled={busy || configuration.loading}
+                      onClick={() => addDie(sides)}
+                      className="min-h-11 w-full px-2 text-sm font-black text-[#e4cbd2] disabled:opacity-35"
+                      aria-label={`Add d${sides}`}
+                    >
+                      d{sides}
+                      {count > 0 && (
+                        <span className="ml-1 text-xs text-[#e58da5]">
+                          ×{count}
+                        </span>
+                      )}
+                    </button>
+                    {count > 0 && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => removeDie(sides)}
+                        className="min-h-10 w-full border-t border-[#653845] text-sm font-black text-[#c98496] disabled:opacity-35"
+                        aria-label={`Remove one d${sides}`}
+                      >
+                        −1
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-[auto_1fr_auto_auto]">
+              <div className="flex min-h-11 items-center overflow-hidden rounded-xl border border-[#47313a] bg-black/25">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    setModifier((value) => Math.max(-99, value - 1))
+                  }
+                  className="min-h-11 min-w-11 text-base font-black text-[#b2969f] disabled:opacity-35"
+                  aria-label="Decrease modifier"
+                >
+                  −
+                </button>
+                <span className="min-w-14 border-x border-[#47313a] px-3 text-center text-sm font-black tabular-nums text-[#ead8dd]">
+                  {modifier >= 0 ? `+${modifier}` : modifier}
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    setModifier((value) => Math.min(99, value + 1))
+                  }
+                  className="min-h-11 min-w-11 text-base font-black text-[#b2969f] disabled:opacity-35"
+                  aria-label="Increase modifier"
+                >
+                  +
+                </button>
+              </div>
+
+              <button
+                type="button"
+                disabled={busy || configuration.loading}
+                onClick={() => void rollManualDuality()}
+                className="min-h-11 rounded-xl border border-[#8e465c] bg-[#481827]/55 px-4 text-sm font-black text-[#efd3dc] transition hover:bg-[#5a1d30] disabled:opacity-35"
+              >
+                {busy ? "Rolling…" : "Hope / Fear"}
+              </button>
+
+              <button
+                type="button"
+                disabled={busy}
+                onClick={clearManualDice}
+                className="min-h-11 rounded-xl border border-[#45303a] px-4 text-xs font-bold text-[#a2868f] transition hover:border-[#6a4050] disabled:opacity-35"
+              >
+                Clear
+              </button>
+
               <button
                 type="button"
                 disabled={
@@ -554,19 +676,19 @@ export function DaggerheartSheetDiceOverlay({
                   manualPhysicalCount > MAX_PHYSICAL_DICE
                 }
                 onClick={() => void rollManual()}
-                className="min-h-10 rounded-xl border border-[#b45b73]/65 bg-[#6a2135]/45 px-4 text-xs font-black uppercase tracking-[0.12em] text-[#f3d9e0] disabled:cursor-not-allowed disabled:opacity-35"
+                className="min-h-11 rounded-xl border border-[#b45b73]/70 bg-[#6a2135]/55 px-5 text-sm font-black text-[#f3d9e0] transition hover:bg-[#7a2940] disabled:cursor-not-allowed disabled:opacity-35"
               >
                 {busy ? "Rolling…" : "🎲 Roll"}
               </button>
             </div>
-          </div>
 
-          {error && (
-            <p className="mt-1.5 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-1.5 text-[10px] text-rose-200">
-              {error}
-            </p>
-          )}
-        </div>
+            {error && (
+              <p className="mt-2 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                {error}
+              </p>
+            )}
+          </section>
+        )}
       </div>
     </>
   );
