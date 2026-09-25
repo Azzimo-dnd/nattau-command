@@ -165,6 +165,7 @@ Deno.serve(async (req) => {
     .insert({
       campaign_id: campaignId,
       user_id: userId,
+      display_name: resolvedDisplayName,
       role,
       planning_enabled: planningEnabled,
       counts_toward_campaign_progress: countsTowardProgress,
