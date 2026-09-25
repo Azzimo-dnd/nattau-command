@@ -13,6 +13,7 @@ import { DaggerheartActionsPanel } from "@/components/daggerheart/DaggerheartAct
 import { DaggerheartCombatPanel } from "@/components/daggerheart/DaggerheartCombatPanel";
 import { DaggerheartActiveArmorPanel } from "@/components/daggerheart/DaggerheartActiveArmorPanel";
 import { DaggerheartActiveRulesPanel } from "@/components/daggerheart/DaggerheartActiveRulesPanel";
+import { DaggerheartPlaySummary } from "@/components/daggerheart/DaggerheartPlaySummary";
 import {
   DaggerheartSheetDiceOverlay,
   type DaggerheartSheetRollIntent,
@@ -171,6 +172,15 @@ type Props = {
   currentUserId: string;
   isDm: boolean;
 };
+
+type SheetArea = "play" | "cards" | "equipment" | "character";
+
+const SHEET_AREAS: Array<{ id: SheetArea; label: string; hint: string }> = [
+  { id: "play", label: "Play", hint: "Combat, resources and actions" },
+  { id: "cards", label: "Cards", hint: "Domain Loadout & Vault" },
+  { id: "equipment", label: "Equipment", hint: "Weapons, armor and loot" },
+  { id: "character", label: "Character", hint: "Build, story and advancement" },
+];
 
 const inputClass =
   "min-h-11 w-full rounded-xl border border-[#58323f] bg-[#100a0e] px-3 py-2 text-sm text-[#eadfe3] outline-none transition focus:border-[#a34d64] focus:ring-2 focus:ring-[#6e263b]/30";
@@ -912,6 +922,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   const [sheetRollIntent, setSheetRollIntent] =
     useState<DaggerheartSheetRollIntent | null>(null);
   const [sheetRollBusy, setSheetRollBusy] = useState(false);
+  const [activeSheetArea, setActiveSheetArea] = useState<SheetArea>("play");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1033,6 +1044,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     setAdvancedCreation(false);
     setFreeLoadoutEditing(false);
     setActionMessage(null);
+    setActiveSheetArea("play");
     draftRef.current = next;
     editGenerationRef.current = 0;
     setDraft(next);
@@ -1790,6 +1802,69 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       expression,
       damageType,
       source,
+    });
+  }
+
+  function changeSheetArea(nextArea: SheetArea) {
+    if (nextArea === activeSheetArea) return;
+    if (nextArea === "play" && dirty) {
+      setMessage(
+        "Save character changes before returning to Play. This keeps session actions from persisting unfinished edits."
+      );
+      return;
+    }
+    setMessage(null);
+    setActiveSheetArea(nextArea);
+  }
+
+  function updatePlayTrack(
+    key: "hope" | "hp" | "stress" | "armor",
+    nextValue: number
+  ) {
+    if (!draft.id || !canEdit) return;
+
+    if (key === "hope") {
+      persistRuntimePatch({ hope_current: nextValue });
+      return;
+    }
+
+    if (key === "stress") {
+      persistRuntimePatch({ stress_current: nextValue });
+      return;
+    }
+
+    if (key === "armor") {
+      persistRuntimePatch({
+        armor_slots_current: nextValue,
+        armor: syncEquippedArmorMarks(draftRef.current.armor, nextValue),
+      });
+      return;
+    }
+
+    const knockedOut =
+      nextValue >= effectResult.stats.hp_max && effectResult.stats.hp_max > 0;
+    const activeOptionIds = knockedOut
+      ? [
+          draft.class_state.active_beastform_id,
+          draft.class_state.active_stance_id,
+        ].filter((id): id is string => typeof id === "string")
+      : [];
+    const nextEffectState = activeOptionIds.reduce(
+      (state, id) =>
+        clearDaggerheartSourceEffects(state, `class-option:${id}`),
+      draft.effect_state
+    );
+
+    persistRuntimePatch({
+      hp_current: nextValue,
+      effect_state: nextEffectState,
+      class_state: knockedOut
+        ? {
+            ...draft.class_state,
+            active_beastform_id: null,
+            active_stance_id: null,
+          }
+        : draft.class_state,
     });
   }
 
