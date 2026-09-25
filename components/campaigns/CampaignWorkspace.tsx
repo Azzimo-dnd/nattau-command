@@ -3,23 +3,46 @@ import type { ReactNode } from "react";
 import { campaignPresentation, type SupportedCampaign } from "@/lib/campaigns/campaignPresentation";
 import styles from "./CampaignWorkspace.module.css";
 
-export function CampaignWorkspace({ campaignSlug, title, description, children, actions }: {
+export function CampaignWorkspace({ campaignSlug, title, description, children, actions, compact = false }: {
   campaignSlug: SupportedCampaign;
   title: string;
   description: string;
   children: ReactNode;
   actions?: ReactNode;
+  compact?: boolean;
 }) {
   const theme = campaignPresentation(campaignSlug);
   return (
     <main className={`${styles.workspace} ${theme.barovia ? styles.barovia : ""} min-h-screen px-3 py-5 text-slate-100 sm:px-6 lg:py-7`}>
       <div className="mx-auto max-w-[1800px]">
-        <header className={`${styles.header} mb-5 rounded-[30px] border p-5 sm:p-8`}>
+        <header
+          className={`${styles.header} border ${
+            compact
+              ? "mb-4 rounded-2xl p-4 sm:p-5"
+              : "mb-5 rounded-[30px] p-5 sm:p-8"
+          }`}
+        >
           <Link href={theme.home} className="text-xs font-bold uppercase tracking-[0.22em] text-slate-400 hover:text-slate-100">← {theme.homeLabel}</Link>
-          <div className="mt-5 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+          <div
+            className={`${
+              compact ? "mt-3 gap-3" : "mt-5 gap-5"
+            } flex flex-col justify-between lg:flex-row lg:items-end`}
+          >
             <div className="max-w-3xl">
-              <h1 className={`${theme.barovia ? "font-serif" : ""} text-3xl font-black sm:text-5xl`}>{title}</h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">{description}</p>
+              <h1
+                className={`${theme.barovia ? "font-serif" : ""} ${
+                  compact ? "text-2xl sm:text-3xl" : "text-3xl sm:text-5xl"
+                } font-black`}
+              >
+                {title}
+              </h1>
+              <p
+                className={`${
+                  compact ? "mt-2 leading-6" : "mt-4 leading-7"
+                } max-w-2xl text-sm text-slate-400`}
+              >
+                {description}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">{actions}</div>
           </div>
