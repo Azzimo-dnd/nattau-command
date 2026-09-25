@@ -3088,39 +3088,6 @@ export function DaggerheartCharacterSheets({
           </Section>
 
           <Section
-            title="Active Armor"
-            subtitle="Your currently equipped armor, live thresholds and marked Armor Slots."
-          >
-            <DaggerheartActiveArmorPanel
-              armor={equipmentError ? [] : draft.armor}
-              stats={effectResult.stats}
-              markedSlots={draft.armor_slots_current}
-              onMarkedSlotsChange={(armor_slots_current) =>
-                void persistRuntimePatch({
-                  armor_slots_current,
-                  armor: syncEquippedArmorMarks(
-                    draftRef.current.armor,
-                    armor_slots_current
-                  ),
-                })
-              }
-            />
-          </Section>
-
-          <Section
-            title="Actions & Resources"
-            subtitle="Use consumables and abilities directly from the sheet. Costs, marked tracks, use limits and linked temporary effects update automatically."
-          >
-            <DaggerheartActionsPanel
-              character={actionCharacter}
-              sources={actionSources}
-              lastMessage={actionMessage}
-              onUse={useResourceAction}
-              onReset={resetResourceActions}
-            />
-          </Section>
-
-          <Section
             title="Active Rules Reference"
             subtitle="Full linked rules for your current Loadout, equipped gear and carried compendium items."
           >
