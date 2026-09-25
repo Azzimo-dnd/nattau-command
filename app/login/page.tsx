@@ -19,6 +19,11 @@ export default function LoginPage() {
     if (params.get("reset") === "success") {
       setSuccessMessage("Password changed successfully. Sign in with your new password.");
       window.history.replaceState({}, "", "/login");
+    } else if (params.get("temporary") === "changed") {
+      setSuccessMessage(
+        "Your temporary password has been replaced. Sign in with your new password."
+      );
+      window.history.replaceState({}, "", "/login");
     }
   }, []);
 
@@ -30,7 +35,7 @@ export default function LoginPage() {
 
     const supabase = createClient();
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
@@ -41,7 +46,19 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
+    if (data.user?.app_metadata?.requires_password_change === true) {
+      router.push("/change-password");
+      router.refresh();
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const requestedNext = params.get("next");
+    const next =
+      requestedNext?.startsWith("/") && !requestedNext.startsWith("//")
+        ? requestedNext
+        : "/";
+    router.push(next);
     router.refresh();
   }
 
@@ -50,7 +67,7 @@ export default function LoginPage() {
       <section className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
         <div>
           <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
-            Nattau Command
+            Campaign Companion
           </p>
 
           <h1 className="mt-3 text-3xl font-bold">
@@ -58,8 +75,8 @@ export default function LoginPage() {
           </h1>
 
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            Sign in to access your character, campaign tools and shared session
-            data.
+            Sign in to access the campaigns you belong to, your character sheet,
+            session tools and shared game data.
           </p>
         </div>
 
@@ -137,7 +154,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-xs text-slate-500">
-          Accounts are created by the Dungeon Master.
+          Nattau · Beyond the Mists · accounts are managed by campaign Game Masters.
         </p>
       </section>
     </main>

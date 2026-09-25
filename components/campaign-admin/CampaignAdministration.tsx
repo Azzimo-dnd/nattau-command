@@ -20,7 +20,7 @@ type CampaignAdministrationProps = {
   initialInvites: CampaignInviteSummary[];
 };
 
-type TabKey = "members" | "invites";
+type TabKey = "members" | "create" | "invites";
 
 type MemberDraft = {
   role: "dm" | "player";
@@ -71,6 +71,48 @@ function statusClass(status: string) {
 
 async function copyText(value: string) {
   await navigator.clipboard.writeText(value);
+}
+
+function generateTemporaryPassword() {
+  const alphabet =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  const bytes = new Uint32Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (value) => alphabet[value % alphabet.length]).join("");
+}
+
+async function functionErrorMessage(error: unknown, fallback: string) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "context" in error &&
+    (error as { context?: unknown }).context instanceof Response
+  ) {
+    try {
+      const body = await (error as { context: Response }).context.clone().json();
+      if (
+        body &&
+        typeof body === "object" &&
+        "error" in body &&
+        typeof (body as { error?: unknown }).error === "string"
+      ) {
+        return (body as { error: string }).error;
+      }
+    } catch {
+      // Fall through to the public error message.
+    }
+  }
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return fallback;
 }
 
 function Toggle({
@@ -317,6 +359,19 @@ export function CampaignAdministration({
   const [tab, setTab] = useState<TabKey>("members");
   const [members, setMembers] = useState(initialMembers);
   const [invites, setInvites] = useState(initialInvites);
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountDisplayName, setAccountDisplayName] = useState("");
+  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [accountRole, setAccountRole] = useState<"player" | "dm">("player");
+  const [accountPlanningEnabled, setAccountPlanningEnabled] = useState(true);
+  const [accountCountsTowardProgress, setAccountCountsTowardProgress] =
+    useState(true);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [createdAccount, setCreatedAccount] = useState<{
+    email: string;
+    password: string;
+    role: "player" | "dm";
+  } | null>(null);
   const [editingMember, setEditingMember] =
     useState<CampaignAdminMember | null>(null);
   const [label, setLabel] = useState("Main party");
@@ -347,6 +402,109 @@ export function CampaignAdministration({
 
   function refresh() {
     router.refresh();
+  }
+
+  async function createAccount() {
+    setNotice(null);
+    setCreatedAccount(null);
+
+    const email = accountEmail.trim().toLowerCase();
+    const displayName = accountDisplayName.trim();
+
+    if (!email) {
+      setNotice("Enter the player's email address.");
+      return;
+    }
+    if (temporaryPassword.length < 10) {
+      setNotice("Temporary password must contain at least 10 characters.");
+      return;
+    }
+
+    setIsCreatingAccount(true);
+    const supabase = createClient();
+
+    const { data, error } = await supabase.functions.invoke(
+      "campaign-admin-create-user",
+      {
+        body: {
+          campaignId,
+          email,
+          password: temporaryPassword,
+          displayName: displayName || null,
+          role: accountRole,
+          planningEnabled: accountPlanningEnabled,
+          countsTowardProgress: accountCountsTowardProgress,
+        },
+      }
+    );
+
+    if (error) {
+      setNotice(
+        await functionErrorMessage(
+          error,
+          "The account could not be created."
+        )
+      );
+      setIsCreatingAccount(false);
+      return;
+    }
+
+    const record =
+      data && typeof data === "object"
+        ? (data as Record<string, unknown>)
+        : null;
+    const member =
+      record?.member && typeof record.member === "object"
+        ? (record.member as Record<string, unknown>)
+        : null;
+
+    if (!member || typeof member.userId !== "string") {
+      setNotice("The account was created, but the new member could not be displayed.");
+      setIsCreatingAccount(false);
+      refresh();
+      return;
+    }
+
+    const newMember: CampaignAdminMember = {
+      userId: member.userId,
+      displayName:
+        typeof member.displayName === "string"
+          ? member.displayName
+          : email.split("@")[0],
+      email: typeof member.email === "string" ? member.email : email,
+      role: member.role === "dm" ? "dm" : "player",
+      planningEnabled: member.planningEnabled !== false,
+      countsTowardProgress: member.countsTowardProgress !== false,
+      isTestAccount: member.isTestAccount === true,
+      isActive: member.isActive !== false,
+      joinedAt:
+        typeof member.joinedAt === "string"
+          ? member.joinedAt
+          : new Date().toISOString(),
+      lastSeenAt:
+        typeof member.lastSeenAt === "string" ? member.lastSeenAt : null,
+    };
+
+    setMembers((current) => [
+      newMember,
+      ...current.filter((item) => item.userId !== newMember.userId),
+    ]);
+    setCreatedAccount({
+      email,
+      password: temporaryPassword,
+      role: newMember.role,
+    });
+    setAccountEmail("");
+    setAccountDisplayName("");
+    setTemporaryPassword("");
+    setAccountRole("player");
+    setAccountPlanningEnabled(true);
+    setAccountCountsTowardProgress(true);
+    setNotice(
+      "Account created and added to the campaign. Copy the temporary credentials now."
+    );
+    setIsCreatingAccount(false);
+    refresh();
   }
 
   async function createInvite() {
@@ -459,6 +617,7 @@ export function CampaignAdministration({
       <div className={`mt-6 flex rounded-2xl border bg-black/20 p-1 ${theme.border}`}>
         {([
           ["members", "Members"],
+          ["create", "Create account"],
           ["invites", "Invitations"],
         ] as const).map(([key, text]) => (
           <button
@@ -544,6 +703,183 @@ export function CampaignAdministration({
               </div>
             </article>
           ))}
+        </div>
+      ) : tab === "create" ? (
+        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.75fr)]">
+          <section className={`${theme.panel} p-5 sm:p-6`}>
+            <p
+              className={`text-xs font-bold uppercase tracking-[0.28em] ${theme.accentText}`}
+            >
+              Direct onboarding
+            </p>
+            <h2 className={`mt-3 font-serif text-2xl font-black ${theme.mainText}`}>
+              Create campaign account
+            </h2>
+            <p className={`mt-2 text-sm leading-6 ${theme.mutedText}`}>
+              Create the Supabase Auth account yourself, choose its campaign role,
+              and give the player a temporary password. On first sign-in they must
+              replace it with their own password before entering the campaign.
+            </p>
+
+            <div className="mt-6 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className={`text-sm font-semibold ${theme.mainText}`}>
+                    Email
+                  </span>
+                  <input
+                    type="email"
+                    value={accountEmail}
+                    onChange={(event) => setAccountEmail(event.target.value)}
+                    autoComplete="off"
+                    placeholder="player@example.com"
+                    className={`mt-2 w-full rounded-xl border px-4 py-3 outline-none ${theme.input}`}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className={`text-sm font-semibold ${theme.mainText}`}>
+                    Display name · optional
+                  </span>
+                  <input
+                    value={accountDisplayName}
+                    onChange={(event) => setAccountDisplayName(event.target.value)}
+                    maxLength={80}
+                    autoComplete="off"
+                    placeholder="Player name"
+                    className={`mt-2 w-full rounded-xl border px-4 py-3 outline-none ${theme.input}`}
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className={`text-sm font-semibold ${theme.mainText}`}>
+                  Temporary password
+                </span>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={temporaryPassword}
+                    onChange={(event) => setTemporaryPassword(event.target.value)}
+                    minLength={10}
+                    autoComplete="off"
+                    placeholder="At least 10 characters"
+                    className={`min-w-0 flex-1 rounded-xl border px-4 py-3 font-mono outline-none ${theme.input}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setTemporaryPassword(generateTemporaryPassword())}
+                    className={`min-h-11 shrink-0 rounded-xl border px-3 text-xs font-bold ${theme.secondaryButton}`}
+                  >
+                    Generate
+                  </button>
+                </div>
+                <span className={`mt-2 block text-xs leading-5 ${theme.faintText}`}>
+                  The password is sent only to Supabase Auth and is never stored in
+                  campaign tables. The player must change it after the first login.
+                </span>
+              </label>
+
+              <label className={`block rounded-2xl border p-4 ${theme.panelSoft}`}>
+                <span className={`text-sm font-semibold ${theme.mainText}`}>
+                  Campaign role
+                </span>
+                <select
+                  value={accountRole}
+                  onChange={(event) =>
+                    setAccountRole(event.target.value === "dm" ? "dm" : "player")
+                  }
+                  className={`mt-3 w-full rounded-xl border px-3 py-3 text-sm outline-none ${theme.input}`}
+                >
+                  <option value="player">Player</option>
+                  <option value="dm">Game Master</option>
+                </select>
+                <span className={`mt-2 block text-xs leading-5 ${theme.mutedText}`}>
+                  Game Master grants full GM access to this campaign. Use it only for
+                  people who should administer the campaign.
+                </span>
+              </label>
+
+              <Toggle
+                checked={accountPlanningEnabled}
+                onChange={setAccountPlanningEnabled}
+                label="Include in session planning"
+                description="Recommended for normal players."
+                themeKey={themeKey}
+              />
+              <Toggle
+                checked={accountCountsTowardProgress}
+                onChange={setAccountCountsTowardProgress}
+                label="Include in campaign progress"
+                description="Recommended for normal campaign members."
+                themeKey={themeKey}
+              />
+
+              <button
+                type="button"
+                disabled={isCreatingAccount}
+                onClick={() => void createAccount()}
+                className={`min-h-12 w-full rounded-xl border px-5 text-sm font-black shadow-lg shadow-black/20 disabled:opacity-50 ${theme.primaryButton}`}
+              >
+                {isCreatingAccount ? "Creating account…" : "Create account & grant access"}
+              </button>
+            </div>
+          </section>
+
+          <aside className={`${theme.panel} p-5 sm:p-6`}>
+            <p
+              className={`text-xs font-bold uppercase tracking-[0.28em] ${theme.accentText}`}
+            >
+              First login
+            </p>
+            <h2 className={`mt-3 font-serif text-2xl font-black ${theme.mainText}`}>
+              What the player receives
+            </h2>
+            <div className={`mt-4 space-y-3 text-sm leading-6 ${theme.mutedText}`}>
+              <p>
+                1. Send them the production login page, their email and the temporary password.
+              </p>
+              <p>
+                2. After signing in, the app forces them to choose a private password.
+              </p>
+              <p>
+                3. After that they enter only campaigns where their membership is active.
+              </p>
+            </div>
+
+            {createdAccount && (
+              <div className={`mt-6 rounded-[22px] border p-5 ${theme.codeBox}`}>
+                <p className={`text-[10px] font-bold uppercase tracking-[0.25em] ${theme.accentText}`}>
+                  Copy now
+                </p>
+                <p className={`mt-3 break-all text-sm font-bold ${theme.mainText}`}>
+                  {createdAccount.email}
+                </p>
+                <code className={`mt-2 block break-all rounded-xl border bg-black/25 px-3 py-3 text-center text-sm font-black tracking-[0.08em] ${theme.border} ${theme.mainText}`}>
+                  {createdAccount.password}
+                </code>
+                <p className={`mt-2 text-xs ${theme.mutedText}`}>
+                  Role: {createdAccount.role === "dm" ? "Game Master" : "Player"}
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => copyText(createdAccount.email)}
+                    className={`min-h-11 rounded-xl border px-3 text-sm font-bold ${theme.secondaryButton}`}
+                  >
+                    Copy email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => copyText(createdAccount.password)}
+                    className={`min-h-11 rounded-xl border px-3 text-sm font-bold ${theme.secondaryButton}`}
+                  >
+                    Copy password
+                  </button>
+                </div>
+              </div>
+            )}
+          </aside>
         </div>
       ) : (
         <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">

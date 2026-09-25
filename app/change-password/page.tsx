@@ -6,7 +6,41 @@ import { createClient } from "@/lib/supabase/client";
 
 const MIN_PASSWORD_LENGTH = 10;
 
-export default function ResetPasswordPage() {
+async function functionErrorMessage(error: unknown, fallback: string) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "context" in error &&
+    (error as { context?: unknown }).context instanceof Response
+  ) {
+    try {
+      const body = await (error as { context: Response }).context.clone().json();
+      if (
+        body &&
+        typeof body === "object" &&
+        "error" in body &&
+        typeof (body as { error?: unknown }).error === "string"
+      ) {
+        return (body as { error: string }).error;
+      }
+    } catch {
+      // Use the generic error below.
+    }
+  }
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return fallback;
+}
+
+export default function ChangePasswordPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -19,7 +53,7 @@ export default function ResetPasswordPage() {
 
     if (password.length < MIN_PASSWORD_LENGTH) {
       setErrorMessage(
-        `Use at least ${MIN_PASSWORD_LENGTH} characters for your new password.`,
+        `Use at least ${MIN_PASSWORD_LENGTH} characters for your new password.`
       );
       return;
     }
@@ -32,33 +66,24 @@ export default function ResetPasswordPage() {
     setIsSubmitting(true);
     const supabase = createClient();
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { error } = await supabase.functions.invoke(
+      "complete-temporary-password",
+      { body: { password } }
+    );
 
-    if (userError || !user) {
+    if (error) {
+      setErrorMessage(
+        await functionErrorMessage(
+          error,
+          "Your password could not be changed."
+        )
+      );
       setIsSubmitting(false);
-      router.replace("/forgot-password?error=recovery_link_invalid");
       return;
     }
 
-    const { error: updateError } = await supabase.auth.updateUser({
-      password,
-    });
-
-    if (updateError) {
-      setIsSubmitting(false);
-      setErrorMessage(updateError.message);
-      return;
-    }
-
-    // A password recovery should also terminate old refresh-token sessions.
-    // Supabase access-token JWTs may live until their normal expiry, but no
-    // revoked session can refresh afterwards.
     await supabase.auth.signOut({ scope: "global" });
-
-    router.replace("/login?reset=success");
+    router.replace("/login?temporary=changed");
     router.refresh();
   }
 
@@ -70,23 +95,20 @@ export default function ResetPasswordPage() {
             Campaign Companion
           </p>
 
-          <h1 className="mt-3 text-3xl font-bold">Choose a new password</h1>
+          <h1 className="mt-3 text-3xl font-bold">Choose your password</h1>
 
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            Set a new password for your player account. For security, resetting it
-            will sign the account out on every device.
+            Your Game Master created this account with a temporary password.
+            Replace it before entering the campaign. The temporary password will
+            no longer work afterwards.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           <div>
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-slate-300"
-            >
+            <label htmlFor="password" className="text-sm font-medium text-slate-300">
               New password
             </label>
-
             <input
               id="password"
               type="password"
@@ -102,13 +124,9 @@ export default function ResetPasswordPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="confirmation"
-              className="text-sm font-medium text-slate-300"
-            >
+            <label htmlFor="confirmation" className="text-sm font-medium text-slate-300">
               Confirm new password
             </label>
-
             <input
               id="confirmation"
               type="password"
@@ -118,7 +136,7 @@ export default function ResetPasswordPage() {
               minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-yellow-500"
-              placeholder="Repeat the new password"
+              placeholder="Repeat your new password"
             />
           </div>
 
@@ -133,7 +151,7 @@ export default function ResetPasswordPage() {
             disabled={isSubmitting}
             className="w-full rounded-xl bg-yellow-500 px-4 py-3 font-bold text-slate-950 transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? "Updating password..." : "Set new password"}
+            {isSubmitting ? "Saving password…" : "Set my password"}
           </button>
         </form>
       </section>

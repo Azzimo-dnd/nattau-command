@@ -56,7 +56,7 @@ export default function ForgotPasswordPage() {
       <section className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
         <div>
           <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
-            Nattau Command
+            Campaign Companion
           </p>
 
           <h1 className="mt-3 text-3xl font-bold">Reset password</h1>

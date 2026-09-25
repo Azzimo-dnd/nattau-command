@@ -4,8 +4,8 @@ import { AuthenticatedNavigation } from "@/components/navigation/AuthenticatedNa
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nattau Command",
-  description: "Campaign command center for Nattau and Barovia — Beyond the Mists.",
+  title: "Campaign Companion",
+  description: "Campaign companion for Nattau and Barovia — Beyond the Mists.",
 };
 
 type RootLayoutProps = {
