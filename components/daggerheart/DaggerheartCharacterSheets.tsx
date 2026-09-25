@@ -698,6 +698,66 @@ function NumberField({
   );
 }
 
+function PlayTrackCard({
+  label,
+  current,
+  max,
+  mode,
+  disabled,
+  onDecrease,
+  onIncrease,
+}: {
+  label: string;
+  current: number;
+  max: number;
+  mode: "current" | "marked";
+  disabled: boolean;
+  onDecrease: () => void;
+  onIncrease: () => void;
+}) {
+  const atMin = current <= 0;
+  const atMax = current >= max;
+
+  return (
+    <div className="rounded-xl border border-[#432a34] bg-black/20 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.13em] text-[#a77887]">
+            {label}
+          </p>
+          <p className="mt-1 text-2xl font-black tabular-nums text-[#f0dce2]">
+            {current}
+            <span className="text-sm font-semibold text-[#7e6971]">/{max}</span>
+          </p>
+          <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#705d64]">
+            {mode}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          disabled={disabled || atMin}
+          onClick={onDecrease}
+          className="min-h-11 rounded-lg border border-[#49313a] bg-black/20 text-base font-black text-[#b99da6] transition hover:border-[#754454] disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label={`Decrease ${label}`}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          disabled={disabled || atMax}
+          onClick={onIncrease}
+          className="min-h-11 rounded-lg border border-[#754153] bg-[#3a1723] text-base font-black text-[#e2c4cd] transition hover:border-[#a35a70] disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label={`Increase ${label}`}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function StringListEditor({
   value,
   onChange,
