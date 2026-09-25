@@ -170,6 +170,7 @@ type Props = {
   campaignId: string;
   currentUserId: string;
   isDm: boolean;
+  mode?: "play" | "manager";
 };
 
 const inputClass =
@@ -890,7 +891,12 @@ function GearEditor({
   );
 }
 
-export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: Props) {
+export function DaggerheartCharacterSheets({
+  campaignId,
+  currentUserId,
+  isDm,
+  mode = "play",
+}: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [characters, setCharacters] = useState<CharacterRow[]>([]);
@@ -1260,7 +1266,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }, [actionSources]);
 
   useEffect(() => {
-    if (!liveConfigurationValid) return;
+    if (mode === "play" || !liveConfigurationValid) return;
     const snapshot = effectiveSnapshot(effectResult);
     const nextHp = Math.min(draft.hp_current, snapshot.hp_max);
     const nextStress = Math.min(draft.stress_current, snapshot.stress_max);
@@ -1293,7 +1299,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         armor_slots_current: nextArmorSlots,
       });
     }
-  }, [draft, effectResult, liveConfigurationValid, patch]);
+  }, [draft, effectResult, liveConfigurationValid, mode, patch]);
 
   function normalizeRuntimePatch(
     patchValue: Partial<CharacterRow>
@@ -1791,6 +1797,94 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
       damageType,
       source,
     });
+  }
+
+  function updatePlayTrack(
+    track: "hope" | "hp" | "stress" | "armor",
+    nextValue: number
+  ) {
+    if (!draft.id || !canEdit) return;
+
+    if (track === "hope") {
+      void persistRuntimePatch({
+        hope_current: Math.max(
+          0,
+          Math.min(nextValue, effectResult.stats.hope_max)
+        ),
+      });
+      return;
+    }
+
+    if (track === "stress") {
+      void persistRuntimePatch({
+        stress_current: Math.max(
+          0,
+          Math.min(nextValue, effectResult.stats.stress_max)
+        ),
+      });
+      return;
+    }
+
+    if (track === "armor") {
+      const armor_slots_current = Math.max(
+        0,
+        Math.min(nextValue, effectResult.stats.armor_slots_max)
+      );
+      void persistRuntimePatch({
+        armor_slots_current,
+        armor: syncEquippedArmorMarks(
+          draftRef.current.armor,
+          armor_slots_current
+        ),
+      });
+      return;
+    }
+
+    const hp_current = Math.max(
+      0,
+      Math.min(nextValue, effectResult.stats.hp_max)
+    );
+    const knockedOut =
+      hp_current >= effectResult.stats.hp_max &&
+      effectResult.stats.hp_max > 0;
+    const activeOptionIds = knockedOut
+      ? [
+          draft.class_state.active_beastform_id,
+          draft.class_state.active_stance_id,
+        ].filter((id): id is string => typeof id === "string")
+      : [];
+    const nextEffectState = activeOptionIds.reduce(
+      (state, id) =>
+        clearDaggerheartSourceEffects(state, `class-option:${id}`),
+      draft.effect_state
+    );
+
+    void persistRuntimePatch({
+      hp_current,
+      effect_state: nextEffectState,
+      class_state: knockedOut
+        ? {
+            ...draft.class_state,
+            active_beastform_id: null,
+            active_stance_id: null,
+          }
+        : draft.class_state,
+    });
+  }
+
+  function changePlayTrack(
+    track: "hope" | "hp" | "stress" | "armor",
+    delta: number
+  ) {
+    const current =
+      track === "hope"
+        ? draft.hope_current
+        : track === "hp"
+          ? draft.hp_current
+          : track === "stress"
+            ? draft.stress_current
+            : draft.armor_slots_current;
+    updatePlayTrack(track, current + delta);
   }
 
   function setManualModifier(stat: keyof DaggerheartManualStatModifiers, value: number) {
