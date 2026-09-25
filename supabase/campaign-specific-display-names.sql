@@ -25,6 +25,58 @@ alter table public.campaign_members
   add constraint campaign_members_display_name_length_check
   check (display_name is null or char_length(trim(display_name)) between 1 and 80);
 
+create or replace function private.campaign_display_name(
+  p_campaign_id uuid,
+  p_user_id uuid,
+  p_fallback text default 'Campaign member'
+)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select coalesce(
+    (
+      select nullif(trim(cm.display_name), '')
+      from public.campaign_members cm
+      where cm.campaign_id = p_campaign_id
+        and cm.user_id = p_user_id
+      limit 1
+    ),
+    (
+      select nullif(trim(p.display_name), '')
+      from public.profiles p
+      where p.id = p_user_id
+      limit 1
+    ),
+    p_fallback
+  );
+$;
+
+create or replace function private.ensure_campaign_member_display_name()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $
+begin
+  if nullif(trim(new.display_name), '') is null then
+    select nullif(trim(p.display_name), '')
+      into new.display_name
+    from public.profiles p
+    where p.id = new.user_id;
+  end if;
+
+  new.display_name := coalesce(
+    nullif(trim(new.display_name), ''),
+    'Campaign member'
+  );
+
+  return new;
+end;
+$;
+
 CREATE OR REPLACE FUNCTION public.get_campaign_chat_messages(p_thread_id uuid)
  RETURNS TABLE(id uuid, campaign_id uuid, thread_id uuid, sender_id uuid, sender_name text, sender_role text, content text, created_at timestamp with time zone)
  LANGUAGE sql
