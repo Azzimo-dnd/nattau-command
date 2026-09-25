@@ -2655,6 +2655,67 @@ export function DaggerheartCharacterSheets({
         )}
 
         <Section
+          title="Inventory & Gold"
+          subtitle="Carried items and stored weapons from your configured character."
+        >
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              ["Handfuls", draft.gold.handfuls],
+              ["Bags", draft.gold.bags],
+              ["Chests", draft.gold.chests],
+            ].map(([label, value]) => (
+              <div
+                key={String(label)}
+                className="rounded-xl border border-[#38272e] bg-black/15 px-3 py-3 text-center"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#806c73]">
+                  {label}
+                </p>
+                <p className="mt-1 text-xl font-black tabular-nums text-[#ddc8cf]">
+                  {value}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {[
+              ...draft.weapons.filter((item) => item.equipped === false),
+              ...draft.inventory,
+            ].map((item, index) => (
+              <details
+                key={item.instance_id ?? `${item.name}:${index}`}
+                className="rounded-xl border border-[#35252c] bg-black/15"
+              >
+                <summary className="cursor-pointer list-none px-3 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-[#d8c2c9]">
+                      {item.name || "Unnamed item"}
+                    </span>
+                    {(item.quantity ?? 1) > 1 && (
+                      <span className="rounded-full border border-[#49313a] px-2 py-0.5 text-xs text-[#9d858d]">
+                        ×{item.quantity}
+                      </span>
+                    )}
+                  </div>
+                </summary>
+                {item.details?.trim() && item.details.trim() !== "—" && (
+                  <p className="border-t border-[#2d2026] px-3 py-3 whitespace-pre-line text-sm leading-6 text-[#a48d95]">
+                    {item.details}
+                  </p>
+                )}
+              </details>
+            ))}
+            {draft.inventory.length === 0 &&
+              draft.weapons.every((item) => item.equipped !== false) && (
+                <p className="rounded-xl border border-dashed border-[#34262c] px-3 py-4 text-center text-sm text-[#746269]">
+                  No stored items on this character.
+                </p>
+              )}
+          </div>
+        </Section>
+
+        <Section
           title="Effects & Conditions"
           subtitle="Situational effects and their impact on the live sheet."
         >
