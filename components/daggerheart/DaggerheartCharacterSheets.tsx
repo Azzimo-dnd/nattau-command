@@ -170,6 +170,7 @@ type Props = {
   campaignId: string;
   currentUserId: string;
   isDm: boolean;
+  mode?: "play" | "manager";
 };
 
 const inputClass =
@@ -697,6 +698,66 @@ function NumberField({
   );
 }
 
+function PlayTrackCard({
+  label,
+  current,
+  max,
+  mode,
+  disabled,
+  onDecrease,
+  onIncrease,
+}: {
+  label: string;
+  current: number;
+  max: number;
+  mode: "current" | "marked";
+  disabled: boolean;
+  onDecrease: () => void;
+  onIncrease: () => void;
+}) {
+  const atMin = current <= 0;
+  const atMax = current >= max;
+
+  return (
+    <div className="rounded-xl border border-[#432a34] bg-black/20 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.13em] text-[#a77887]">
+            {label}
+          </p>
+          <p className="mt-1 text-2xl font-black tabular-nums text-[#f0dce2]">
+            {current}
+            <span className="text-sm font-semibold text-[#7e6971]">/{max}</span>
+          </p>
+          <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#705d64]">
+            {mode}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          disabled={disabled || atMin}
+          onClick={onDecrease}
+          className="min-h-11 rounded-lg border border-[#49313a] bg-black/20 text-base font-black text-[#b99da6] transition hover:border-[#754454] disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label={`Decrease ${label}`}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          disabled={disabled || atMax}
+          onClick={onIncrease}
+          className="min-h-11 rounded-lg border border-[#754153] bg-[#3a1723] text-base font-black text-[#e2c4cd] transition hover:border-[#a35a70] disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label={`Increase ${label}`}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function StringListEditor({
   value,
   onChange,
@@ -890,7 +951,12 @@ function GearEditor({
   );
 }
 
-export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: Props) {
+export function DaggerheartCharacterSheets({
+  campaignId,
+  currentUserId,
+  isDm,
+  mode = "play",
+}: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [characters, setCharacters] = useState<CharacterRow[]>([]);
@@ -1260,7 +1326,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
   }, [actionSources]);
 
   useEffect(() => {
-    if (!liveConfigurationValid) return;
+    if (mode === "play" || !liveConfigurationValid) return;
     const snapshot = effectiveSnapshot(effectResult);
     const nextHp = Math.min(draft.hp_current, snapshot.hp_max);
     const nextStress = Math.min(draft.stress_current, snapshot.stress_max);
@@ -1293,7 +1359,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         armor_slots_current: nextArmorSlots,
       });
     }
-  }, [draft, effectResult, liveConfigurationValid, patch]);
+  }, [draft, effectResult, liveConfigurationValid, mode, patch]);
 
   function normalizeRuntimePatch(
     patchValue: Partial<CharacterRow>
@@ -1793,6 +1859,94 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
     });
   }
 
+  function updatePlayTrack(
+    track: "hope" | "hp" | "stress" | "armor",
+    nextValue: number
+  ) {
+    if (!draft.id || !canEdit) return;
+
+    if (track === "hope") {
+      void persistRuntimePatch({
+        hope_current: Math.max(
+          0,
+          Math.min(nextValue, effectResult.stats.hope_max)
+        ),
+      });
+      return;
+    }
+
+    if (track === "stress") {
+      void persistRuntimePatch({
+        stress_current: Math.max(
+          0,
+          Math.min(nextValue, effectResult.stats.stress_max)
+        ),
+      });
+      return;
+    }
+
+    if (track === "armor") {
+      const armor_slots_current = Math.max(
+        0,
+        Math.min(nextValue, effectResult.stats.armor_slots_max)
+      );
+      void persistRuntimePatch({
+        armor_slots_current,
+        armor: syncEquippedArmorMarks(
+          draftRef.current.armor,
+          armor_slots_current
+        ),
+      });
+      return;
+    }
+
+    const hp_current = Math.max(
+      0,
+      Math.min(nextValue, effectResult.stats.hp_max)
+    );
+    const knockedOut =
+      hp_current >= effectResult.stats.hp_max &&
+      effectResult.stats.hp_max > 0;
+    const activeOptionIds = knockedOut
+      ? [
+          draft.class_state.active_beastform_id,
+          draft.class_state.active_stance_id,
+        ].filter((id): id is string => typeof id === "string")
+      : [];
+    const nextEffectState = activeOptionIds.reduce(
+      (state, id) =>
+        clearDaggerheartSourceEffects(state, `class-option:${id}`),
+      draft.effect_state
+    );
+
+    void persistRuntimePatch({
+      hp_current,
+      effect_state: nextEffectState,
+      class_state: knockedOut
+        ? {
+            ...draft.class_state,
+            active_beastform_id: null,
+            active_stance_id: null,
+          }
+        : draft.class_state,
+    });
+  }
+
+  function changePlayTrack(
+    track: "hope" | "hp" | "stress" | "armor",
+    delta: number
+  ) {
+    const current =
+      track === "hope"
+        ? draft.hope_current
+        : track === "hp"
+          ? draft.hp_current
+          : track === "stress"
+            ? draft.stress_current
+            : draft.armor_slots_current;
+    updatePlayTrack(track, current + delta);
+  }
+
   function setManualModifier(stat: keyof DaggerheartManualStatModifiers, value: number) {
     patch({
       manual_stat_modifiers: {
@@ -2112,6 +2266,495 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
 
   if (loading) {
     return <div className="rounded-2xl border border-[#402630] bg-[#120c10]/80 p-6 text-sm text-[#a9969d]">Reading the names written in the Mists…</div>;
+  }
+
+  if (mode === "play") {
+    if (!draft.id) {
+      return (
+        <div className="space-y-4">
+          {isDm && roster.length > 0 && (
+            <label className="block rounded-2xl border border-[#402630] bg-[#100a0e]/90 p-4">
+              <span className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-[#9b6877]">
+                View player sheet
+              </span>
+              <select
+                className={inputClass}
+                value={selectedPlayerId ?? ""}
+                onChange={(event) => choosePlayer(event.target.value)}
+              >
+                {roster.map((player) => (
+                  <option key={player.player_id} value={player.player_id}>
+                    {player.display_name}
+                    {player.character_name
+                      ? ` · ${player.character_name}`
+                      : " · no character sheet"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <div className="rounded-2xl border border-[#4a303a] bg-[#120c10]/88 p-6 text-center">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#9f6878]">
+              Character sheet
+            </p>
+            <h2 className="mt-2 font-serif text-2xl font-black text-[#ead7dc]">
+              No playable character yet
+            </h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#927e85]">
+              {isDm
+                ? "This player does not have an assigned character sheet. Create or assign one in Character Manager."
+                : "Your GM has not assigned a character sheet to you yet."}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    const playWeapons = activeBeastform
+      ? [
+          {
+            instance_id: `beastform:${activeBeastform.id}`,
+            name: activeBeastform.name,
+            category: "beastform",
+            equipped: true,
+            metadata: activeBeastform.metadata,
+          },
+        ]
+      : brawlerStrike
+        ? [...draft.weapons, brawlerStrike]
+        : draft.weapons;
+    const activeLoadout = draft.domain_cards.filter(
+      (card) => card.state === "loadout"
+    );
+
+    return (
+      <div className="space-y-4 pb-[calc(8rem+env(safe-area-inset-bottom))]">
+        {isDm && (
+          <div className="rounded-2xl border border-[#402630] bg-[#100a0e]/90 p-3 sm:p-4">
+            <label className="block max-w-xl">
+              <span className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-[#9b6877]">
+                View player sheet
+              </span>
+              <select
+                className={inputClass}
+                value={selectedPlayerId ?? ""}
+                onChange={(event) => choosePlayer(event.target.value)}
+              >
+                {roster.map((player) => (
+                  <option key={player.player_id} value={player.player_id}>
+                    {player.display_name}
+                    {player.character_name
+                      ? ` · ${player.character_name}`
+                      : " · no character sheet"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+
+        {message && (
+          <p className="rounded-xl border border-[#55303d] bg-black/20 px-3 py-2 text-sm text-[#d8bbc3]">
+            {message}
+          </p>
+        )}
+
+        <header className="rounded-2xl border border-[#4a2935] bg-gradient-to-br from-[#2b111a] to-[#100a0e] p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#a65a70]">
+                Play sheet · Daggerheart
+              </p>
+              <h2 className="mt-1 break-words font-serif text-2xl font-black text-[#f0dde2] sm:text-3xl">
+                {draft.name || "Unnamed Wanderer"}
+              </h2>
+              <p className="mt-1.5 text-sm text-[#a58f96]">
+                Lv. {draft.level}
+                {selectedClass ? ` · ${selectedClass.label}` : ""}
+                {draft.subclass_key ? ` · ${draft.subclass_key}` : ""}
+              </p>
+              <p className="mt-1 text-xs text-[#7f6d73]">
+                {[draft.ancestry_key, draft.community_key]
+                  .filter(Boolean)
+                  .join(" · ") || "Heritage not configured"}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full border border-[#563642] bg-black/20 px-3 py-1.5 font-bold text-[#c5abb3]">
+                Proficiency {effectResult.stats.proficiency}
+              </span>
+              {actionMessage && (
+                <span className="max-w-md rounded-xl border border-[#744253] bg-[#211219] px-3 py-1.5 text-[#d6bac3]">
+                  {actionMessage}
+                </span>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <section className="rounded-2xl border border-[#432a34] bg-[#120c10]/88 p-4 sm:p-5">
+          <div className="mb-4">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#a56a7a]">
+              Current state
+            </p>
+            <h3 className="mt-1 font-serif text-xl font-black text-[#ead7dc]">
+              Resources & defense
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <PlayTrackCard
+              label="Hope"
+              current={draft.hope_current}
+              max={effectResult.stats.hope_max}
+              mode="current"
+              disabled={!canEdit}
+              onDecrease={() => changePlayTrack("hope", -1)}
+              onIncrease={() => changePlayTrack("hope", 1)}
+            />
+            <PlayTrackCard
+              label="HP"
+              current={draft.hp_current}
+              max={effectResult.stats.hp_max}
+              mode="marked"
+              disabled={!canEdit}
+              onDecrease={() => changePlayTrack("hp", -1)}
+              onIncrease={() => changePlayTrack("hp", 1)}
+            />
+            <PlayTrackCard
+              label="Stress"
+              current={draft.stress_current}
+              max={effectResult.stats.stress_max}
+              mode="marked"
+              disabled={!canEdit}
+              onDecrease={() => changePlayTrack("stress", -1)}
+              onIncrease={() => changePlayTrack("stress", 1)}
+            />
+            <PlayTrackCard
+              label="Armor"
+              current={draft.armor_slots_current}
+              max={effectResult.stats.armor_slots_max}
+              mode="marked"
+              disabled={!canEdit}
+              onDecrease={() => changePlayTrack("armor", -1)}
+              onIncrease={() => changePlayTrack("armor", 1)}
+            />
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              ["Evasion", effectResult.stats.evasion],
+              ["Major", effectResult.stats.major_threshold],
+              ["Severe", effectResult.stats.severe_threshold],
+              ["Armor Score", effectResult.stats.armor_score],
+            ].map(([label, value]) => (
+              <div
+                key={String(label)}
+                className="rounded-xl border border-[#34242b] bg-black/15 px-3 py-2.5"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#806c73]">
+                  {label}
+                </p>
+                <p className="mt-1 text-xl font-black tabular-nums text-[#dfcbd1]">
+                  {value}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {draft.special_resources.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {draft.special_resources
+                .filter((resource) => resource.name.trim())
+                .map((resource, index) => (
+                  <span
+                    key={`${resource.name}:${index}`}
+                    className="rounded-full border border-[#4b313a] bg-black/20 px-3 py-1.5 text-xs text-[#bda2ab]"
+                  >
+                    <strong className="text-[#ddc4cb]">{resource.name}</strong>{" "}
+                    {resource.current}/{resource.max}
+                  </span>
+                ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-[#432a34] bg-[#120c10]/88 p-4 sm:p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#a56a7a]">
+                Action rolls
+              </p>
+              <h3 className="mt-1 font-serif text-xl font-black text-[#ead7dc]">
+                Traits
+              </h3>
+            </div>
+            {draft.experiences.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {draft.experiences.map((experience, index) => (
+                  <span
+                    key={`${experience.name}:${index}`}
+                    className="rounded-full border border-[#49313a] bg-black/20 px-2.5 py-1 text-xs text-[#a88e97]"
+                    title="Spend Hope when an Experience applies to an action or reaction roll."
+                  >
+                    {experience.name} {experience.modifier >= 0 ? "+" : ""}
+                    {experience.modifier}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {daggerheartTraits.map((trait) => {
+              const effective = effectResult.stats[trait];
+              return (
+                <button
+                  key={trait}
+                  type="button"
+                  disabled={!canEdit || sheetRollBusy || Boolean(sheetRollIntent)}
+                  onClick={() =>
+                    queueDualityRoll(
+                      `${trait[0].toUpperCase() + trait.slice(1)} Roll`,
+                      effective,
+                      trait
+                    )
+                  }
+                  className="min-h-16 rounded-xl border border-[#663849] bg-[#25131b] px-3 py-3 text-left transition hover:border-[#9d536a] hover:bg-[#321721] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b85e76] disabled:cursor-not-allowed disabled:opacity-45"
+                  aria-label={`Roll ${trait} ${effective >= 0 ? "+" : ""}${effective}`}
+                >
+                  <span className="block text-sm font-black capitalize text-[#e7d2d8]">
+                    {trait}
+                  </span>
+                  <span className="mt-1 flex items-center justify-between gap-2">
+                    <span className="text-xl font-black tabular-nums text-[#f0dce2]">
+                      {effective >= 0 ? "+" : ""}
+                      {effective}
+                    </span>
+                    <span className="text-xs font-black text-[#c78598]">
+                      🎲 Roll
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <Section
+          title="Active Weapons"
+          subtitle="Attack and damage use the live trait, Proficiency and equipped weapon profile."
+          open
+        >
+          <DaggerheartCombatPanel
+            weapons={playWeapons}
+            stats={effectResult.stats}
+            level={draft.level}
+            rolling={sheetRollBusy || Boolean(sheetRollIntent)}
+            onRollAttack={({ title, modifier, source }) =>
+              queueDualityRoll(title, modifier, source)
+            }
+            onRollDamage={({ title, expression, damageType, source }) =>
+              queueDamageRoll(title, expression, damageType, source)
+            }
+          />
+        </Section>
+
+        <Section
+          title="Active Armor"
+          subtitle="Equipped armor and its live thresholds."
+        >
+          <DaggerheartActiveArmorPanel
+            armor={equipmentError ? [] : draft.armor}
+            stats={effectResult.stats}
+            markedSlots={draft.armor_slots_current}
+            onMarkedSlotsChange={(armor_slots_current) =>
+              void persistRuntimePatch({
+                armor_slots_current,
+                armor: syncEquippedArmorMarks(
+                  draftRef.current.armor,
+                  armor_slots_current
+                ),
+              })
+            }
+          />
+        </Section>
+
+        {(draft.class_state.options ?? []).length > 0 && (
+          <Section
+            title="Forms & Stances"
+            subtitle="Switch between the class options already configured by the GM."
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(draft.class_state.options ?? []).map((option) => {
+                const active =
+                  (option.category === "beastform"
+                    ? draft.class_state.active_beastform_id
+                    : draft.class_state.active_stance_id) === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    disabled={!canEdit}
+                    onClick={() => setActiveClassOption(option)}
+                    className={`min-h-12 rounded-xl border px-3 text-left text-sm font-bold transition ${
+                      active
+                        ? "border-emerald-800/60 bg-emerald-950/25 text-emerald-200"
+                        : "border-[#583541] bg-[#211219] text-[#c5a7b0] hover:border-[#8b4b5e]"
+                    }`}
+                  >
+                    {active ? `${option.name} · Active` : option.name}
+                  </button>
+                );
+              })}
+            </div>
+          </Section>
+        )}
+
+        <Section
+          title="Actions & Resources"
+          subtitle="Use class abilities, consumables and other structured actions."
+          open
+        >
+          <DaggerheartActionsPanel
+            character={actionCharacter}
+            sources={actionSources}
+            lastMessage={actionMessage}
+            onUse={useResourceAction}
+            onReset={resetResourceActions}
+          />
+        </Section>
+
+        {activeLoadout.length > 0 && (
+          <Section
+            title={`Domain Loadout · ${activeLoadout.length}/${effectResult.stats.domain_loadout_max}`}
+            subtitle="Your currently active Domain Cards. Manual dice remain available for card text that is not automated yet."
+          >
+            <div className="grid gap-2 lg:grid-cols-2">
+              {activeLoadout.map((card, index) => (
+                <details
+                  key={card.compendium_id ?? `${card.name}:${index}`}
+                  className="rounded-xl border border-[#38272e] bg-black/15"
+                >
+                  <summary className="cursor-pointer list-none px-3 py-3">
+                    <p className="font-bold text-[#d9c3ca]">{card.name}</p>
+                    <p className="mt-1 text-xs text-[#806c73]">
+                      {card.domain} · Level {card.level}
+                    </p>
+                  </summary>
+                  {card.details && (
+                    <p className="border-t border-[#2d2026] px-3 py-3 whitespace-pre-line text-sm leading-6 text-[#a48d95]">
+                      {card.details}
+                    </p>
+                  )}
+                </details>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        <Section
+          title="Inventory & Gold"
+          subtitle="Carried items and stored weapons from your configured character."
+        >
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              ["Handfuls", draft.gold.handfuls],
+              ["Bags", draft.gold.bags],
+              ["Chests", draft.gold.chests],
+            ].map(([label, value]) => (
+              <div
+                key={String(label)}
+                className="rounded-xl border border-[#38272e] bg-black/15 px-3 py-3 text-center"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#806c73]">
+                  {label}
+                </p>
+                <p className="mt-1 text-xl font-black tabular-nums text-[#ddc8cf]">
+                  {value}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {[
+              ...draft.weapons.filter((item) => item.equipped === false),
+              ...draft.inventory,
+            ].map((item, index) => (
+              <details
+                key={item.instance_id ?? `${item.name}:${index}`}
+                className="rounded-xl border border-[#35252c] bg-black/15"
+              >
+                <summary className="cursor-pointer list-none px-3 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-[#d8c2c9]">
+                      {item.name || "Unnamed item"}
+                    </span>
+                    {(item.quantity ?? 1) > 1 && (
+                      <span className="rounded-full border border-[#49313a] px-2 py-0.5 text-xs text-[#9d858d]">
+                        ×{item.quantity}
+                      </span>
+                    )}
+                  </div>
+                </summary>
+                {item.details?.trim() && item.details.trim() !== "—" && (
+                  <p className="border-t border-[#2d2026] px-3 py-3 whitespace-pre-line text-sm leading-6 text-[#a48d95]">
+                    {item.details}
+                  </p>
+                )}
+              </details>
+            ))}
+            {draft.inventory.length === 0 &&
+              draft.weapons.every((item) => item.equipped !== false) && (
+                <p className="rounded-xl border border-dashed border-[#34262c] px-3 py-4 text-center text-sm text-[#746269]">
+                  No stored items on this character.
+                </p>
+              )}
+          </div>
+        </Section>
+
+        <Section
+          title="Effects & Conditions"
+          subtitle="Situational effects and their impact on the live sheet."
+        >
+          <DaggerheartEffectsPanel
+            result={effectResult}
+            manualModifiers={draft.manual_stat_modifiers}
+            effectState={draft.effect_state}
+            onManualModifierChange={() => undefined}
+            onToggleEffects={toggleEffects}
+            actionControlledEffectKeys={actionControlledEffectKeys}
+            actionDeactivatedEffectKeys={actionDeactivatedEffectKeys}
+            allowManualCorrections={false}
+          />
+        </Section>
+
+        <Section
+          title="Rules Reference"
+          subtitle="Full rules for your class, Loadout and equipped or carried compendium items."
+        >
+          <DaggerheartActiveRulesPanel
+            intrinsicRules={[...selectedIntrinsicSources, ...activeClassOptions]}
+            domainCards={draft.domain_cards}
+            weapons={draft.weapons}
+            armor={draft.armor}
+            inventory={draft.inventory}
+          />
+        </Section>
+
+        {draft.id && canEdit && (
+          <DaggerheartSheetDiceOverlay
+            campaignId={campaignId}
+            currentUserId={currentUserId}
+            externalIntent={sheetRollIntent}
+            onExternalIntentConsumed={() => setSheetRollIntent(null)}
+            onBusyChange={setSheetRollBusy}
+          />
+        )}
+      </div>
+    );
   }
 
   return (
@@ -2502,46 +3145,6 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               }
               stats={effectResult.stats}
               level={draft.level}
-              rolling={sheetRollBusy || Boolean(sheetRollIntent)}
-              onRollAttack={({ title, modifier, source }) =>
-                queueDualityRoll(title, modifier, source)
-              }
-              onRollDamage={({ title, expression, damageType, source }) =>
-                queueDamageRoll(title, expression, damageType, source)
-              }
-            />
-          </Section>
-
-          <Section
-            title="Active Armor"
-            subtitle="Your currently equipped armor, live thresholds and marked Armor Slots."
-          >
-            <DaggerheartActiveArmorPanel
-              armor={equipmentError ? [] : draft.armor}
-              stats={effectResult.stats}
-              markedSlots={draft.armor_slots_current}
-              onMarkedSlotsChange={(armor_slots_current) =>
-                void persistRuntimePatch({
-                  armor_slots_current,
-                  armor: syncEquippedArmorMarks(
-                    draftRef.current.armor,
-                    armor_slots_current
-                  ),
-                })
-              }
-            />
-          </Section>
-
-          <Section
-            title="Actions & Resources"
-            subtitle="Use consumables and abilities directly from the sheet. Costs, marked tracks, use limits and linked temporary effects update automatically."
-          >
-            <DaggerheartActionsPanel
-              character={actionCharacter}
-              sources={actionSources}
-              lastMessage={actionMessage}
-              onUse={useResourceAction}
-              onReset={resetResourceActions}
             />
           </Section>
 
@@ -2586,22 +3189,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
                           {effective}
                         </p>
                       )}
-                      {draft.id && (
-                        <button
-                          type="button"
-                          disabled={sheetRollBusy || Boolean(sheetRollIntent)}
-                          onClick={() =>
-                            queueDualityRoll(
-                              `${trait[0].toUpperCase() + trait.slice(1)} Roll`,
-                              effective,
-                              trait
-                            )
-                          }
-                          className="mt-2 min-h-11 w-full rounded-xl border border-[#784255] bg-[#3b1724] px-3 text-xs font-black text-[#e4c4ce] transition hover:border-[#a75a70] hover:bg-[#4a1c2c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b75e76] disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          {sheetRollBusy || sheetRollIntent ? "Rolling…" : "🎲 Roll"} {effective >= 0 ? `+${effective}` : effective}
-                        </button>
-                      )}
+
                     </div>
                   );
                 })}
@@ -3261,15 +3849,6 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         )}
       </div>
 
-      {draft.id && canEdit && (
-        <DaggerheartSheetDiceOverlay
-          campaignId={campaignId}
-          currentUserId={currentUserId}
-          externalIntent={sheetRollIntent}
-          onExternalIntentConsumed={() => setSheetRollIntent(null)}
-          onBusyChange={setSheetRollBusy}
-        />
-      )}
     </div>
   );
 }

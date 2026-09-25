@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { DaggerheartCharacterSheets } from "@/components/daggerheart/DaggerheartCharacterSheets";
 import {
   CampaignWorkspace,
@@ -6,31 +7,32 @@ import {
 } from "@/components/campaigns/CampaignWorkspace";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 
-export const metadata: Metadata = { title: "Character Sheet" };
+export const metadata: Metadata = { title: "Character Manager" };
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const access = await requireCampaignMembership("barovia");
-  const isDm = access.membership.role === "dm";
+
+  if (access.membership.role !== "dm") {
+    redirect("/campaigns/barovia/characters");
+  }
 
   return (
     <CampaignWorkspace
       campaignSlug="barovia"
-      title="Character Sheet"
-      description="Your Daggerheart play sheet for the table: live resources, traits, weapons, actions, rules and physical dice rolls."
+      title="Character Manager"
+      description="GM workspace for creating, editing, assigning and maintaining Daggerheart character sheets. Gameplay rolls stay on the separate Character Sheet."
       actions={
         <>
-          {isDm && (
-            <WorkspaceLink href="/campaigns/barovia/characters/manage">
-              Character manager
-            </WorkspaceLink>
-          )}
+          <WorkspaceLink href="/campaigns/barovia/characters">
+            Open play sheets
+          </WorkspaceLink>
           <WorkspaceLink href="/campaigns/barovia/compendium">
             Open compendium
           </WorkspaceLink>
-          <WorkspaceLink href="/campaigns/barovia/vtt">
-            Open tabletop
+          <WorkspaceLink href="/campaigns/barovia/gm/miniatures">
+            Manage miniatures
           </WorkspaceLink>
         </>
       }
@@ -38,8 +40,8 @@ export default async function Page() {
       <DaggerheartCharacterSheets
         campaignId={access.membership.campaignId}
         currentUserId={access.userId}
-        isDm={isDm}
-        mode="play"
+        isDm
+        mode="manager"
       />
     </CampaignWorkspace>
   );
