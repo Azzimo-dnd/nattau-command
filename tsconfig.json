@@ -32,6 +32,7 @@
   ],
   "exclude": [
     "node_modules",
-    "components/miniatures/MiniaturePainterPrototype.tsx"
+    "components/miniatures/MiniaturePainterPrototype.tsx",
+    "supabase/functions/**"
   ]
 }
