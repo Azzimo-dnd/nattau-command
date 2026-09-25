@@ -3084,13 +3084,6 @@ export function DaggerheartCharacterSheets({
               }
               stats={effectResult.stats}
               level={draft.level}
-              rolling={sheetRollBusy || Boolean(sheetRollIntent)}
-              onRollAttack={({ title, modifier, source }) =>
-                queueDualityRoll(title, modifier, source)
-              }
-              onRollDamage={({ title, expression, damageType, source }) =>
-                queueDamageRoll(title, expression, damageType, source)
-              }
             />
           </Section>
 
@@ -3168,22 +3161,7 @@ export function DaggerheartCharacterSheets({
                           {effective}
                         </p>
                       )}
-                      {draft.id && (
-                        <button
-                          type="button"
-                          disabled={sheetRollBusy || Boolean(sheetRollIntent)}
-                          onClick={() =>
-                            queueDualityRoll(
-                              `${trait[0].toUpperCase() + trait.slice(1)} Roll`,
-                              effective,
-                              trait
-                            )
-                          }
-                          className="mt-2 min-h-11 w-full rounded-xl border border-[#784255] bg-[#3b1724] px-3 text-xs font-black text-[#e4c4ce] transition hover:border-[#a75a70] hover:bg-[#4a1c2c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b75e76] disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          {sheetRollBusy || sheetRollIntent ? "Rolling…" : "🎲 Roll"} {effective >= 0 ? `+${effective}` : effective}
-                        </button>
-                      )}
+
                     </div>
                   );
                 })}
