@@ -2404,7 +2404,702 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
         )}
 
         <fieldset disabled={!canEdit} className="space-y-4 disabled:opacity-80">
-          <Section title="Identity & Heritage" subtitle="Class, subclass, ancestry, community and Hope & Fear transformations." open>
+        {activeSheetArea === "play" && (
+          <div className="space-y-4">
+            <DaggerheartPlaySummary
+              tracks={[
+                {
+                  key: "hope",
+                  label: "Hope",
+                  current: draft.hope_current,
+                  max: effectResult.stats.hope_max,
+                  currentLabel: "current",
+                },
+                {
+                  key: "hp",
+                  label: "HP",
+                  current: draft.hp_current,
+                  max: effectResult.stats.hp_max,
+                  currentLabel: "marked",
+                },
+                {
+                  key: "stress",
+                  label: "Stress",
+                  current: draft.stress_current,
+                  max: effectResult.stats.stress_max,
+                  currentLabel: "marked",
+                },
+                {
+                  key: "armor",
+                  label: "Armor",
+                  current: draft.armor_slots_current,
+                  max: effectResult.stats.armor_slots_max,
+                  currentLabel: "marked slots",
+                },
+              ]}
+              defense={[
+                { label: "Evasion", value: effectResult.stats.evasion },
+                { label: "Major", value: effectResult.stats.major_threshold },
+                { label: "Severe", value: effectResult.stats.severe_threshold },
+                { label: "Armor Score", value: effectResult.stats.armor_score },
+              ]}
+              classStatus={[
+                ...activeClassOptions.map((option) => ({
+                  label:
+                    option.category === "beastform" ? "Beastform" : "Stance",
+                  value: option.name,
+                })),
+                ...draft.special_resources
+                  .filter((resource) => resource.name.trim())
+                  .map((resource) => ({
+                    label: resource.name,
+                    value: `${resource.current}/${resource.max}`,
+                  })),
+              ]}
+              disabled={sheetRollBusy || Boolean(sheetRollIntent)}
+              onTrackChange={updatePlayTrack}
+            />
+          <section className="rounded-2xl border border-[#422934] bg-[#120c10]/88 p-4 sm:p-5">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#a56879]">
+                  Action rolls
+                </p>
+                <h3 className="mt-1 font-serif text-xl font-black text-[#ead7dc]">
+                  Traits
+                </h3>
+              </div>
+              {draft.experiences.length > 0 && (
+                <div className="flex max-w-full flex-wrap gap-1.5">
+                  {draft.experiences.slice(0, 4).map((experience, index) => (
+                    <span
+                      key={`${experience.name}:${index}`}
+                      className="rounded-full border border-[#49313a] bg-black/20 px-2.5 py-1 text-xs text-[#a88e97]"
+                    >
+                      {experience.name} {experience.modifier >= 0 ? "+" : ""}
+                      {experience.modifier}
+                    </span>
+                  ))}
+                  {draft.experiences.length > 4 && (
+                    <button
+                      type="button"
+                      onClick={() => changeSheetArea("character")}
+                      className="rounded-full border border-[#49313a] px-2.5 py-1 text-xs font-bold text-[#b89aa4]"
+                    >
+                      +{draft.experiences.length - 4} more
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {daggerheartTraits.map((trait) => {
+                const effective = effectResult.stats[trait];
+                const base = draft.traits[trait] ?? 0;
+                return (
+                  <button
+                    key={trait}
+                    type="button"
+                    disabled={sheetRollBusy || Boolean(sheetRollIntent)}
+                    onClick={() =>
+                      queueDualityRoll(
+                        `${trait[0].toUpperCase() + trait.slice(1)} Roll`,
+                        effective,
+                        trait
+                      )
+                    }
+                    className="min-h-14 rounded-xl border border-[#633849] bg-[#25131b] px-3 py-2.5 text-left transition hover:border-[#9b5369] hover:bg-[#321721] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b85e76] disabled:cursor-not-allowed disabled:opacity-45"
+                    aria-label={`Roll ${trait} ${effective >= 0 ? "+" : ""}${effective}`}
+                  >
+                    <span className="block text-sm font-black capitalize text-[#e7d2d8]">
+                      {trait}
+                    </span>
+                    <span className="mt-1 flex items-center justify-between gap-2">
+                      <span className="text-xl font-black tabular-nums text-[#f0dce2]">
+                        {effective >= 0 ? "+" : ""}
+                        {effective}
+                      </span>
+                      <span className="text-xs font-bold text-[#bc7e91]">🎲 Roll</span>
+                    </span>
+                    {effective !== base && (
+                      <span className="mt-1 block text-[11px] text-[#7f6a72]">
+                        Base {base >= 0 ? "+" : ""}{base}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+<Section
+            title="Active Weapons"
+            subtitle="Equipped weapons use the current trait modifiers, Proficiency and errata-aware weapon data."
+            open
+          >
+            <DaggerheartCombatPanel
+              weapons={
+                activeBeastform
+                  ? [
+                      {
+                        instance_id: `beastform:${activeBeastform.id}`,
+                        name: activeBeastform.name,
+                        category: "beastform",
+                        equipped: true,
+                        metadata: activeBeastform.metadata,
+                      },
+                    ]
+                  : brawlerStrike
+                    ? [...draft.weapons, brawlerStrike]
+                    : draft.weapons
+              }
+              stats={effectResult.stats}
+              level={draft.level}
+              rolling={sheetRollBusy || Boolean(sheetRollIntent)}
+              onRollAttack={({ title, modifier, source }) =>
+                queueDualityRoll(title, modifier, source)
+              }
+              onRollDamage={({ title, expression, damageType, source }) =>
+                queueDamageRoll(title, expression, damageType, source)
+              }
+            />
+          </Section>
+
+          
+<Section
+            title="Active Armor"
+            subtitle="Your currently equipped armor, live thresholds and marked Armor Slots."
+          >
+            <DaggerheartActiveArmorPanel
+              armor={equipmentError ? [] : draft.armor}
+              stats={effectResult.stats}
+              markedSlots={draft.armor_slots_current}
+              onMarkedSlotsChange={(armor_slots_current) =>
+                void persistRuntimePatch({
+                  armor_slots_current,
+                  armor: syncEquippedArmorMarks(
+                    draftRef.current.armor,
+                    armor_slots_current
+                  ),
+                })
+              }
+            />
+          </Section>
+
+          
+          {(draft.class_state.options ?? []).length > 0 && (
+            <section className="rounded-2xl border border-[#3f2932] bg-[#120c10]/82 p-4 sm:p-5">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#9e6878]">
+                  Class state
+                </p>
+                <h3 className="mt-1 font-serif text-lg font-black text-[#dfcbd1]">
+                  Forms & stances
+                </h3>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(draft.class_state.options ?? []).map((option) => {
+                  const active =
+                    (option.category === "beastform"
+                      ? draft.class_state.active_beastform_id
+                      : draft.class_state.active_stance_id) === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setActiveClassOption(option)}
+                      className={`min-h-11 rounded-xl border px-3 text-sm font-bold transition ${
+                        active
+                          ? "border-emerald-800/60 bg-emerald-950/25 text-emerald-200"
+                          : "border-[#5b3542] bg-[#211219] text-[#c5a7b0] hover:border-[#8b4b5e]"
+                      }`}
+                    >
+                      {active
+                        ? `${option.name} · Active`
+                        : option.category === "martial_stance"
+                          ? `${option.name} · Shift 1 Focus`
+                          : `${option.name} · Set active`}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {(draft.effect_state.active_effect_ids ?? []).length > 0 && (
+            <section className="rounded-2xl border border-[#3b2830] bg-black/15 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#9d6a79]">
+                Active effects
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {Array.from(
+                  new Map(
+                    effectResult.toggles
+                      .filter((toggle) =>
+                        (draft.effect_state.active_effect_ids ?? []).includes(toggle.key)
+                      )
+                      .map((toggle) => [
+                        toggle.bundle_id ?? toggle.key,
+                        { label: toggle.label, source: toggle.source },
+                      ])
+                  ).values()
+                ).map((item) => (
+                  <span
+                    key={`${item.source}:${item.label}`}
+                    className="rounded-full border border-emerald-900/45 bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-100/85"
+                  >
+                    {item.label} · {item.source}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+
+<Section
+            title="Actions & Resources"
+            subtitle="Use consumables and abilities directly from the sheet. Costs, marked tracks, use limits and linked temporary effects update automatically."
+            open
+          >
+            <DaggerheartActionsPanel
+              character={actionCharacter}
+              sources={actionSources}
+              lastMessage={actionMessage}
+              onUse={useResourceAction}
+              onReset={resetResourceActions}
+            />
+          </Section>
+
+          
+<Section
+            title="Active Rules Reference"
+            subtitle="Full linked rules for your current Loadout, equipped gear and carried compendium items."
+          >
+            <DaggerheartActiveRulesPanel
+              intrinsicRules={[...selectedIntrinsicSources, ...activeClassOptions]}
+              domainCards={draft.domain_cards}
+              weapons={draft.weapons}
+              armor={draft.armor}
+              inventory={draft.inventory}
+            />
+          </Section>
+
+          
+          </div>
+        )}
+
+        {activeSheetArea === "cards" && (
+          <div className="space-y-4">
+<Section title="Domain Cards" subtitle="Track cards from all ten domains, including Dread. Move cards between Loadout and Vault.">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#38242c] bg-black/15 px-3 py-2 text-xs text-[#a18a92]">
+                <span>Active Loadout</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-black text-[#dfc5cd]">
+                    {domainLoadoutCount} / {configurationEffectResult.stats.domain_loadout_max}
+                  </span>
+                  <button
+                    type="button"
+                    className={smallButton}
+                    onClick={() => setFreeLoadoutEditing((value) => !value)}
+                  >
+                    {freeLoadoutEditing
+                      ? "Rest / level-up edit: free"
+                      : "Gameplay: Recall costs apply"}
+                  </button>
+                </div>
+              </div>
+              {duplicateDomainCardIds.size > 0 && (
+                <div className="rounded-xl border border-red-800/55 bg-red-950/20 px-3 py-2 text-xs leading-5 text-red-100/90">
+                  Duplicate compendium Domain Cards are not allowed. Duplicate definitions are deduplicated for live calculations, and gameplay actions stay blocked until you remove the duplicate.
+                </div>
+              )}
+              {domainLoadoutCount > configurationEffectResult.stats.domain_loadout_max && (
+                <div className="rounded-xl border border-amber-800/55 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-100/90">
+                  Loadout exceeds the current limit by{" "}
+                  {domainLoadoutCount - configurationEffectResult.stats.domain_loadout_max}. Loadout-scoped card effects and actions are suspended until you move enough cards to the Vault.
+                </div>
+              )}
+              <DaggerheartCompendiumPicker
+                categories={["domain_card"]}
+                label={selectedClass ? `Choose a ${selectedClass.domains.join(" / ")} card…` : "Choose a domain card…"}
+                domains={selectedClass?.domains}
+                maxLevel={draft.level}
+                onSelect={(entry) => {
+                  if (
+                    draft.domain_cards.some(
+                      (card) => card.compendium_id === entry.id
+                    )
+                  ) {
+                    setMessage(`${entry.name} is already on this character.`);
+                    return;
+                  }
+                  const permanentVault = entry.slug === "blade-vitality";
+                  patch({
+                    domain_cards: [
+                      ...draft.domain_cards,
+                      {
+                        name: entry.name,
+                        domain: entry.domain ?? "",
+                        level: entry.level ?? 1,
+                        state: permanentVault
+                          ? "vault"
+                          : domainLoadoutCount <
+                              configurationEffectResult.stats.domain_loadout_max
+                            ? "loadout"
+                            : "vault",
+                        permanent_vault: permanentVault,
+                        compendium_id: entry.id,
+                        slug: entry.slug,
+                        source_key: entry.source_key,
+                        details: compendiumEntryDetails(entry),
+                        definition_revision: compendiumDefinitionRevision(entry),
+                        metadata: compendiumEffectiveMetadata(entry),
+                        effects: entry.effects ?? [],
+                        actions: entry.actions ?? [],
+                      },
+                    ],
+                  });
+                }}
+              />
+              <div className="grid gap-4 xl:grid-cols-2">
+                <section className="rounded-2xl border border-[#4a2c37] bg-[#160d12]/70 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="font-serif text-lg font-black text-[#ead6dc]">Loadout</h4>
+                      <p className="text-xs text-[#8c757d]">Cards currently available during play.</p>
+                    </div>
+                    <span className="rounded-full border border-[#6a3b4b] bg-[#2a131c] px-3 py-1 text-xs font-black text-[#d9bbc4]">
+                      {domainLoadoutCount}/{configurationEffectResult.stats.domain_loadout_max}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {draft.domain_cards
+                      .map((card, index) => ({ card, index }))
+                      .filter(({ card }) => card.state === "loadout")
+                      .map(({ card, index }) => (
+                        <div key={card.compendium_id ?? `${card.name}:${index}`} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1.5fr_1fr_90px_120px_auto]">
+                  <input
+                    className={inputClass}
+                    placeholder="Card name"
+                    value={card.name}
+                    readOnly={Boolean(card.compendium_id)}
+                    onChange={(e) => {
+                      const next = [...draft.domain_cards];
+                      next[index] = { ...card, name: e.target.value };
+                      patch({ domain_cards: next });
+                    }}
+                  />
+                  <select
+                    className={inputClass}
+                    value={card.domain}
+                    disabled={Boolean(card.compendium_id)}
+                    onChange={(e) => {
+                      const next = [...draft.domain_cards];
+                      next[index] = { ...card, domain: e.target.value };
+                      patch({ domain_cards: next });
+                    }}
+                  >
+                    <option value="">Domain</option>
+                    {daggerheartDomains.map((domain) => <option key={domain} value={domain}>{domain}</option>)}
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    className={inputClass}
+                    value={card.level}
+                    readOnly={Boolean(card.compendium_id)}
+                    onChange={(e) => {
+                      const next = [...draft.domain_cards];
+                      next[index] = { ...card, level: toNumber(e.target.value, 1) };
+                      patch({ domain_cards: next });
+                    }}
+                  />
+                  <select
+                    className={inputClass}
+                    value={card.state}
+                    onChange={(e) =>
+                      changeDomainCardState(
+                        index,
+                        e.target.value as DomainCard["state"]
+                      )
+                    }
+                  >
+                    <option value="loadout" disabled={card.permanent_vault}>
+                      Loadout
+                    </option>
+                    <option value="vault">
+                      {card.permanent_vault ? "Permanent Vault" : "Vault"}
+                    </option>
+                  </select>
+                  <button
+                    type="button"
+                    className={smallButton}
+                    disabled={card.permanent_vault}
+                    title={
+                      card.permanent_vault
+                        ? "This card was placed in the Vault permanently and is removed from normal card-management choices."
+                        : "Remove card"
+                    }
+                    onClick={() =>
+                      patch({
+                        domain_cards: draft.domain_cards.filter(
+                          (_, i) => i !== index
+                        ),
+                      })
+                    }
+                  >
+                    ×
+                  </button>
+                  {card.compendium_id && (
+                    <span
+                      className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63] md:col-span-5"
+                      title={
+                        card.definition_revision
+                          ? `Definition revision: ${card.definition_revision}`
+                          : "Cached compendium snapshot; revision unknown until the next successful refresh."
+                      }
+                    >
+                      Compendium-linked · {card.definition_revision ? "versioned" : "cached"}
+                    </span>
+                  )}
+                </div>
+
+                      ))}
+                    {draft.domain_cards.every((card) => card.state !== "loadout") && (
+                      <p className="rounded-xl border border-dashed border-[#3d2930] px-3 py-4 text-center text-sm text-[#7e6a71]">
+                        No cards in the active Loadout.
+                      </p>
+                    )}
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-[#382832] bg-black/15 p-3">
+                  <div className="mb-3">
+                    <h4 className="font-serif text-lg font-black text-[#d8c5cb]">Vault</h4>
+                    <p className="text-xs text-[#806d74]">
+                      Recall costs are shown by the card data and still use the existing rules.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {draft.domain_cards
+                      .map((card, index) => ({ card, index }))
+                      .filter(({ card }) => card.state === "vault")
+                      .map(({ card, index }) => (
+                        <div key={card.compendium_id ?? `${card.name}:${index}`} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1.5fr_1fr_90px_120px_auto]">
+                  <input
+                    className={inputClass}
+                    placeholder="Card name"
+                    value={card.name}
+                    readOnly={Boolean(card.compendium_id)}
+                    onChange={(e) => {
+                      const next = [...draft.domain_cards];
+                      next[index] = { ...card, name: e.target.value };
+                      patch({ domain_cards: next });
+                    }}
+                  />
+                  <select
+                    className={inputClass}
+                    value={card.domain}
+                    disabled={Boolean(card.compendium_id)}
+                    onChange={(e) => {
+                      const next = [...draft.domain_cards];
+                      next[index] = { ...card, domain: e.target.value };
+                      patch({ domain_cards: next });
+                    }}
+                  >
+                    <option value="">Domain</option>
+                    {daggerheartDomains.map((domain) => <option key={domain} value={domain}>{domain}</option>)}
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    className={inputClass}
+                    value={card.level}
+                    readOnly={Boolean(card.compendium_id)}
+                    onChange={(e) => {
+                      const next = [...draft.domain_cards];
+                      next[index] = { ...card, level: toNumber(e.target.value, 1) };
+                      patch({ domain_cards: next });
+                    }}
+                  />
+                  <select
+                    className={inputClass}
+                    value={card.state}
+                    onChange={(e) =>
+                      changeDomainCardState(
+                        index,
+                        e.target.value as DomainCard["state"]
+                      )
+                    }
+                  >
+                    <option value="loadout" disabled={card.permanent_vault}>
+                      Loadout
+                    </option>
+                    <option value="vault">
+                      {card.permanent_vault ? "Permanent Vault" : "Vault"}
+                    </option>
+                  </select>
+                  <button
+                    type="button"
+                    className={smallButton}
+                    disabled={card.permanent_vault}
+                    title={
+                      card.permanent_vault
+                        ? "This card was placed in the Vault permanently and is removed from normal card-management choices."
+                        : "Remove card"
+                    }
+                    onClick={() =>
+                      patch({
+                        domain_cards: draft.domain_cards.filter(
+                          (_, i) => i !== index
+                        ),
+                      })
+                    }
+                  >
+                    ×
+                  </button>
+                  {card.compendium_id && (
+                    <span
+                      className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63] md:col-span-5"
+                      title={
+                        card.definition_revision
+                          ? `Definition revision: ${card.definition_revision}`
+                          : "Cached compendium snapshot; revision unknown until the next successful refresh."
+                      }
+                    >
+                      Compendium-linked · {card.definition_revision ? "versioned" : "cached"}
+                    </span>
+                  )}
+                </div>
+
+                      ))}
+                    {draft.domain_cards.every((card) => card.state !== "vault") && (
+                      <p className="rounded-xl border border-dashed border-[#34262c] px-3 py-4 text-center text-sm text-[#746269]">
+                        Vault is empty.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              </div>
+              <button
+                type="button"
+                className={smallButton}
+                onClick={() =>
+                  patch({
+                    domain_cards: [
+                      ...draft.domain_cards,
+                      {
+                        name: "",
+                        domain: selectedClass?.domains[0] ?? "",
+                        level: 1,
+                        state:
+                          domainLoadoutCount < effectResult.stats.domain_loadout_max
+                            ? "loadout"
+                            : "vault",
+                        effects: [],
+                      },
+                    ],
+                  })
+                }
+              >
+                + Domain card
+              </button>
+            </div>
+          </Section>
+
+          
+          </div>
+        )}
+
+        {activeSheetArea === "equipment" && (
+          <div className="space-y-4">
+<Section title="Equipment & Loot" subtitle="Weapons, armor and inventory are intentionally open enough to support Core and Hope & Fear equipment without schema changes.">
+            <div className="space-y-6">
+              {equipmentError && (
+                <div className="rounded-xl border border-amber-800/55 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-100/90">
+                  {equipmentError}
+                </div>
+              )}
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Weapons</p>
+                <div className="mb-3">
+                  <DaggerheartCompendiumPicker
+                    categories={["weapon_primary", "weapon_secondary"]}
+                    label="Choose an eligible weapon…"
+                    maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
+                    allowMagicWeapons={spellcastTraitKey(draft) !== null}
+                    onSelect={(entry) =>
+                      patch({
+                        weapons: addEquippedGear(draft.weapons, entry),
+                      })
+                    }
+                  />
+                </div>
+                <GearEditor value={draft.weapons} onChange={(weapons) => patch({ weapons })} addLabel="Custom weapon" equipMode="exclusive-category" />
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Armor</p>
+                <div className="mb-3">
+                  <DaggerheartCompendiumPicker
+                    categories={["armor"]}
+                    label="Choose eligible armor…"
+                    maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
+                    onSelect={(entry) =>
+                      patch({
+                        armor: addEquippedGear(draft.armor, entry),
+                        armor_slots_current: 0,
+                      })
+                    }
+                  />
+                </div>
+                <GearEditor
+                  value={draft.armor}
+                  onChange={(armor) =>
+                    patch({
+                      armor,
+                      armor_slots_current: equippedArmorMarks(armor),
+                    })
+                  }
+                  addLabel="Custom armor"
+                  equipMode="exclusive-category"
+                />
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Inventory / Loot</p>
+                <div className="mb-3">
+                  <DaggerheartCompendiumPicker
+                    categories={["loot_item", "consumable"]}
+                    label="Choose loot or a consumable…"
+                    onSelect={(entry) =>
+                      patch({
+                        inventory: [
+                          ...draft.inventory,
+                          gearFromCompendium(entry, false),
+                        ],
+                      })
+                    }
+                  />
+                </div>
+                <GearEditor value={draft.inventory} onChange={(inventory) => patch({ inventory })} addLabel="Custom item" equipMode="independent" />
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <NumberField label="Gold handfuls" min={0} value={draft.gold.handfuls} onChange={(handfuls) => patch({ gold: { ...draft.gold, handfuls } })} />
+                <NumberField label="Gold bags" min={0} value={draft.gold.bags} onChange={(bags) => patch({ gold: { ...draft.gold, bags } })} />
+                <NumberField label="Gold chests" min={0} value={draft.gold.chests} onChange={(chests) => patch({ gold: { ...draft.gold, chests } })} />
+              </div>
+            </div>
+          </Section>
+
+          
+          </div>
+        )}
+
+        {activeSheetArea === "character" && (
+          <div className="space-y-4">
+<Section title="Identity & Heritage" subtitle="Class, subclass, ancestry, community and Hope & Fear transformations." open>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <label>
                 <span className="mb-1.5 block text-xs text-[#a48d95]">Character name</span>
@@ -2562,226 +3257,27 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             </div>
           </Section>
 
+          
           <Section
-            title="Calculated Stats & Effects"
-            subtitle="Live totals from class, heritage, equipped gear, Loadout cards, situational effects and GM/homebrew modifiers."
+            title="Traits & Base Progression"
+            subtitle="Edit permanent character values here. Play uses the effective values after all active effects."
             open
           >
-            <DaggerheartEffectsPanel
-              result={effectResult}
-              manualModifiers={draft.manual_stat_modifiers}
-              effectState={draft.effect_state}
-              onManualModifierChange={setManualModifier}
-              onToggleEffects={toggleEffects}
-              actionControlledEffectKeys={actionControlledEffectKeys}
-              actionDeactivatedEffectKeys={actionDeactivatedEffectKeys}
-              allowManualCorrections={isDm}
-            />
-          </Section>
-
-          <Section
-            title="Active Weapons"
-            subtitle="Equipped weapons use the current trait modifiers, Proficiency and errata-aware weapon data."
-          >
-            <DaggerheartCombatPanel
-              weapons={
-                activeBeastform
-                  ? [
-                      {
-                        instance_id: `beastform:${activeBeastform.id}`,
-                        name: activeBeastform.name,
-                        category: "beastform",
-                        equipped: true,
-                        metadata: activeBeastform.metadata,
-                      },
-                    ]
-                  : brawlerStrike
-                    ? [...draft.weapons, brawlerStrike]
-                    : draft.weapons
-              }
-              stats={effectResult.stats}
-              level={draft.level}
-              rolling={sheetRollBusy || Boolean(sheetRollIntent)}
-              onRollAttack={({ title, modifier, source }) =>
-                queueDualityRoll(title, modifier, source)
-              }
-              onRollDamage={({ title, expression, damageType, source }) =>
-                queueDamageRoll(title, expression, damageType, source)
-              }
-            />
-          </Section>
-
-          <Section
-            title="Active Armor"
-            subtitle="Your currently equipped armor, live thresholds and marked Armor Slots."
-          >
-            <DaggerheartActiveArmorPanel
-              armor={equipmentError ? [] : draft.armor}
-              stats={effectResult.stats}
-              markedSlots={draft.armor_slots_current}
-              onMarkedSlotsChange={(armor_slots_current) =>
-                void persistRuntimePatch({
-                  armor_slots_current,
-                  armor: syncEquippedArmorMarks(
-                    draftRef.current.armor,
-                    armor_slots_current
-                  ),
-                })
-              }
-            />
-          </Section>
-
-          <Section
-            title="Actions & Resources"
-            subtitle="Use consumables and abilities directly from the sheet. Costs, marked tracks, use limits and linked temporary effects update automatically."
-          >
-            <DaggerheartActionsPanel
-              character={actionCharacter}
-              sources={actionSources}
-              lastMessage={actionMessage}
-              onUse={useResourceAction}
-              onReset={resetResourceActions}
-            />
-          </Section>
-
-          <Section
-            title="Active Rules Reference"
-            subtitle="Full linked rules for your current Loadout, equipped gear and carried compendium items."
-          >
-            <DaggerheartActiveRulesPanel
-              intrinsicRules={[...selectedIntrinsicSources, ...activeClassOptions]}
-              domainCards={draft.domain_cards}
-              weapons={draft.weapons}
-              armor={draft.armor}
-              inventory={draft.inventory}
-            />
-          </Section>
-
-          <Section
-            title="Traits & Core Tracks"
-            subtitle="Base character values and marked resources. Temporary and equipment modifiers are calculated above."
-            open
-          >
-            <div>
-              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#8f717a]">
-                Character traits
-              </p>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-                {daggerheartTraits.map((trait) => {
-                  const effective = effectResult.stats[trait];
-                  const base = draft.traits[trait] ?? 0;
-                  return (
-                    <div key={trait}>
-                      <NumberField
-                        label={`${trait} base`}
-                        value={base}
-                        onChange={(value) =>
-                          patch({ traits: { ...draft.traits, [trait]: value } })
-                        }
-                      />
-                      {effective !== base && (
-                        <p className="mt-1 text-center text-[10px] font-bold text-[#b98191]">
-                          Current {effective > 0 ? "+" : ""}
-                          {effective}
-                        </p>
-                      )}
-                      {draft.id && (
-                        <button
-                          type="button"
-                          disabled={sheetRollBusy || Boolean(sheetRollIntent)}
-                          onClick={() =>
-                            queueDualityRoll(
-                              `${trait[0].toUpperCase() + trait.slice(1)} Roll`,
-                              effective,
-                              trait
-                            )
-                          }
-                          className="mt-2 min-h-11 w-full rounded-xl border border-[#784255] bg-[#3b1724] px-3 text-xs font-black text-[#e4c4ce] transition hover:border-[#a75a70] hover:bg-[#4a1c2c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b75e76] disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          {sheetRollBusy || sheetRollIntent ? "Rolling…" : "🎲 Roll"} {effective >= 0 ? `+${effective}` : effective}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#8f717a]">
-                Marked resources
-              </p>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {daggerheartTraits.map((trait) => (
                 <NumberField
-                  label={`Hope · max ${effectResult.stats.hope_max}`}
-                  min={0}
-                  max={effectResult.stats.hope_max}
-                  value={draft.hope_current}
-                  onChange={(hope_current) => patch({ hope_current })}
-                />
-                <NumberField
-                  label={`HP marked · max ${effectResult.stats.hp_max}`}
-                  min={0}
-                  max={effectResult.stats.hp_max}
-                  value={draft.hp_current}
-                  onChange={(hp_current) => {
-                    const knockedOut =
-                      hp_current >= effectResult.stats.hp_max &&
-                      effectResult.stats.hp_max > 0;
-                    const activeOptionIds = knockedOut
-                      ? [
-                          draft.class_state.active_beastform_id,
-                          draft.class_state.active_stance_id,
-                        ].filter((id): id is string => typeof id === "string")
-                      : [];
-                    const nextEffectState = activeOptionIds.reduce(
-                      (state, id) =>
-                        clearDaggerheartSourceEffects(
-                          state,
-                          `class-option:${id}`
-                        ),
-                      draft.effect_state
-                    );
-                    patch({
-                      hp_current,
-                      effect_state: nextEffectState,
-                      class_state: knockedOut
-                        ? {
-                            ...draft.class_state,
-                            active_beastform_id: null,
-                            active_stance_id: null,
-                          }
-                        : draft.class_state,
-                    });
-                  }}
-                />
-                <NumberField
-                  label={`Stress marked · max ${effectResult.stats.stress_max}`}
-                  min={0}
-                  max={effectResult.stats.stress_max}
-                  value={draft.stress_current}
-                  onChange={(stress_current) => patch({ stress_current })}
-                />
-                <NumberField
-                  label={`Armor marked · max ${effectResult.stats.armor_slots_max}`}
-                  min={0}
-                  max={effectResult.stats.armor_slots_max}
-                  value={draft.armor_slots_current}
-                  onChange={(armor_slots_current) =>
-                    patch({
-                      armor_slots_current,
-                      armor: syncEquippedArmorMarks(
-                        draft.armor,
-                        armor_slots_current
-                      ),
-                    })
+                  key={trait}
+                  label={`${trait} base`}
+                  value={draft.traits[trait] ?? 0}
+                  onChange={(value) =>
+                    patch({ traits: { ...draft.traits, [trait]: value } })
                   }
                 />
-              </div>
+              ))}
             </div>
 
-            <details className="group mt-6 rounded-xl border border-[#38242c] bg-black/15">
-              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-[#977985]">
+            <details className="group mt-5 rounded-xl border border-[#38242c] bg-black/15">
+              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#a0868f]">
                 Base progression values · advanced
               </summary>
               <div className="grid gap-3 border-t border-[#302028] p-4 md:grid-cols-3 xl:grid-cols-5">
@@ -2828,7 +3324,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             </details>
           </Section>
 
-          <Section title="Experiences" subtitle="Create any Experiences and track their current modifiers.">
+<Section title="Experiences" subtitle="Create any Experiences and track their current modifiers.">
             <div className="space-y-3">
               {draft.experiences.map((experience, index) => (
                 <div key={index} className="grid gap-2 md:grid-cols-[1fr_120px_auto]">
@@ -2859,271 +3355,8 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             </div>
           </Section>
 
-          <Section title="Domain Cards" subtitle="Track cards from all ten domains, including Dread. Move cards between Loadout and Vault.">
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#38242c] bg-black/15 px-3 py-2 text-xs text-[#a18a92]">
-                <span>Active Loadout</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-black text-[#dfc5cd]">
-                    {domainLoadoutCount} / {configurationEffectResult.stats.domain_loadout_max}
-                  </span>
-                  <button
-                    type="button"
-                    className={smallButton}
-                    onClick={() => setFreeLoadoutEditing((value) => !value)}
-                  >
-                    {freeLoadoutEditing
-                      ? "Rest / level-up edit: free"
-                      : "Gameplay: Recall costs apply"}
-                  </button>
-                </div>
-              </div>
-              {duplicateDomainCardIds.size > 0 && (
-                <div className="rounded-xl border border-red-800/55 bg-red-950/20 px-3 py-2 text-xs leading-5 text-red-100/90">
-                  Duplicate compendium Domain Cards are not allowed. Duplicate definitions are deduplicated for live calculations, and gameplay actions stay blocked until you remove the duplicate.
-                </div>
-              )}
-              {domainLoadoutCount > configurationEffectResult.stats.domain_loadout_max && (
-                <div className="rounded-xl border border-amber-800/55 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-100/90">
-                  Loadout exceeds the current limit by{" "}
-                  {domainLoadoutCount - configurationEffectResult.stats.domain_loadout_max}. Loadout-scoped card effects and actions are suspended until you move enough cards to the Vault.
-                </div>
-              )}
-              <DaggerheartCompendiumPicker
-                categories={["domain_card"]}
-                label={selectedClass ? `Choose a ${selectedClass.domains.join(" / ")} card…` : "Choose a domain card…"}
-                domains={selectedClass?.domains}
-                maxLevel={draft.level}
-                onSelect={(entry) => {
-                  if (
-                    draft.domain_cards.some(
-                      (card) => card.compendium_id === entry.id
-                    )
-                  ) {
-                    setMessage(`${entry.name} is already on this character.`);
-                    return;
-                  }
-                  const permanentVault = entry.slug === "blade-vitality";
-                  patch({
-                    domain_cards: [
-                      ...draft.domain_cards,
-                      {
-                        name: entry.name,
-                        domain: entry.domain ?? "",
-                        level: entry.level ?? 1,
-                        state: permanentVault
-                          ? "vault"
-                          : domainLoadoutCount <
-                              configurationEffectResult.stats.domain_loadout_max
-                            ? "loadout"
-                            : "vault",
-                        permanent_vault: permanentVault,
-                        compendium_id: entry.id,
-                        slug: entry.slug,
-                        source_key: entry.source_key,
-                        details: compendiumEntryDetails(entry),
-                        definition_revision: compendiumDefinitionRevision(entry),
-                        metadata: compendiumEffectiveMetadata(entry),
-                        effects: entry.effects ?? [],
-                        actions: entry.actions ?? [],
-                      },
-                    ],
-                  });
-                }}
-              />
-              {draft.domain_cards.map((card, index) => (
-                <div key={index} className="grid gap-2 rounded-xl border border-[#342029] bg-black/15 p-3 md:grid-cols-[1.5fr_1fr_90px_120px_auto]">
-                  <input
-                    className={inputClass}
-                    placeholder="Card name"
-                    value={card.name}
-                    readOnly={Boolean(card.compendium_id)}
-                    onChange={(e) => {
-                      const next = [...draft.domain_cards];
-                      next[index] = { ...card, name: e.target.value };
-                      patch({ domain_cards: next });
-                    }}
-                  />
-                  <select
-                    className={inputClass}
-                    value={card.domain}
-                    disabled={Boolean(card.compendium_id)}
-                    onChange={(e) => {
-                      const next = [...draft.domain_cards];
-                      next[index] = { ...card, domain: e.target.value };
-                      patch({ domain_cards: next });
-                    }}
-                  >
-                    <option value="">Domain</option>
-                    {daggerheartDomains.map((domain) => <option key={domain} value={domain}>{domain}</option>)}
-                  </select>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    className={inputClass}
-                    value={card.level}
-                    readOnly={Boolean(card.compendium_id)}
-                    onChange={(e) => {
-                      const next = [...draft.domain_cards];
-                      next[index] = { ...card, level: toNumber(e.target.value, 1) };
-                      patch({ domain_cards: next });
-                    }}
-                  />
-                  <select
-                    className={inputClass}
-                    value={card.state}
-                    onChange={(e) =>
-                      changeDomainCardState(
-                        index,
-                        e.target.value as DomainCard["state"]
-                      )
-                    }
-                  >
-                    <option value="loadout" disabled={card.permanent_vault}>
-                      Loadout
-                    </option>
-                    <option value="vault">
-                      {card.permanent_vault ? "Permanent Vault" : "Vault"}
-                    </option>
-                  </select>
-                  <button
-                    type="button"
-                    className={smallButton}
-                    disabled={card.permanent_vault}
-                    title={
-                      card.permanent_vault
-                        ? "This card was placed in the Vault permanently and is removed from normal card-management choices."
-                        : "Remove card"
-                    }
-                    onClick={() =>
-                      patch({
-                        domain_cards: draft.domain_cards.filter(
-                          (_, i) => i !== index
-                        ),
-                      })
-                    }
-                  >
-                    ×
-                  </button>
-                  {card.compendium_id && (
-                    <span
-                      className="text-[10px] uppercase tracking-[0.12em] text-[#6f5c63] md:col-span-5"
-                      title={
-                        card.definition_revision
-                          ? `Definition revision: ${card.definition_revision}`
-                          : "Cached compendium snapshot; revision unknown until the next successful refresh."
-                      }
-                    >
-                      Compendium-linked · {card.definition_revision ? "versioned" : "cached"}
-                    </span>
-                  )}
-                </div>
-              ))}
-              <button
-                type="button"
-                className={smallButton}
-                onClick={() =>
-                  patch({
-                    domain_cards: [
-                      ...draft.domain_cards,
-                      {
-                        name: "",
-                        domain: selectedClass?.domains[0] ?? "",
-                        level: 1,
-                        state:
-                          domainLoadoutCount < effectResult.stats.domain_loadout_max
-                            ? "loadout"
-                            : "vault",
-                        effects: [],
-                      },
-                    ],
-                  })
-                }
-              >
-                + Domain card
-              </button>
-            </div>
-          </Section>
-
-          <Section title="Equipment & Loot" subtitle="Weapons, armor and inventory are intentionally open enough to support Core and Hope & Fear equipment without schema changes.">
-            <div className="space-y-6">
-              {equipmentError && (
-                <div className="rounded-xl border border-amber-800/55 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-100/90">
-                  {equipmentError}
-                </div>
-              )}
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Weapons</p>
-                <div className="mb-3">
-                  <DaggerheartCompendiumPicker
-                    categories={["weapon_primary", "weapon_secondary"]}
-                    label="Choose an eligible weapon…"
-                    maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
-                    allowMagicWeapons={spellcastTraitKey(draft) !== null}
-                    onSelect={(entry) =>
-                      patch({
-                        weapons: addEquippedGear(draft.weapons, entry),
-                      })
-                    }
-                  />
-                </div>
-                <GearEditor value={draft.weapons} onChange={(weapons) => patch({ weapons })} addLabel="Custom weapon" equipMode="exclusive-category" />
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Armor</p>
-                <div className="mb-3">
-                  <DaggerheartCompendiumPicker
-                    categories={["armor"]}
-                    label="Choose eligible armor…"
-                    maxTier={draft.level === 1 ? 1 : draft.level <= 4 ? 2 : draft.level <= 7 ? 3 : 4}
-                    onSelect={(entry) =>
-                      patch({
-                        armor: addEquippedGear(draft.armor, entry),
-                        armor_slots_current: 0,
-                      })
-                    }
-                  />
-                </div>
-                <GearEditor
-                  value={draft.armor}
-                  onChange={(armor) =>
-                    patch({
-                      armor,
-                      armor_slots_current: equippedArmorMarks(armor),
-                    })
-                  }
-                  addLabel="Custom armor"
-                  equipMode="exclusive-category"
-                />
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#927580]">Inventory / Loot</p>
-                <div className="mb-3">
-                  <DaggerheartCompendiumPicker
-                    categories={["loot_item", "consumable"]}
-                    label="Choose loot or a consumable…"
-                    onSelect={(entry) =>
-                      patch({
-                        inventory: [
-                          ...draft.inventory,
-                          gearFromCompendium(entry, false),
-                        ],
-                      })
-                    }
-                  />
-                </div>
-                <GearEditor value={draft.inventory} onChange={(inventory) => patch({ inventory })} addLabel="Custom item" equipMode="independent" />
-              </div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <NumberField label="Gold handfuls" min={0} value={draft.gold.handfuls} onChange={(handfuls) => patch({ gold: { ...draft.gold, handfuls } })} />
-                <NumberField label="Gold bags" min={0} value={draft.gold.bags} onChange={(bags) => patch({ gold: { ...draft.gold, bags } })} />
-                <NumberField label="Gold chests" min={0} value={draft.gold.chests} onChange={(chests) => patch({ gold: { ...draft.gold, chests } })} />
-              </div>
-            </div>
-          </Section>
-
-          <Section title="Class, Subclass & Special Resources" subtitle="Tracks mechanics unique to a build: Favor, Focus, Patron, Martial Stances, beastform notes, subclass choices and future expansion mechanics.">
+          
+<Section title="Class, Subclass & Special Resources" subtitle="Tracks mechanics unique to a build: Favor, Focus, Patron, Martial Stances, beastform notes, subclass choices and future expansion mechanics.">
             <div className="grid gap-4 md:grid-cols-2">
               <label>
                 <span className="mb-1.5 block text-xs text-[#a48d95]">Class notes / choices</span>
@@ -3310,7 +3543,26 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             </div>
           </Section>
 
-          <Section title="Advancement" subtitle="Permanent level-up choices, including trait increases, extra HP/Stress, proficiency, subclass upgrades and multiclass choices.">
+          
+<Section
+            title="Calculated Stats & Effects"
+            subtitle="Live totals from class, heritage, equipped gear, Loadout cards, situational effects and GM/homebrew modifiers."
+            open
+          >
+            <DaggerheartEffectsPanel
+              result={effectResult}
+              manualModifiers={draft.manual_stat_modifiers}
+              effectState={draft.effect_state}
+              onManualModifierChange={setManualModifier}
+              onToggleEffects={toggleEffects}
+              actionControlledEffectKeys={actionControlledEffectKeys}
+              actionDeactivatedEffectKeys={actionDeactivatedEffectKeys}
+              allowManualCorrections={isDm}
+            />
+          </Section>
+
+          
+<Section title="Advancement" subtitle="Permanent level-up choices, including trait increases, extra HP/Stress, proficiency, subclass upgrades and multiclass choices.">
             <div className="space-y-3">
               {draft.advancements.map((advancement, index) => (
                 <div key={index} className="grid gap-2 md:grid-cols-[100px_1fr_auto]">
@@ -3327,7 +3579,8 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             </div>
           </Section>
 
-          <Section title="Story" subtitle="Description, background answers and party connections — the bits Strahd will definitely never weaponize against you.">
+          
+<Section title="Story" subtitle="Description, background answers and party connections — the bits Strahd will definitely never weaponize against you.">
             <label className="block">
               <span className="mb-1.5 block text-xs text-[#a48d95]">Character description</span>
               <textarea className={`${inputClass} min-h-28`} value={draft.description} onChange={(e) => patch({ description: e.target.value })} />
@@ -3344,9 +3597,14 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
             </div>
           </Section>
 
-          <Section title="Notes" subtitle="Anything that does not deserve its own box yet.">
+          
+<Section title="Notes" subtitle="Anything that does not deserve its own box yet.">
             <textarea className={`${inputClass} min-h-40`} value={draft.notes} onChange={(e) => patch({ notes: e.target.value })} />
           </Section>
+
+          </div>
+        )}
+
         </fieldset>
 
         {canEdit && (
