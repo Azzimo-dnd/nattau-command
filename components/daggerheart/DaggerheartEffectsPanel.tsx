@@ -178,19 +178,21 @@ export function DaggerheartEffectsPanel({
                   </p>
                 )}
 
-                <label className="mt-3 block border-t border-[#2d1d23] pt-3">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.13em] text-[#806b72]">
-                    GM / Homebrew modifier
-                  </span>
-                  <input
-                    type="number"
-                    value={manual}
-                    onChange={(event) =>
-                      onManualModifierChange(stat, Number(event.target.value) || 0)
-                    }
-                    className="min-h-9 w-full rounded-lg border border-[#49303a] bg-[#0d080b] px-2 text-sm text-[#dbcbd0] outline-none focus:border-[#8b465a]"
-                  />
-                </label>
+                {allowManualCorrections && (
+                  <label className="mt-3 block border-t border-[#2d1d23] pt-3">
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.13em] text-[#806b72]">
+                      GM / Homebrew modifier
+                    </span>
+                    <input
+                      type="number"
+                      value={manual}
+                      onChange={(event) =>
+                        onManualModifierChange(stat, Number(event.target.value) || 0)
+                      }
+                      className="min-h-11 w-full rounded-lg border border-[#49303a] bg-[#0d080b] px-2 text-sm text-[#dbcbd0] outline-none focus:border-[#8b465a]"
+                    />
+                  </label>
+                )}
               </div>
             </details>
           );
