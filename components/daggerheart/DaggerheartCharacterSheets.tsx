@@ -2833,6 +2833,7 @@ export function DaggerheartCharacterSheets({ campaignId, currentUserId, isDm }: 
               armor={equipmentError ? [] : draft.armor}
               stats={effectResult.stats}
               markedSlots={draft.armor_slots_current}
+              compact
               onMarkedSlotsChange={(armor_slots_current) =>
                 void persistRuntimePatch({
                   armor_slots_current,
