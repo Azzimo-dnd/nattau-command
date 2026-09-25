@@ -9,7 +9,7 @@ import {
   type RapierRigidBody,
 } from "@react-three/rapier";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Quaternion, Vector3 } from "three";
+import { Color, Quaternion, Vector3 } from "three";
 import {
   displayFaceValue,
   getDieDefinition,
@@ -147,12 +147,32 @@ function VttDiceVisual({ spec, request }: { spec: PhysicsDieRequest; request: Ph
   const cosmetic = useMemo(() => getDiceCosmetic(request.settings.cosmeticId), [request.settings.cosmeticId]);
   const surfaceTexture = useMemo(() => getDiceSurfaceTexture(cosmetic.id), [cosmetic.id]);
   const labelScale = getDiceNumberScale(request.settings.numberSize);
+  const tone = spec.tone ?? "normal";
+  const material = useMemo(() => {
+    const base = new Color(cosmetic.baseColor);
+    const edge = new Color(cosmetic.edgeColor);
+    if (tone === "hope") {
+      base.lerp(new Color("#f7edcf"), 0.58);
+      edge.lerp(new Color("#ffe2a1"), 0.45);
+    } else if (tone === "fear") {
+      base.lerp(new Color("#170710"), 0.5);
+      edge.lerp(new Color("#c04b70"), 0.35);
+    }
+    return {
+      baseColor: `#${base.getHexString()}`,
+      edgeColor: `#${edge.getHexString()}`,
+      numberColor:
+        tone === "hope" ? "#fff5c9" : tone === "fear" ? "#ffd3df" : cosmetic.numberColor,
+      numberOutline:
+        tone === "hope" ? "#533a12" : tone === "fear" ? "#260713" : cosmetic.numberOutlineColor,
+    };
+  }, [cosmetic, tone]);
 
   return (
     <group>
       <mesh geometry={definition.geometry} castShadow receiveShadow>
         <meshPhysicalMaterial
-          color={cosmetic.baseColor}
+          color={material.baseColor}
           map={surfaceTexture ?? undefined}
           roughness={cosmetic.roughness}
           metalness={cosmetic.metalness}
@@ -163,15 +183,15 @@ function VttDiceVisual({ spec, request }: { spec: PhysicsDieRequest; request: Ph
         />
       </mesh>
       <lineSegments geometry={definition.edges} renderOrder={8}>
-        <lineBasicMaterial color={cosmetic.edgeColor} transparent opacity={0.88} depthWrite={false} />
+        <lineBasicMaterial color={material.edgeColor} transparent opacity={0.88} depthWrite={false} />
       </lineSegments>
       {definition.labels.map((face, labelIndex) => {
         const display = displayFaceValue(face.value, spec.percentilePart);
         const texture = getLabelTexture(
           definition.kind,
           display,
-          cosmetic.numberColor,
-          cosmetic.numberOutlineColor,
+          material.numberColor,
+          material.numberOutline,
           request.settings.numberSize,
         );
         const size = definition.labelSize * labelScale;
