@@ -23,6 +23,7 @@ type CampaignAdministrationProps = {
 type TabKey = "members" | "create" | "invites";
 
 type MemberDraft = {
+  displayName: string;
   role: "dm" | "player";
   planningEnabled: boolean;
   countsTowardProgress: boolean;
@@ -182,6 +183,7 @@ function MemberEditor({
     companionName
   );
   const [draft, setDraft] = useState<MemberDraft>({
+    displayName: member.displayName,
     role: member.role,
     planningEnabled: member.planningEnabled,
     countsTowardProgress: member.countsTowardProgress,
@@ -200,6 +202,7 @@ function MemberEditor({
       p_user_id: member.userId,
       p_role: draft.role,
       p_planning_enabled: draft.planningEnabled,
+      p_display_name: draft.displayName.trim(),
       p_counts_toward_progress: draft.countsTowardProgress,
       p_is_test_account: draft.isTestAccount,
       p_is_active: draft.isActive,
@@ -249,6 +252,26 @@ function MemberEditor({
         </div>
 
         <div className="mt-6 space-y-3">
+          <label className={`block rounded-2xl border p-4 ${theme.panelSoft}`}>
+            <span className={`text-sm font-semibold ${theme.mainText}`}>
+              Campaign display name
+            </span>
+            <input
+              value={draft.displayName}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  displayName: event.target.value,
+                }))
+              }
+              maxLength={80}
+              className={`mt-3 w-full rounded-xl border px-3 py-3 text-sm outline-none ${theme.input}`}
+            />
+            <span className={`mt-2 block text-xs leading-5 ${theme.mutedText}`}>
+              Used only inside this campaign. The same account can use a different name in another campaign.
+            </span>
+          </label>
+
           <label className={`block rounded-2xl border p-4 ${theme.panelSoft}`}>
             <span className={`text-sm font-semibold ${theme.mainText}`}>
               Campaign role
@@ -739,14 +762,14 @@ export function CampaignAdministration({
 
                 <label className="block">
                   <span className={`text-sm font-semibold ${theme.mainText}`}>
-                    Display name · optional
+                    Campaign display name · optional
                   </span>
                   <input
                     value={accountDisplayName}
                     onChange={(event) => setAccountDisplayName(event.target.value)}
                     maxLength={80}
                     autoComplete="off"
-                    placeholder="Player name"
+                    placeholder="Name used in this campaign"
                     className={`mt-2 w-full rounded-xl border px-4 py-3 outline-none ${theme.input}`}
                   />
                 </label>
@@ -1118,6 +1141,7 @@ export function CampaignAdministration({
                 member.userId === editingMember.userId
                   ? {
                       ...member,
+                      displayName: draft.displayName.trim(),
                       role: draft.role,
                       planningEnabled: draft.planningEnabled,
                       countsTowardProgress: draft.countsTowardProgress,
