@@ -21,6 +21,7 @@ type CampaignRelationRow = {
 };
 
 type MembershipRow = {
+  display_name?: string | null;
   role?: string | null;
   planning_enabled?: boolean | null;
   is_active?: boolean | null;
@@ -52,6 +53,7 @@ export const loadUserCampaignAccess = cache(
       .from("campaign_members")
       .select(
         `
+          display_name,
           role,
           planning_enabled,
           is_active,
@@ -109,6 +111,7 @@ export const loadUserCampaignAccess = cache(
           systemKey: campaign.system_key?.trim() || "unknown",
           themeKey: campaign.theme_key?.trim() || campaign.slug,
           enabledModules: normalizeModules(campaign.enabled_modules),
+          displayName: row.display_name?.trim() || currentUser.displayName,
           role: row.role === "dm" ? "dm" : "player",
           planningEnabled: row.planning_enabled !== false,
           homeHref: getCampaignHomeHref(campaign.slug),
