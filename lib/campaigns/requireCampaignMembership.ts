@@ -26,7 +26,7 @@ export async function requireCampaignMembership(
   if (membership) {
     return {
       userId: access.userId,
-      displayName: access.displayName,
+      displayName: membership.displayName,
       membership,
       canSwitchCampaign: access.campaigns.length > 1,
       sourceAvailable: access.sourceAvailable,
@@ -48,6 +48,7 @@ export async function requireCampaignMembership(
         systemKey: "dnd5e",
         themeKey: "nattau",
         enabledModules: [],
+        displayName: access.displayName,
         role: access.defaultRole,
         planningEnabled: true,
         homeHref: "/campaigns/nattau",
