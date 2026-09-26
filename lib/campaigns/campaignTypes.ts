@@ -11,6 +11,7 @@ export type CampaignMembership = {
   systemKey: string;
   themeKey: CampaignThemeKey;
   enabledModules: string[];
+  displayName: string;
   role: AppRole;
   planningEnabled: boolean;
   homeHref: string;
