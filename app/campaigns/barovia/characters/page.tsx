@@ -7,6 +7,7 @@ import {
   WorkspaceLink,
 } from "@/components/campaigns/CampaignWorkspace";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
+import styles from "./playerHub.module.css";
 
 export const metadata: Metadata = { title: "Player Hub" };
 
@@ -155,13 +156,15 @@ export default async function Page() {
             Your current miniature is selected automatically. You can inspect skins here and open the painter without leaving your player space.
           </p>
         </div>
-        <CharacterMiniaturesGallery
-          campaignId={access.membership.campaignId}
-          campaignSlug="barovia"
-          currentUserId={access.userId}
-          isDm={false}
-          preferredPlayerId={access.userId}
-        />
+        <div className={styles.baroviaMiniatures}>
+          <CharacterMiniaturesGallery
+            campaignId={access.membership.campaignId}
+            campaignSlug="barovia"
+            currentUserId={access.userId}
+            isDm={false}
+            preferredPlayerId={access.userId}
+          />
+        </div>
       </section>
     </CampaignWorkspace>
   );
