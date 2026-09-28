@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { getCampaignAdminPresentation } from "@/lib/campaigns/campaignAdminPresentation";
 import type { CampaignAdminMember } from "./adminTypes";
 
@@ -13,35 +12,14 @@ function generatePassword() {
   return Array.from(bytes, (value) => alphabet[value % alphabet.length]).join("");
 }
 
-async function functionErrorMessage(error: unknown, fallback: string) {
+function responseErrorMessage(body: unknown, fallback: string) {
   if (
-    error &&
-    typeof error === "object" &&
-    "context" in error &&
-    (error as { context?: unknown }).context instanceof Response
+    body &&
+    typeof body === "object" &&
+    "error" in body &&
+    typeof (body as { error?: unknown }).error === "string"
   ) {
-    try {
-      const body = await (error as { context: Response }).context.clone().json();
-      if (
-        body &&
-        typeof body === "object" &&
-        "error" in body &&
-        typeof (body as { error?: unknown }).error === "string"
-      ) {
-        return (body as { error: string }).error;
-      }
-    } catch {
-      // Fall through to the generic message below.
-    }
-  }
-
-  if (
-    error &&
-    typeof error === "object" &&
-    "message" in error &&
-    typeof (error as { message?: unknown }).message === "string"
-  ) {
-    return (error as { message: string }).message;
+    return (body as { error: string }).error;
   }
 
   return fallback;
@@ -96,36 +74,48 @@ export function CampaignPasswordReset({
     }
 
     setIsSaving(true);
-    const supabase = createClient();
-    const { error } = await supabase.functions.invoke(
-      "campaign-admin-reset-password",
-      {
-        body: {
-          campaignId,
-          userId,
-          password,
-          requirePasswordChange,
-        },
-      }
-    );
 
-    if (error) {
+    try {
+      const response = await fetch(
+        `/api/campaigns/${encodeURIComponent(campaignSlug)}/gm/reset-password`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campaignSlug,
+            campaignId,
+            userId,
+            password,
+            requirePasswordChange,
+          }),
+        }
+      );
+
+      const body = (await response.json().catch(() => null)) as unknown;
+
+      if (!response.ok) {
+        setMessage({
+          kind: "error",
+          text: responseErrorMessage(body, "Password could not be reset."),
+        });
+        return;
+      }
+
+      setMessage({
+        kind: "success",
+        text: requirePasswordChange
+          ? `Password updated for ${selected?.displayName ?? "campaign member"}. They will be forced to choose a new password after signing in.`
+          : `Password updated for ${selected?.displayName ?? "campaign member"}.`,
+      });
+      setPassword("");
+    } catch {
       setMessage({
         kind: "error",
-        text: await functionErrorMessage(error, "Password could not be reset."),
+        text: "The password service could not be reached. Please try again.",
       });
+    } finally {
       setIsSaving(false);
-      return;
     }
-
-    setMessage({
-      kind: "success",
-      text: requirePasswordChange
-        ? `Password updated for ${selected?.displayName ?? "campaign member"}. They will be forced to choose a new password after signing in.`
-        : `Password updated for ${selected?.displayName ?? "campaign member"}.`,
-    });
-    setPassword("");
-    setIsSaving(false);
   }
 
   return (
@@ -191,7 +181,9 @@ export function CampaignPasswordReset({
         </label>
       </div>
 
-      <label className={`mt-4 flex items-start justify-between gap-4 rounded-2xl border p-4 ${theme.panelSoft}`}>
+      <label
+        className={`mt-4 flex items-start justify-between gap-4 rounded-2xl border p-4 ${theme.panelSoft}`}
+      >
         <span>
           <span className={`block text-sm font-semibold ${theme.mainText}`}>
             Require password change on next login
