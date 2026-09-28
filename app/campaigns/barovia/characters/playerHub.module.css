@@ -1,0 +1,47 @@
+.baroviaMiniatures [class*="border-slate-800"],
+.baroviaMiniatures [class*="border-slate-700"] {
+  border-color: #482b35 !important;
+}
+
+.baroviaMiniatures [class*="bg-slate-900"],
+.baroviaMiniatures [class*="bg-slate-950"] {
+  background-color: rgba(18, 12, 16, 0.9) !important;
+}
+
+.baroviaMiniatures [class*="text-slate-100"],
+.baroviaMiniatures [class*="text-slate-200"] {
+  color: #eadbd2 !important;
+}
+
+.baroviaMiniatures [class*="text-slate-400"],
+.baroviaMiniatures [class*="text-slate-500"],
+.baroviaMiniatures [class*="text-slate-600"] {
+  color: #98888e !important;
+}
+
+.baroviaMiniatures [class*="border-yellow-"],
+.baroviaMiniatures [class*="border-cyan-"],
+.baroviaMiniatures [class*="border-fuchsia-"] {
+  border-color: rgba(159, 83, 103, 0.62) !important;
+}
+
+.baroviaMiniatures [class*="bg-yellow-"],
+.baroviaMiniatures [class*="bg-cyan-"],
+.baroviaMiniatures [class*="bg-fuchsia-"] {
+  background-color: rgba(94, 31, 49, 0.32) !important;
+}
+
+.baroviaMiniatures [class*="text-yellow-"],
+.baroviaMiniatures [class*="text-cyan-"],
+.baroviaMiniatures [class*="text-fuchsia-"] {
+  color: #d58ba0 !important;
+}
+
+.baroviaMiniatures button[class*="border-yellow-500"] {
+  border-color: rgba(159, 83, 103, 0.8) !important;
+  background-color: rgba(91, 27, 45, 0.42) !important;
+}
+
+.baroviaMiniatures button[class*="border-yellow-500"] [class*="text-yellow-100"] {
+  color: #f1dce2 !important;
+}
