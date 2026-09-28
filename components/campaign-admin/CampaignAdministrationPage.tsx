@@ -47,6 +47,12 @@ export async function CampaignAdministrationPage({
         >
           All managed campaigns
         </Link>
+        <Link
+          href={`/campaigns/${access.membership.slug}/gm/members/passwords`}
+          className={`inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-semibold transition ${theme.secondaryButton}`}
+        >
+          Reset passwords
+        </Link>
       </div>
 
       <div className="mt-6 flex flex-wrap items-end justify-between gap-4">
