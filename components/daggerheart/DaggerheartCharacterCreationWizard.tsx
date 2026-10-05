@@ -35,6 +35,8 @@ import {
   type HeritageState,
 } from "@/components/daggerheart/DaggerheartHeritageBuilder";
 
+import { DaggerheartDomainCardPicker } from "./DaggerheartDomainCardPicker";
+
 type TraitKey = (typeof daggerheartTraits)[number];
 type Traits = Record<TraitKey, number>;
 type Experience = { name: string; modifier: number };
@@ -129,6 +131,8 @@ export type WizardCharacter = {
 };
 
 type Props = {
+  campaignId: string;
+  characterId?: string;
   draft: WizardCharacter;
   patch: (value: Partial<WizardCharacter>) => void;
   onFinish: () => void;
@@ -209,6 +213,8 @@ function hasSpellcastTrait(character: WizardCharacter) {
 }
 
 export function DaggerheartCharacterCreationWizard({
+  campaignId,
+  characterId,
   draft,
   patch,
   onFinish,
@@ -1217,11 +1223,13 @@ export function DaggerheartCharacterCreationWizard({
                 {expectedDomainCards === 3 ? " School of Knowledge grants one additional starting card." : ""}
               </p>
             </div>
-            <DaggerheartCompendiumPicker
-              categories={["domain_card"]}
-              label="Choose a level 1 Domain Card…"
-              domains={selectedClass?.domains}
-              maxLevel={1}
+            <DaggerheartDomainCardPicker
+              campaignId={campaignId}
+              characterId={characterId}
+              domains={selectedClass?.domains ?? []}
+              selected={draft.domain_cards}
+              limit={expectedDomainCards}
+              onRemove={(card) => patch({ domain_cards: draft.domain_cards.filter((item) => item !== card) })}
               onSelect={(entry) => {
                 if (draft.domain_cards.some((card) => card.compendium_id === entry.id)) return;
                 if (draft.domain_cards.length >= expectedDomainCards) return;
@@ -1246,17 +1254,7 @@ export function DaggerheartCharacterCreationWizard({
                 });
               }}
             />
-            <div className="space-y-2">
-              {draft.domain_cards.map((card) => (
-                <div key={card.compendium_id ?? card.name} className="flex items-center justify-between rounded-xl border border-[#3a252d] bg-black/15 p-3">
-                  <div>
-                    <p className="font-semibold text-[#d9c5cb]">{card.name}</p>
-                    <p className="mt-1 text-xs text-[#8e777f]">{card.domain} · Level {card.level}</p>
-                  </div>
-                  <button type="button" onClick={() => patch({ domain_cards: draft.domain_cards.filter((item) => item !== card) })}>×</button>
-                </div>
-              ))}
-            </div>
+
           </div>
         )}
 
