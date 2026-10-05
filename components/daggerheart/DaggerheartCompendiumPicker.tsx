@@ -12,6 +12,7 @@ import {
   DaggerheartCategoryIcon,
   DaggerheartDomainIcon,
 } from "@/components/daggerheart/DaggerheartCompendiumIcons";
+import { DaggerheartDomainDeck } from "@/components/daggerheart/DaggerheartDomainDeck";
 
 type Props = {
   categories: DaggerheartCompendiumCategory[];
@@ -98,6 +99,30 @@ export function DaggerheartCompendiumPicker({
         )
         ? "Add & equip weapon"
         : "Add from compendium");
+  const isDomainCardBrowser =
+    categories.length === 1 && categories[0] === "domain_card";
+  const browserDomains = domains?.length
+    ? domains
+    : [...new Set(entries.map((entry) => entry.domain).filter((value): value is string => Boolean(value)))];
+
+  if (isDomainCardBrowser) {
+    return (
+      <DaggerheartDomainDeck
+        mode="browser"
+        entries={entries}
+        usage={[]}
+        domains={browserDomains}
+        selected={[]}
+        limit={0}
+        loading={loading}
+        error={null}
+        refreshUsage={async () => []}
+        onRetry={() => undefined}
+        onSelect={onSelect}
+        onRemove={() => undefined}
+      />
+    );
+  }
 
   return (
     <div className="rounded-xl border border-[#39232c] bg-black/15 p-3">
