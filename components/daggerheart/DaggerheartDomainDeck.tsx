@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { compendiumEffectiveMetadata, compendiumHasErrata, type DaggerheartCompendiumEntry } from "@/lib/daggerheart/compendium";
 import { cardHolders, entryIdentity, holderLabel, sameDomainCard, type DomainCardIdentity, type DomainCardUsage } from "@/lib/daggerheart/domain-deck";
-import { compendiumEntryDetails } from "./DaggerheartCompendiumPicker";
 import { DaggerheartDomainIcon } from "./DaggerheartCompendiumIcons";
 import styles from "./DaggerheartDomainDeck.module.css";
 
@@ -25,6 +24,17 @@ type Props = {
 
 function sourceLabel(entry: DaggerheartCompendiumEntry) {
   return `${entry.source_key === "hope-fear" ? "Hope & Fear" : "Core"}${compendiumHasErrata(entry) ? " · Errata" : ""}`;
+}
+
+function domainCardDetails(entry: DaggerheartCompendiumEntry) {
+  const original = entry.rules_text && entry.rules_text !== "—" ? entry.rules_text : entry.summary;
+  if (!compendiumHasErrata(entry)) return original;
+  const current = [entry.errata.summary, entry.errata.rules_text].filter(Boolean).join(" · ");
+  const revision = entry.errata.revision ? ` (${entry.errata.revision})` : "";
+  return [
+    `Original source: ${original || "See source entry."}`,
+    `Official errata/current${revision}: ${current || original || "See current compendium entry."}`,
+  ].join("\n\n");
 }
 
 function domainKey(domain?: string | null) {
@@ -221,7 +231,7 @@ export function DaggerheartDomainDeck({ entries, usage, characterId, domains, se
               <h3 className={styles.cardTitle}>{focused.name}</h3>
             </div>
 
-            <div className={styles.rules}>{compendiumEntryDetails(focused) || focused.summary}</div>
+            <div className={styles.rules}>{domainCardDetails(focused) || focused.summary}</div>
 
             <div className={styles.cardFooter}>
               <span>{sourceLabel(focused)}</span>
