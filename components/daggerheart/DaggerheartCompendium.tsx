@@ -283,7 +283,7 @@ export function DaggerheartCompendium() {
               mode="browser"
               entries={visibleEntries}
               usage={[]}
-              domains={daggerheartDomains}
+              domains={[...daggerheartDomains]}
               selected={[]}
               limit={0}
               loading={loading}
