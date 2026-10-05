@@ -2858,6 +2858,8 @@ export function DaggerheartCharacterSheets({
               </div>
             )}
             <DaggerheartCharacterCreationWizard
+              campaignId={campaignId}
+              characterId={draft.id || undefined}
               draft={draft}
               patch={patch}
               onFinish={save}

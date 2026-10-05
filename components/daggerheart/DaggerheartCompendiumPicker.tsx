@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   compendiumEffectiveMetadata,
@@ -8,10 +8,12 @@ import {
   type DaggerheartCompendiumCategory,
   type DaggerheartCompendiumEntry,
 } from "@/lib/daggerheart/compendium";
+import type { DomainCardUsage } from "@/lib/daggerheart/domain-deck";
 import {
   DaggerheartCategoryIcon,
   DaggerheartDomainIcon,
 } from "@/components/daggerheart/DaggerheartCompendiumIcons";
+import { DaggerheartDomainDeck } from "@/components/daggerheart/DaggerheartDomainDeck";
 
 type Props = {
   categories: DaggerheartCompendiumCategory[];
@@ -28,6 +30,12 @@ type Props = {
 const fieldClass =
   "min-h-10 w-full rounded-xl border border-[#4c2d38] bg-[#0d080b] px-3 text-sm text-[#dbcbd0] outline-none transition focus:border-[#9a4d61]";
 
+function campaignSlugFromPath() {
+  if (typeof window === "undefined") return null;
+  const match = window.location.pathname.match(/^\/campaigns\/([^/]+)/);
+  return match?.[1] ?? null;
+}
+
 export function DaggerheartCompendiumPicker({
   categories,
   label,
@@ -43,6 +51,38 @@ export function DaggerheartCompendiumPicker({
   const [entries, setEntries] = useState<DaggerheartCompendiumEntry[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [domainUsage, setDomainUsage] = useState<DomainCardUsage[] | null>(null);
+  const usageRequestId = useRef(0);
+  const isDomainCardBrowser =
+    categories.length === 1 && categories[0] === "domain_card";
+
+  const refreshDomainUsage = useCallback(async () => {
+    if (!isDomainCardBrowser) return [];
+    const requestId = ++usageRequestId.current;
+    try {
+      const slug = campaignSlugFromPath();
+      if (!slug) throw new Error("Campaign route unavailable");
+      const campaignResult = await supabase
+        .from("campaigns")
+        .select("id")
+        .eq("slug", slug)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (campaignResult.error || !campaignResult.data?.id) {
+        throw campaignResult.error ?? new Error("Campaign not found");
+      }
+      const usageResult = await supabase.rpc("list_daggerheart_domain_card_usage", {
+        p_campaign_id: campaignResult.data.id,
+      });
+      if (usageResult.error) throw usageResult.error;
+      const rows = (usageResult.data ?? []) as DomainCardUsage[];
+      if (requestId === usageRequestId.current) setDomainUsage(rows);
+      return rows;
+    } catch {
+      if (requestId === usageRequestId.current) setDomainUsage(null);
+      return null;
+    }
+  }, [isDomainCardBrowser, supabase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +128,26 @@ export function DaggerheartCompendiumPicker({
     };
   }, [allowMagicWeapons, categories.join("|"), domains?.join("|"), names?.join("|"), maxLevel, maxTier, supabase]);
 
+  useEffect(() => {
+    if (!isDomainCardBrowser) return;
+    const initial = window.setTimeout(() => {
+      void refreshDomainUsage();
+    }, 0);
+    const timer = window.setInterval(() => {
+      void refreshDomainUsage();
+    }, 20000);
+    const onFocus = () => {
+      void refreshDomainUsage();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      ++usageRequestId.current;
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [isDomainCardBrowser, refreshDomainUsage]);
+
   const selected = entries.find((entry) => entry.id === selectedId) ?? null;
   const resolvedActionLabel =
     actionLabel ??
@@ -98,6 +158,30 @@ export function DaggerheartCompendiumPicker({
         )
         ? "Add & equip weapon"
         : "Add from compendium");
+  const browserDomains = domains?.length
+    ? domains
+    : [...new Set(entries.map((entry) => entry.domain).filter((value): value is string => Boolean(value)))];
+
+  if (isDomainCardBrowser) {
+    return (
+      <DaggerheartDomainDeck
+        mode="browser"
+        entries={entries}
+        usage={domainUsage}
+        domains={browserDomains}
+        selected={[]}
+        limit={0}
+        loading={loading}
+        error={null}
+        refreshUsage={refreshDomainUsage}
+        onRetry={() => {
+          void refreshDomainUsage();
+        }}
+        onSelect={onSelect}
+        onRemove={() => undefined}
+      />
+    );
+  }
 
   return (
     <div className="rounded-xl border border-[#39232c] bg-black/15 p-3">
