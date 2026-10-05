@@ -6,6 +6,8 @@ import type { DaggerheartCompendiumEntry } from "@/lib/daggerheart/compendium";
 import type { DomainCardIdentity, DomainCardUsage } from "@/lib/daggerheart/domain-deck";
 import { createClient } from "@/lib/supabase/client";
 
+const RETURN_PATH = "/login/domain-deck-test";
+
 export function DomainDeckPlayground() {
   const supabase = useMemo(() => createClient(), []);
   const [entries, setEntries] = useState<DaggerheartCompendiumEntry[]>([]);
@@ -16,6 +18,7 @@ export function DomainDeckPlayground() {
   const [limit, setLimit] = useState(2);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -24,7 +27,21 @@ export function DomainDeckPlayground() {
     async function load() {
       setLoading(true);
       setError(null);
+      setAuthRequired(false);
+
       try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+
+        if (!sessionData.session) {
+          if (!cancelled) {
+            setEntries([]);
+            setAuthRequired(true);
+            setError("Sign in is required to load the real Daggerheart compendium on this preview.");
+          }
+          return;
+        }
+
         const result = await supabase.from("daggerheart_compendium_entries")
           .select("id,source_key,category,slug,name,parent_slug,domain,level,tier,summary,rules_text,metadata,effects,actions,errata,source_page_start,source_page_end,sort_order")
           .eq("is_active", true)
@@ -36,11 +53,17 @@ export function DomainDeckPlayground() {
           .limit(500);
 
         if (result.error) throw result.error;
-        if (!cancelled) setEntries((result.data ?? []) as DaggerheartCompendiumEntry[]);
+        if (!cancelled) {
+          const cards = (result.data ?? []) as DaggerheartCompendiumEntry[];
+          setEntries(cards);
+          if (cards.length === 0) {
+            setError("The compendium request succeeded, but no level 1 Domain cards were returned for this account.");
+          }
+        }
       } catch {
         if (!cancelled) {
           setEntries([]);
-          setError("Nie udało się wczytać prawdziwej talii. Zaloguj się na tym preview i spróbuj ponownie.");
+          setError("The real Domain deck could not be loaded. Please retry; if the problem continues, sign in again on this preview.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -51,7 +74,10 @@ export function DomainDeckPlayground() {
     return () => { cancelled = true; };
   }, [attempt, supabase]);
 
-  const domains = useMemo(() => Array.from(new Set(entries.map((entry) => entry.domain).filter((domain): domain is string => Boolean(domain)))), [entries]);
+  const domains = useMemo(
+    () => Array.from(new Set(entries.map((entry) => entry.domain).filter((domain): domain is string => Boolean(domain)))),
+    [entries],
+  );
   const occupied = entries[0] ?? null;
   const usage: DomainCardUsage[] = occupied ? [
     {
@@ -76,22 +102,31 @@ export function DomainDeckPlayground() {
     }] : []),
   ] : [];
   const field = "min-h-11 rounded-lg border border-[#795060] bg-[#201219] px-3 py-2 text-[#ebdae2]";
+  const signInHref = `/login?next=${encodeURIComponent(RETURN_PATH)}`;
 
   return <main className="mx-auto max-w-6xl space-y-6 p-4 text-[#ebdae2] sm:p-8">
     <header className="space-y-3">
-      <p className="text-sm font-bold uppercase tracking-widest text-[#d399ae]">Preview · prawdziwe dane compendium</p>
-      <h1 className="text-3xl font-semibold">Test wyboru kart umiejętności</h1>
-      <p>To są prawdziwe karty Domain 1. poziomu z tego samego compendium i warstwy erraty, z których korzysta kreator postaci. Wybory na tym ekranie nadal są lokalne i niczego nie zapisują w kampanii.</p>
-      <p className="text-sm text-[#d6b8c4]">Jeśli talia się nie załaduje, <a className="underline" href="/login">zaloguj się na tym preview</a> i wróć tutaj.</p>
+      <p className="text-sm font-bold uppercase tracking-widest text-[#d399ae]">Preview · real compendium data</p>
+      <h1 className="text-3xl font-semibold">Domain card selection test</h1>
+      <p>These are the real level 1 Domain cards from the same compendium and errata layer used by character creation. Choices on this page stay local and are not saved to the campaign.</p>
+      {authRequired && <p className="text-sm text-[#efc0d0]">
+        This Vercel preview has its own browser session. <a className="font-semibold underline" href={signInHref}>Sign in here</a> and you will be returned directly to this test.
+      </p>}
     </header>
+
     <fieldset className="flex flex-wrap items-end gap-4 rounded-xl border border-[#795060] p-4">
-      <legend className="px-2">Scenariusz testowy</legend>
-      <label className="grid gap-2">Właściciel karty {occupied?.name ?? "testowej"}<input className={field} value={owner} onChange={(event) => setOwner(event.target.value)} /></label>
-      <label className="grid gap-2">Liczba kart<select className={field} value={limit} onChange={(event) => { setSelected([]); setLimit(Number(event.target.value)); }}><option value={2}>2 — standard</option><option value={3}>3 — dodatkowa karta</option></select></label>
-      <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={multiple} onChange={(event) => setMultiple(event.target.checked)} />Drugi właściciel</label>
-      <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={fail} onChange={(event) => setFail(event.target.checked)} />Symuluj błąd odczytu właścicieli</label>
-      <button type="button" className={field} onClick={() => { setSelected([]); setOwner("Odetta"); setMultiple(false); setFail(false); setLimit(2); }}>Reset testu</button>
+      <legend className="px-2">Test scenario</legend>
+      <label className="grid gap-2">Holder of {occupied?.name ?? "the test card"}<input className={field} value={owner} onChange={(event) => setOwner(event.target.value)} /></label>
+      <label className="grid gap-2">Starting hand size<select className={field} value={limit} onChange={(event) => { setSelected([]); setLimit(Number(event.target.value)); }}><option value={2}>2 — standard</option><option value={3}>3 — extra card</option></select></label>
+      <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={multiple} onChange={(event) => setMultiple(event.target.checked)} />Second holder</label>
+      <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={fail} onChange={(event) => setFail(event.target.checked)} />Simulate holder lookup failure</label>
+      <button type="button" className={field} onClick={() => { setSelected([]); setOwner("Odetta"); setMultiple(false); setFail(false); setLimit(2); }}>Reset test</button>
     </fieldset>
+
+    {authRequired && <div className="rounded-xl border border-[#8c5a6d] bg-[#2a171f] p-4 text-sm">
+      <strong>Sign in required.</strong> The compendium is protected by Supabase RLS, so the preview cannot read the cards until you authenticate on this preview domain. <a className="ml-1 font-semibold underline" href={signInHref}>Sign in and return to the deck</a>.
+    </div>}
+
     <DaggerheartDomainDeck entries={entries} usage={fail ? null : usage} domains={domains}
       selected={selected} limit={limit} loading={loading} error={error}
       onRetry={() => { setFail(false); setAttempt((value) => value + 1); }} refreshUsage={async () => fail ? null : usage}
