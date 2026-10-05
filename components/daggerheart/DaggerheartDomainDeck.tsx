@@ -77,7 +77,7 @@ export function DaggerheartDomainDeck({ entries, usage, characterId, domains, se
   const selectedCard = !browserMode && focused
     ? selected.find((card) => sameDomainCard(card, entryIdentity(focused)))
     : undefined;
-  const holders = !browserMode && focused ? cardHolders(entryIdentity(focused), usage ?? [], characterId) : [];
+  const holders = focused ? cardHolders(entryIdentity(focused), usage ?? [], characterId) : [];
   const holderKey = holders.map((holder) => holder.character_id).sort().join("|");
   const full = !browserMode && selected.length >= limit;
   const focusedMetadata = focused ? compendiumEffectiveMetadata(focused) : null;
@@ -244,6 +244,21 @@ export function DaggerheartDomainDeck({ entries, usage, characterId, domains, se
         </div>
 
         <div className={styles.cardActions}>
+          {browserMode && (
+            <div className={styles.availabilityRow}>
+              <strong className={`${styles.availabilityBadge} ${availabilityClass}`} aria-live="polite">
+                {usage === null ? "Availability unknown" : holders.length ? `Chosen by ${holders.map(holderLabel).join(", ")}` : "Available"}
+              </strong>
+              <span>
+                {usage === null
+                  ? "Could not verify who currently holds this card."
+                  : holders.length
+                    ? "This card is already held by another active character in this campaign; the GM can still add a shared copy."
+                    : "No active character in this campaign currently holds this card."}
+              </span>
+              {usage === null && <button type="button" className={styles.secondaryAction} onClick={onRetry}>Retry</button>}
+            </div>
+          )}
           {!browserMode && <>
             <div className={styles.availabilityRow}>
               <strong className={`${styles.availabilityBadge} ${availabilityClass}`} aria-live="polite">
