@@ -26,6 +26,10 @@ function sourceLabel(entry: DaggerheartCompendiumEntry) {
   return `${entry.source_key === "hope-fear" ? "Hope & Fear" : "Core"}${compendiumHasErrata(entry) ? " · Errata" : ""}`;
 }
 
+function domainKey(domain?: string | null) {
+  return (domain ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
 export function DaggerheartDomainDeck({ entries, usage, characterId, domains, selected, limit, loading, error, refreshUsage, onRetry, onSelect, onRemove }: Props) {
   const [domain, setDomain] = useState("");
   const [search, setSearch] = useState("");
@@ -34,6 +38,7 @@ export function DaggerheartDomainDeck({ entries, usage, characterId, domains, se
   const [notice, setNotice] = useState("");
   const [checking, setChecking] = useState(false);
   const busy = useRef(false);
+  const touchStartX = useRef<number | null>(null);
 
   const shown = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -61,6 +66,9 @@ export function DaggerheartDomainDeck({ entries, usage, characterId, domains, se
   const holders = focused ? cardHolders(entryIdentity(focused), usage ?? [], characterId) : [];
   const holderKey = holders.map((holder) => holder.character_id).sort().join("|");
   const full = selected.length >= limit;
+  const focusedMetadata = focused ? compendiumEffectiveMetadata(focused) : null;
+  const focusedType = String(focusedMetadata?.card_type ?? "Domain card");
+  const focusedRecall = String(focusedMetadata?.recall_cost ?? "—");
 
   function focus(entry: DaggerheartCompendiumEntry) {
     if (busy.current) return;
@@ -102,16 +110,37 @@ export function DaggerheartDomainDeck({ entries, usage, characterId, domains, se
 
   function previewCard(entry: DaggerheartCompendiumEntry, position: "previous" | "next") {
     const metadata = compendiumEffectiveMetadata(entry);
+    const cardType = String(metadata.card_type ?? "Domain card");
+    const recall = String(metadata.recall_cost ?? "—");
     return (
-      <button type="button" className={`${styles.sideCard} ${position === "previous" ? styles.sidePrevious : styles.sideNext}`} onClick={() => focus(entry)} aria-label={`${position === "previous" ? "Previous" : "Next"} card: ${entry.name}`}>
-        <span className={styles.sideTop}>{entry.domain} · Level {entry.level}</span>
-        <span className={styles.sideEmblem}><DaggerheartDomainIcon domain={entry.domain ?? ""} /></span>
-        <strong>{entry.name}</strong>
-        <small>{String(metadata.card_type ?? "Domain card")} · Recall {String(metadata.recall_cost ?? "—")}</small>
+      <button
+        type="button"
+        className={`${styles.sideCard} ${position === "previous" ? styles.sidePrevious : styles.sideNext}`}
+        data-domain={domainKey(entry.domain)}
+        onClick={() => focus(entry)}
+        aria-label={`${position === "previous" ? "Previous" : "Next"} card: ${entry.name}`}
+      >
+        <span className={styles.sideBanner} aria-hidden="true">
+          <strong>{entry.level}</strong>
+          <DaggerheartDomainIcon domain={entry.domain ?? ""} />
+        </span>
+        <span className={styles.sideRecall}><strong>{recall}</strong><small>recall</small></span>
+        <span className={styles.sideWatermark} aria-hidden="true"><DaggerheartDomainIcon domain={entry.domain ?? ""} /></span>
+        <span className={styles.sideType}>{cardType}</span>
+        <strong className={styles.sideTitle}>{entry.name}</strong>
+        <small className={styles.sideDomain}>{entry.domain} domain</small>
         <span className={styles.sideHint}>{position === "previous" ? "← View" : "View →"}</span>
       </button>
     );
   }
+
+  const availabilityClass = selectedCard
+    ? styles.stateOwned
+    : usage === null
+      ? styles.stateUnknown
+      : holders.length
+        ? styles.stateOccupied
+        : styles.stateAvailable;
 
   return (
     <section className={styles.table} aria-label="Domain card deck">
@@ -119,7 +148,7 @@ export function DaggerheartDomainDeck({ entries, usage, characterId, domains, se
         <div>
           <p className={styles.eyebrow}>The domain deck</p>
           <h4>Choose your abilities</h4>
-          <p>Browse the deck one card at a time, just like you would at the table.</p>
+          <p>Browse the deck like a physical hand of Daggerheart cards laid out on a Barovian table.</p>
         </div>
         <span className={styles.counter} aria-live="polite">{selected.length} / {limit} chosen</span>
       </div>
@@ -141,25 +170,52 @@ export function DaggerheartDomainDeck({ entries, usage, characterId, domains, se
         <div className={styles.deckMeta}>
           <span>{shown.length} {shown.length === 1 ? "card" : "cards"}</span>
           <strong>{activeIndex + 1} / {shown.length}</strong>
-          <span>Use the arrows or click a side card</span>
+          <span>Use arrows, click a side card, or swipe on mobile</span>
         </div>
 
-        <div className={styles.deckStage} onKeyDown={(event) => {
-          if (event.key === "ArrowLeft") browse(-1);
-          if (event.key === "ArrowRight") browse(1);
-        }}>
+        <div
+          className={styles.deckStage}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") browse(-1);
+            if (event.key === "ArrowRight") browse(1);
+          }}
+          onTouchStart={(event) => {
+            touchStartX.current = event.changedTouches[0]?.clientX ?? null;
+          }}
+          onTouchEnd={(event) => {
+            const start = touchStartX.current;
+            const end = event.changedTouches[0]?.clientX;
+            touchStartX.current = null;
+            if (start === null || end === undefined) return;
+            const distance = end - start;
+            if (Math.abs(distance) >= 48) browse(distance > 0 ? -1 : 1);
+          }}
+        >
           <button type="button" className={`${styles.stageArrow} ${styles.stageArrowLeft}`} disabled={shown.length < 2 || checking} onClick={() => browse(-1)} aria-label="Previous card">←</button>
           {previous && previewCard(previous, "previous")}
 
-          <article className={styles.activeCard} tabIndex={0} aria-label={`${focused.name}, ${focused.domain} level ${focused.level}`}>
-            <div className={styles.cardTop}><span>{focused.domain}</span><span>Level {focused.level}</span></div>
-            <div className={styles.emblem}><DaggerheartDomainIcon domain={focused.domain ?? ""} className="size-16" /></div>
-            <h3 className={styles.cardTitle}>{focused.name}</h3>
-            <p className={styles.cardType}>{String(compendiumEffectiveMetadata(focused).card_type ?? "Domain card")} · Recall {String(compendiumEffectiveMetadata(focused).recall_cost ?? "—")}</p>
+          <article className={styles.activeCard} data-domain={domainKey(focused.domain)} tabIndex={0} aria-label={`${focused.name}, ${focused.domain} level ${focused.level}`}>
+            <div className={styles.domainBanner} aria-hidden="true">
+              <strong>{focused.level}</strong>
+              <DaggerheartDomainIcon domain={focused.domain ?? ""} />
+              <span>{focused.domain}</span>
+            </div>
+            <div className={styles.recallBadge} aria-label={`Recall cost ${focusedRecall}`}>
+              <strong>{focusedRecall}</strong>
+              <span>recall</span>
+            </div>
+            <div className={styles.watermark} aria-hidden="true"><DaggerheartDomainIcon domain={focused.domain ?? ""} /></div>
+
+            <div className={styles.cardLead}>
+              <div className={styles.typeBand}><span>{focusedType}</span></div>
+              <h3 className={styles.cardTitle}>{focused.name}</h3>
+            </div>
+
             <div className={styles.rules}>{compendiumEntryDetails(focused) || focused.summary}</div>
+
             <div className={styles.cardFooter}>
               <span>{sourceLabel(focused)}</span>
-              {selectedCard ? <strong className={styles.inHand}>✓ In your hand</strong> : usage === null ? <strong>Availability unknown</strong> : holders.length ? <strong className={styles.occupiedText}>Chosen by {holders.map(holderLabel).join(", ")}</strong> : <strong>Available</strong>}
+              <span>{focused.domain} · Level {focused.level}</span>
             </div>
           </article>
 
@@ -168,10 +224,17 @@ export function DaggerheartDomainDeck({ entries, usage, characterId, domains, se
         </div>
 
         <div className={styles.cardActions}>
+          <div className={styles.availabilityRow}>
+            <strong className={`${styles.availabilityBadge} ${availabilityClass}`} aria-live="polite">
+              {selectedCard ? "✓ In your hand" : usage === null ? "Availability unknown" : holders.length ? `Chosen by ${holders.map(holderLabel).join(", ")}` : "Available"}
+            </strong>
+            <span>Card status is kept outside the printed face so the deck still reads like a real tabletop prop.</span>
+          </div>
+
           {!!holders.length && <div className={styles.occupiedPanel}>
             <div>
               <strong>Already chosen by {holders.map(holderLabel).join(", ")}</strong>
-              <p>This card is already in another character's hand. You can still choose a shared copy after agreeing it with that player or the GM.</p>
+              <p>This card is already in another character&apos;s hand. You can still choose a shared copy after agreeing it with that player or the GM.</p>
             </div>
             {!selectedCard && <label className={styles.agreement}><input type="checkbox" disabled={checking} checked={agreement === holderKey} onChange={(event) => setAgreement(event.target.checked ? holderKey : "")} />I have agreed this shared card with the player or GM.</label>}
           </div>}
@@ -193,8 +256,8 @@ export function DaggerheartDomainDeck({ entries, usage, characterId, domains, se
         <p>Your chosen cards stay visible here while you browse the deck.</p>
         <div className={styles.handCards}>
           {selected.map((card, index) => (
-            <div className={styles.handCard} key={card.compendium_id ?? `${card.name}-${index}`}>
-              <DaggerheartDomainIcon domain={card.domain ?? ""} />
+            <div className={styles.handCard} data-domain={domainKey(card.domain)} key={card.compendium_id ?? `${card.name}-${index}`}>
+              <span className={styles.handIcon}><DaggerheartDomainIcon domain={card.domain ?? ""} /></span>
               <div><strong>{card.name}</strong><small>{card.domain}</small></div>
               <button type="button" onClick={() => onRemove(card)} aria-label={`Return ${card.name} to the deck`}>×</button>
             </div>
