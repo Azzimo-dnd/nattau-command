@@ -87,6 +87,26 @@ export function BaroviaDashboard({
   role: AppRole;
   session: CampaignSessionSettings;
 }) {
+  const dashboardModules = modules.map((module) => {
+    if (module.href !== "/campaigns/barovia/characters") return module;
+
+    return role === "dm"
+      ? {
+          ...module,
+          eyebrow: "Party",
+          title: "Character Sheets",
+          description:
+            "Inspect the party's live Daggerheart sheets and open the GM character manager.",
+        }
+      : {
+          ...module,
+          eyebrow: "Your character",
+          title: "Player Hub",
+          description:
+            "Your character sheet, physical dice, miniature and core player tools in one place.",
+        };
+  });
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-9 xl:px-8">
       <section className="relative overflow-hidden rounded-[30px] border border-[#713143]/55 bg-[#150e13]/90 p-6 shadow-2xl sm:p-9">
@@ -120,6 +140,7 @@ export function BaroviaDashboard({
           <div className="mt-4 flex flex-wrap gap-3 text-sm text-[#dfacbd]">
             <Link href="/campaigns/barovia/session-planner">Share availability →</Link>
             <Link href="/campaigns/barovia/tarokka">Read your omen →</Link>
+            {role === "player" && <Link href="/campaigns/barovia/characters">Open Player Hub →</Link>}
             {role === "dm" && <><Link href="/campaigns/barovia/gm/session">Announce the gathering →</Link><Link href="/campaigns/barovia/gm/members">Invite the party →</Link><Link href="/campaigns/barovia/gm/puzzles">Prepare a relic →</Link></>}
           </div>
         </div>
@@ -137,12 +158,12 @@ export function BaroviaDashboard({
             </h2>
           </div>
           <span className="rounded-full border border-[#713143]/50 bg-[#35151f]/40 px-3 py-1 text-xs text-[#c48c9b]">
-            {modules.filter((module) => module.status === "active").length} active modules
+            {dashboardModules.filter((module) => module.status === "active").length} active modules
           </span>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {modules.map((module) => (
+          {dashboardModules.map((module) => (
             <Link
               key={module.href}
               href={module.href}
