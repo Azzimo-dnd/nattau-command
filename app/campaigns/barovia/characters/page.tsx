@@ -21,6 +21,12 @@ const playerLinks = [
     description: "Live Daggerheart resources, traits, weapons, actions and dice rolls.",
   },
   {
+    href: "/campaigns/barovia/journal",
+    eyebrow: "Your story",
+    title: "Story & Journal",
+    description: "Finish your backstory and keep chronological notes from every session.",
+  },
+  {
     href: "#miniature",
     eyebrow: "Your figure",
     title: "Miniature",
@@ -61,6 +67,9 @@ export default async function Page() {
             <WorkspaceLink href="/campaigns/barovia/characters/manage">
               Character manager
             </WorkspaceLink>
+            <WorkspaceLink href="/campaigns/barovia/journal">
+              Story & journals
+            </WorkspaceLink>
             <WorkspaceLink href="/campaigns/barovia/compendium">
               Open compendium
             </WorkspaceLink>
@@ -84,9 +93,12 @@ export default async function Page() {
     <CampaignWorkspace
       campaignSlug="barovia"
       title="Player Hub"
-      description={`Everything you need at the table, ${access.displayName}: your character sheet, miniature and the player-facing tools of Beyond the Mists.`}
+      description={`Everything you need at the table, ${access.displayName}: your character sheet, story, journal, miniature and the player-facing tools of Beyond the Mists.`}
       actions={
         <>
+          <WorkspaceLink href="/campaigns/barovia/journal">
+            Story & journal
+          </WorkspaceLink>
           <WorkspaceLink href="/campaigns/barovia/vtt">
             Open tabletop
           </WorkspaceLink>
@@ -96,7 +108,7 @@ export default async function Page() {
         </>
       }
     >
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Player shortcuts">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" aria-label="Player shortcuts">
         {playerLinks.map((item) => (
           <Link
             key={item.href}
@@ -129,12 +141,20 @@ export default async function Page() {
               Play Sheet
             </h2>
           </div>
-          <Link
-            href="/campaigns/barovia/compendium"
-            className="text-xs font-bold text-[#c68a9b] transition hover:text-[#efb8c6]"
-          >
-            Open compendium →
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/campaigns/barovia/journal"
+              className="text-xs font-bold text-[#c68a9b] transition hover:text-[#efb8c6]"
+            >
+              Story & journal →
+            </Link>
+            <Link
+              href="/campaigns/barovia/compendium"
+              className="text-xs font-bold text-[#c68a9b] transition hover:text-[#efb8c6]"
+            >
+              Open compendium →
+            </Link>
+          </div>
         </div>
         <DaggerheartCharacterSheets
           campaignId={access.membership.campaignId}
