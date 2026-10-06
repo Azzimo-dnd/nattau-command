@@ -12,6 +12,7 @@ type Props = {
   domains: string[];
   selected: DomainCardIdentity[];
   limit: number;
+  maxLevel?: number;
   onSelect: (entry: DaggerheartCompendiumEntry) => void;
   onRemove: (card: DomainCardIdentity) => void;
 };
@@ -26,6 +27,7 @@ export function DaggerheartDomainCardPicker(props: Props) {
   const requestId = useRef(0);
   const domainKey = props.domains.join("|");
   const campaignId = props.campaignId;
+  const maxLevel = Math.max(1, props.maxLevel ?? 1);
 
   const refreshUsage = useCallback(async () => {
     const id = ++requestId.current;
@@ -50,7 +52,7 @@ export function DaggerheartDomainCardPicker(props: Props) {
       try {
         const result = await supabase.from("daggerheart_compendium_entries")
           .select("id,source_key,category,slug,name,parent_slug,domain,level,tier,summary,rules_text,metadata,effects,actions,errata,source_page_start,source_page_end,sort_order")
-          .eq("is_active", true).eq("category", "domain_card").eq("level", 1)
+          .eq("is_active", true).eq("category", "domain_card").lte("level", maxLevel)
           .in("domain", domainKey.split("|").filter(Boolean))
           .order("domain").order("sort_order").order("name").limit(500);
         if (result.error) throw result.error;
@@ -63,7 +65,7 @@ export function DaggerheartDomainCardPicker(props: Props) {
     }
     void load();
     return () => { cancelled = true; };
-  }, [domainKey, attempt, supabase]);
+  }, [domainKey, maxLevel, attempt, supabase]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => { void refreshUsage(); }, 0);
@@ -80,7 +82,7 @@ export function DaggerheartDomainCardPicker(props: Props) {
     };
   }, [refreshUsage]);
 
-  return <DaggerheartDomainDeck key={`${campaignId}:${domainKey}`} {...props} entries={entries}
+  return <DaggerheartDomainDeck key={`${campaignId}:${domainKey}:${maxLevel}`} {...props} entries={entries}
     usage={usage} loading={loading} error={error} refreshUsage={refreshUsage}
     onRetry={() => { setAttempt((value) => value + 1); void refreshUsage(); }} />;
 }
