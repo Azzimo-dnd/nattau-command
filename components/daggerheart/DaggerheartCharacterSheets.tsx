@@ -37,12 +37,19 @@ import {
   type DaggerheartManualStatModifiers,
 } from "@/lib/daggerheart/effects";
 import { DaggerheartCharacterCreationWizard } from "@/components/daggerheart/DaggerheartCharacterCreationWizard";
+import { DaggerheartDomainCardPicker } from "@/components/daggerheart/DaggerheartDomainCardPicker";
+import { DaggerheartDomainDeck } from "@/components/daggerheart/DaggerheartDomainDeck";
+import deckStyles from "@/components/daggerheart/DaggerheartDomainDeck.module.css";
 import type { HeritageState } from "@/components/daggerheart/DaggerheartHeritageBuilder";
 import {
   daggerheartEquipmentConfigurationError,
   daggerheartIsTwoHanded,
   daggerheartRelicNames,
 } from "@/lib/daggerheart/equipment";
+import {
+  sameDomainCard,
+  type DomainCardIdentity,
+} from "@/lib/daggerheart/domain-deck";
 import {
   classOption,
   subclassCompendiumSlug,
@@ -106,6 +113,39 @@ type ClassOptionRef = {
   actions?: DaggerheartAction[];
 };
 type NotesState = { notes?: string; options?: ClassOptionRef[]; [key: string]: unknown };
+
+function domainCardAsCompendiumEntry(
+  card: DomainCard,
+  index: number
+): DaggerheartCompendiumEntry {
+  const sourceKey = card.source_key === "hope-fear" ? "hope-fear" : "core";
+  const slug =
+    card.slug ??
+    `owned-${card.domain.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${card.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")}`;
+
+  return {
+    id: card.compendium_id ?? `owned-domain-card:${index}:${slug}`,
+    source_key: sourceKey,
+    category: "domain_card",
+    slug,
+    name: card.name,
+    parent_slug: null,
+    domain: card.domain,
+    level: card.level,
+    tier: null,
+    summary: card.details ?? "",
+    rules_text: card.details ?? "",
+    metadata: card.metadata ?? {},
+    effects: card.effects ?? [],
+    actions: card.actions ?? [],
+    errata: {},
+    source_page_start: null,
+    source_page_end: null,
+    sort_order: index,
+  };
+}
 
 type CharacterRow = {
   id: string;
@@ -2154,6 +2194,73 @@ export function DaggerheartCharacterSheets({
     }
   }
 
+  function addDomainCardFromCompendium(entry: DaggerheartCompendiumEntry) {
+    if (!draft.id || !canEdit) return;
+    if (
+      draft.domain_cards.some((card) =>
+        sameDomainCard(card, {
+          compendium_id: entry.id,
+          slug: entry.slug,
+          source_key: entry.source_key,
+          name: entry.name,
+          domain: entry.domain,
+        })
+      )
+    ) {
+      setActionMessage(`${entry.name} is already on this character.`);
+      return;
+    }
+
+    const permanentVault = entry.slug === "blade-vitality";
+    const state: DomainCard["state"] = permanentVault
+      ? "vault"
+      : domainLoadoutCount < configurationEffectResult.stats.domain_loadout_max
+        ? "loadout"
+        : "vault";
+
+    const nextCard: DomainCard = {
+      name: entry.name,
+      domain: entry.domain ?? "",
+      level: entry.level ?? 1,
+      state,
+      permanent_vault: permanentVault,
+      compendium_id: entry.id,
+      slug: entry.slug,
+      source_key: entry.source_key,
+      details: compendiumEntryDetails(entry),
+      definition_revision: compendiumDefinitionRevision(entry),
+      metadata: compendiumEffectiveMetadata(entry),
+      effects: entry.effects ?? [],
+      actions: entry.actions ?? [],
+    };
+
+    void persistRuntimePatch({
+      domain_cards: [...draft.domain_cards, nextCard],
+    });
+    setActionMessage(
+      `${entry.name} added to your ${state === "loadout" ? "Loadout" : "Vault"}.`
+    );
+  }
+
+  function removeOwnedDomainCard(identity: DomainCardIdentity) {
+    if (!draft.id || !canEdit) return;
+    const index = draft.domain_cards.findIndex((card) =>
+      sameDomainCard(card, identity)
+    );
+    if (index < 0) return;
+
+    const card = draft.domain_cards[index];
+    if (card.permanent_vault) {
+      setActionMessage(`${card.name} is permanently in the Vault.`);
+      return;
+    }
+
+    void persistRuntimePatch({
+      domain_cards: draft.domain_cards.filter((_, cardIndex) => cardIndex !== index),
+    });
+    setActionMessage(`${card.name} returned to the Domain deck.`);
+  }
+
   function useResourceAction(source: (typeof actionSources)[number]) {
     if (!liveConfigurationValid) {
       setActionMessage(
@@ -2327,6 +2434,7 @@ export function DaggerheartCharacterSheets({
     const activeLoadout = draft.domain_cards.filter(
       (card) => card.state === "loadout"
     );
+    const activeLoadoutEntries = activeLoadout.map(domainCardAsCompendiumEntry);
 
     return (
       <div className="space-y-4 pb-[calc(8rem+env(safe-area-inset-bottom))]">
@@ -2629,28 +2737,138 @@ export function DaggerheartCharacterSheets({
         {activeLoadout.length > 0 && (
           <Section
             title={`Domain Loadout · ${activeLoadout.length}/${effectResult.stats.domain_loadout_max}`}
-            subtitle="Your currently active Domain Cards. Manual dice remain available for card text that is not automated yet."
+            subtitle="Your active cards use the same physical-card view as the Domain deck."
+            open
           >
-            <div className="grid gap-2 lg:grid-cols-2">
-              {activeLoadout.map((card, index) => (
-                <details
-                  key={card.compendium_id ?? `${card.name}:${index}`}
-                  className="rounded-xl border border-[#38272e] bg-black/15"
-                >
-                  <summary className="cursor-pointer list-none px-3 py-3">
-                    <p className="font-bold text-[#d9c3ca]">{card.name}</p>
-                    <p className="mt-1 text-xs text-[#806c73]">
-                      {card.domain} · Level {card.level}
-                    </p>
-                  </summary>
-                  {card.details && (
-                    <p className="border-t border-[#2d2026] px-3 py-3 whitespace-pre-line text-sm leading-6 text-[#a48d95]">
-                      {card.details}
-                    </p>
-                  )}
-                </details>
-              ))}
+            <div className="player-active-domain-deck">
+              <style>{`
+                .player-active-domain-deck .${deckStyles.toolbar},
+                .player-active-domain-deck .${deckStyles.filters},
+                .player-active-domain-deck .${deckStyles.availabilityRow},
+                .player-active-domain-deck .${deckStyles.primaryAction} {
+                  display: none;
+                }
+              `}</style>
+              <DaggerheartDomainDeck
+                mode="browser"
+                entries={activeLoadoutEntries}
+                usage={[]}
+                characterId={draft.id}
+                domains={selectedClass?.domains ?? activeLoadout.map((card) => card.domain)}
+                selected={draft.domain_cards}
+                limit={0}
+                loading={false}
+                error={null}
+                refreshUsage={async () => []}
+                onRetry={() => undefined}
+                onSelect={() => undefined}
+                onRemove={() => undefined}
+              />
             </div>
+          </Section>
+        )}
+
+        {canEdit && (
+          <Section
+            title="Manage Domain Cards"
+            subtitle="Browse cards available to your class and level, add or remove them, and move owned cards between Loadout and Vault."
+          >
+            {selectedClass ? (
+              <div className="space-y-5">
+                <div className="player-domain-card-editor">
+                  <style>{`
+                    .player-domain-card-editor .${deckStyles.counter},
+                    .player-domain-card-editor .${deckStyles.hand} {
+                      display: none;
+                    }
+                  `}</style>
+                  <DaggerheartDomainCardPicker
+                    campaignId={campaignId}
+                    characterId={draft.id}
+                    domains={selectedClass.domains}
+                    selected={draft.domain_cards}
+                    limit={99}
+                    maxLevel={draft.level}
+                    onSelect={addDomainCardFromCompendium}
+                    onRemove={removeOwnedDomainCard}
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-[#3b252e] bg-black/15 p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.14em] text-[#a56a7a]">
+                        Your collection
+                      </p>
+                      <p className="mt-1 text-sm text-[#a18a92]">
+                        Active Loadout {domainLoadoutCount}/{configurationEffectResult.stats.domain_loadout_max}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={smallButton}
+                      onClick={() => setFreeLoadoutEditing((value) => !value)}
+                    >
+                      {freeLoadoutEditing
+                        ? "Rest / level-up edit: free"
+                        : "Gameplay: Recall costs apply"}
+                    </button>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    {draft.domain_cards.map((card, index) => (
+                      <div
+                        key={card.compendium_id ?? `${card.name}:${card.domain}:${index}`}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#38272e] bg-[#120c10]/80 px-3 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-bold text-[#dfc8cf]">{card.name}</p>
+                          <p className="mt-1 text-xs text-[#8f777f]">
+                            {card.domain} · Level {card.level}
+                            {card.permanent_vault ? " · Permanent Vault" : ""}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className={smallButton}
+                            disabled={card.state === "loadout" || card.permanent_vault}
+                            onClick={() => changeDomainCardState(index, "loadout")}
+                          >
+                            Loadout
+                          </button>
+                          <button
+                            type="button"
+                            className={smallButton}
+                            disabled={card.state === "vault"}
+                            onClick={() => changeDomainCardState(index, "vault")}
+                          >
+                            Vault
+                          </button>
+                          <button
+                            type="button"
+                            className={smallButton}
+                            disabled={card.permanent_vault}
+                            onClick={() => removeOwnedDomainCard(card)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {draft.domain_cards.length === 0 && (
+                      <p className="rounded-xl border border-dashed border-[#4a303a] px-3 py-5 text-center text-sm text-[#8f7b82]">
+                        No Domain Cards are assigned to this character yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-[#9d878e]">
+                Choose a class before editing Domain Cards.
+              </p>
+            )}
           </Section>
         )}
 
