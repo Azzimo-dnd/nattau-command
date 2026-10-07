@@ -57,6 +57,17 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (
+    user &&
+    user.app_metadata?.requires_password_change === true &&
+    pathname !== "/change-password"
+  ) {
+    const passwordUrl = request.nextUrl.clone();
+    passwordUrl.pathname = "/change-password";
+    passwordUrl.search = "";
+    return NextResponse.redirect(passwordUrl);
+  }
+
   if (user) {
     const requiredCampaignSlug = campaignSlugForProtectedPath(pathname);
 
@@ -75,17 +86,6 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(safeUrl);
       }
     }
-  }
-
-  if (
-    user &&
-    user.app_metadata?.requires_password_change === true &&
-    pathname !== "/change-password"
-  ) {
-    const passwordUrl = request.nextUrl.clone();
-    passwordUrl.pathname = "/change-password";
-    passwordUrl.search = "";
-    return NextResponse.redirect(passwordUrl);
   }
 
   if (user && pathname === "/login") {
