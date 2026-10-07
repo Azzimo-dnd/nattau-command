@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { campaignSlugForProtectedPath } from "@/lib/campaigns/campaignRoutes";
 
 const publicRoutes = ["/login", "/forgot-password", "/auth/confirm"];
 
@@ -54,6 +55,26 @@ export async function updateSession(request: NextRequest) {
     loginUrl.searchParams.set("next", pathname);
 
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (user) {
+    const requiredCampaignSlug = campaignSlugForProtectedPath(pathname);
+
+    if (requiredCampaignSlug) {
+      const { data: campaign, error: campaignError } = await supabase
+        .from("campaigns")
+        .select("id")
+        .eq("slug", requiredCampaignSlug)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (campaignError || !campaign) {
+        const safeUrl = request.nextUrl.clone();
+        safeUrl.pathname = campaignError ? "/no-campaign-access" : "/";
+        safeUrl.search = "";
+        return NextResponse.redirect(safeUrl);
+      }
+    }
   }
 
   if (
