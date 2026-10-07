@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { ChangePasswordForm } from "@/components/auth/ChangePasswordForm";
+import { loadUserCampaignAccess } from "@/lib/campaigns/loadUserCampaigns";
 
 export default async function AccountPage() {
   const supabase = await createClient();
@@ -15,19 +16,33 @@ export default async function AccountPage() {
     redirect("/login");
   }
 
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("display_name, role, created_at")
-    .eq("id", user.id)
-    .single();
+  const [{ data: profile, error }, campaignAccess] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("display_name, role, created_at")
+      .eq("id", user.id)
+      .single(),
+    loadUserCampaignAccess(),
+  ]);
+
+  const onlyCampaign =
+    campaignAccess?.sourceAvailable && campaignAccess.campaigns.length === 1
+      ? campaignAccess.campaigns[0]
+      : null;
+  const backHref = onlyCampaign?.homeHref ?? (
+    campaignAccess?.sourceAvailable ? "/campaigns" : "/no-campaign-access"
+  );
+  const backLabel = onlyCampaign
+    ? `Back to ${onlyCampaign.companionName}`
+    : "Back to campaigns";
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-8 text-slate-100">
       <Link
-        href="/"
+        href={backHref}
         className="inline-flex rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-300 transition hover:border-yellow-600/40 hover:text-yellow-300"
       >
-        ← Back to Command Center
+        ← {backLabel}
       </Link>
 
       <div className="mt-6 space-y-6">
