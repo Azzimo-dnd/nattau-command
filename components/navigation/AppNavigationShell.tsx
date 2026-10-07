@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import type { CampaignMembership } from "@/lib/campaigns/campaignTypes";
+import { campaignSlugForProtectedPath } from "@/lib/campaigns/campaignRoutes";
 import { useEffect, useMemo, useState } from "react";
 import { NavIcon } from "./NavIcon";
 import {
@@ -509,13 +510,22 @@ export function AppNavigationShell({
     return <>{children}</>;
   }
 
-  const activeSlug = pathname.startsWith("/campaigns/barovia")
-    ? "barovia"
-    : "nattau";
-  const activeMembership = campaigns.find(
-    (campaign) => campaign.slug === activeSlug
-  );
-  const activeRole = activeMembership?.role ?? role;
+  const protectedSlug = campaignSlugForProtectedPath(pathname);
+  const accountMembership =
+    pathname === "/account" && campaigns.length === 1 ? campaigns[0] : null;
+  const activeMembership =
+    (protectedSlug
+      ? campaigns.find((campaign) => campaign.slug === protectedSlug)
+      : null) ?? accountMembership;
+
+  // Global pages are deliberately campaign-neutral. This also prevents a
+  // Barovia-only account page from falling through to the legacy Nattau shell.
+  if (!activeMembership) {
+    return <>{children}</>;
+  }
+
+  const activeSlug = activeMembership.slug;
+  const activeRole = activeMembership.role ?? role;
 
   if (activeSlug === "barovia") {
     return (
