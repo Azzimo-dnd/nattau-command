@@ -8,9 +8,10 @@ export default async function CampaignEntryPage() {
     redirect("/login");
   }
 
-  // Until the SQL migration is present, preserve the existing application.
   if (!access.sourceAvailable) {
-    redirect("/campaigns/nattau");
+    // Membership data is an authorization boundary. Never fall back to Nattau
+    // when it cannot be verified.
+    redirect("/no-campaign-access");
   }
 
   if (access.campaigns.length === 0) {

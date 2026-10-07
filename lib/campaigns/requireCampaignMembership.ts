@@ -33,29 +33,9 @@ export async function requireCampaignMembership(
     };
   }
 
-  // Safe fallback while the SQL migration is being installed.
-  // It keeps the existing Nattau application reachable instead of breaking login.
-  if (!access.sourceAvailable && slug === "nattau") {
-    return {
-      userId: access.userId,
-      displayName: access.displayName,
-      membership: {
-        campaignId: "legacy-nattau",
-        slug: "nattau",
-        name: "Nattau Expedition",
-        companionName: "Nattau Command",
-        subtitle: "Kainite Expedition",
-        systemKey: "dnd5e",
-        themeKey: "nattau",
-        enabledModules: [],
-        displayName: access.displayName,
-        role: access.defaultRole,
-        planningEnabled: true,
-        homeHref: "/campaigns/nattau",
-      },
-      canSwitchCampaign: false,
-      sourceAvailable: false,
-    };
+  if (!access.sourceAvailable) {
+    // Authorization must fail closed if campaign membership cannot be loaded.
+    redirect("/no-campaign-access");
   }
 
   if (access.campaigns.length === 0) {

@@ -16,7 +16,9 @@ export default async function CampaignSelectionPage() {
   }
 
   if (!access.sourceAvailable) {
-    redirect("/campaigns/nattau");
+    // Membership data is an authorization boundary. Never fall back to Nattau
+    // when it cannot be verified.
+    redirect("/no-campaign-access");
   }
 
   if (access.campaigns.length === 0) {
