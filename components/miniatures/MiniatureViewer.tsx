@@ -35,7 +35,7 @@ const MATERIALS = [
   { name: "Obsidian", value: "#30343b" },
 ];
 
-function CameraRig({ height, resetKey, autoRotate }: { height: number; resetKey: number; autoRotate: boolean }) {
+function CameraRig({ info, resetKey, autoRotate }: { info: MiniatureModelInfo; resetKey: number; autoRotate: boolean }) {
   const { camera, gl } = useThree();
   const controls = useRef<OrbitControls | null>(null);
 
@@ -66,18 +66,24 @@ function CameraRig({ height, resetKey, autoRotate }: { height: number; resetKey:
   }, [camera, gl, autoRotate]);
 
   useEffect(() => {
-    const distance = Math.max(52, height * 1.8);
-    camera.position.set(distance * 0.75, Math.max(24, height * 0.72), distance * 0.92);
-    camera.near = 0.1;
-    camera.far = 2000;
-    camera.updateProjectionMatrix();
-    controls.current?.target.set(0, Math.max(8, height * 0.42), 0);
+    const radius = Math.max(1, Math.hypot(info.width, info.depth, info.height) / 2);
+    const perspective = camera as THREE.PerspectiveCamera;
+    const verticalFov = THREE.MathUtils.degToRad(perspective.fov);
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * perspective.aspect);
+    const fitDistance = radius / Math.sin(Math.min(verticalFov, horizontalFov) / 2);
+    const distance = Math.max(20, fitDistance * 1.35);
+    const target = new THREE.Vector3(0, info.height / 2, 0);
+    camera.position.copy(target).add(new THREE.Vector3(0.65, 0.4, 1).normalize().multiplyScalar(distance));
+    perspective.near = Math.max(0.1, distance / 1000);
+    perspective.far = Math.max(2000, distance + radius * 8);
+    perspective.updateProjectionMatrix();
+    controls.current?.target.copy(target);
     if (controls.current) {
-      controls.current.minDistance = Math.max(18, height * 0.55);
-      controls.current.maxDistance = Math.max(120, height * 4.2);
+      controls.current.minDistance = Math.max(1, radius * 0.4);
+      controls.current.maxDistance = Math.max(120, distance * 5);
     }
     controls.current?.update();
-  }, [camera, height, resetKey]);
+  }, [camera, info.width, info.depth, info.height, resetKey]);
 
   return null;
 }
@@ -86,7 +92,6 @@ function MiniatureScene({ model, material, autoRotate, resetKey }: { model: Load
   return (
     <>
       <color attach="background" args={["#0a0f16"]} />
-      <fog attach="fog" args={["#0a0f16", 95, 220]} />
       <ambientLight intensity={1.15} />
       <hemisphereLight args={["#d8e7ff", "#281d16", 1.35]} />
       <directionalLight castShadow position={[40, 70, 35]} intensity={3.1} shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
@@ -108,7 +113,7 @@ function MiniatureScene({ model, material, autoRotate, resetKey }: { model: Load
       </mesh>
       <gridHelper args={[140, 28, "#344253", "#17202a"]} position={[0, -0.1, 0]} />
 
-      <CameraRig height={model.info.height} resetKey={resetKey} autoRotate={autoRotate} />
+      <CameraRig info={model.info} resetKey={resetKey} autoRotate={autoRotate} />
     </>
   );
 }
@@ -127,6 +132,8 @@ export function MiniatureViewer({
   const [model, setModel] = useState<LoadedModel | null>(null);
   const modelRef = useRef<LoadedModel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingName, setLoadingName] = useState<string | null>(null);
+  const loadRequest = useRef(0);
   const [dragging, setDragging] = useState(false);
   const [material, setMaterial] = useState(MATERIALS[0].value);
   const [autoRotate, setAutoRotate] = useState(false);
@@ -147,14 +154,19 @@ export function MiniatureViewer({
   }, []);
 
   const loadFile = useCallback(async (file: File, notifyLocal: boolean) => {
+    const request = ++loadRequest.current;
     setError(null);
     if (!file.name.toLowerCase().endsWith(".stl")) {
       setError("Choose an STL file.");
       return;
     }
 
+    setLoadingName(file.name);
+    // Let React paint the loading indicator before parsing a potentially huge STL.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     try {
       const buffer = await file.arrayBuffer();
+      if (request !== loadRequest.current) return;
       const geometry = new STLLoader().parse(buffer);
       geometry.computeVertexNormals();
       geometry.computeBoundingBox();
@@ -179,17 +191,27 @@ export function MiniatureViewer({
         depth,
         height,
       };
+      if (request !== loadRequest.current) {
+        geometry.dispose();
+        return;
+      }
       replaceModel({ geometry, info });
       setResetKey((value) => value + 1);
       if (notifyLocal) onLocalFileLoaded?.(file, info);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load this STL file.");
+      if (request === loadRequest.current) {
+        setError(cause instanceof Error ? cause.message : "Could not load this STL file.");
+      }
+    } finally {
+      if (request === loadRequest.current) setLoadingName(null);
     }
   }, [onLocalFileLoaded, replaceModel]);
 
   useEffect(() => {
     if (sourceFile === undefined) return;
     if (sourceFile === null) {
+      loadRequest.current += 1;
+      setLoadingName(null);
       replaceModel(null);
       return;
     }
@@ -219,7 +241,7 @@ export function MiniatureViewer({
               {autoRotate ? "Stop turntable" : "Turntable"}
             </button>
             <button type="button" onClick={() => setResetKey((value) => value + 1)} disabled={!model} className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-400 disabled:opacity-30">
-              Reset view
+              Fit model
             </button>
           </div>
         </div>
@@ -254,6 +276,11 @@ export function MiniatureViewer({
               <span className="max-w-xl text-sm leading-6 text-slate-500">{emptyCopy}</span>
             </div>
           )}
+          {loadingName ? (
+            <div role="status" aria-live="polite" className="pointer-events-none absolute left-1/2 top-5 z-10 -translate-x-1/2 rounded-xl border border-cyan-400/30 bg-slate-950/95 px-4 py-3 text-sm font-semibold text-cyan-100 shadow-xl">
+              Loading {loadingName}… Large STL files may temporarily slow down the browser.
+            </div>
+          ) : null}
           {model ? (
             <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-slate-700/80 bg-slate-950/75 px-4 py-2 text-center text-[11px] font-semibold text-slate-400 backdrop-blur">
               Drag to orbit · wheel / pinch to zoom · right-drag / two fingers to pan
