@@ -11,6 +11,7 @@ import type {
   FateProfile,
 } from "@/components/fate/fateTypes";
 import { createClient } from "@/lib/supabase/server";
+import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 
 function attachCycle(
   draw: FateDraw,
@@ -26,6 +27,7 @@ function attachCycle(
 }
 
 export default async function FatePage() {
+  const access = await requireCampaignMembership("nattau");
   const supabase = await createClient();
 
   const {
@@ -47,6 +49,7 @@ export default async function FatePage() {
   }
 
   const currentProfile = profileData as FateProfile;
+  const isNattauDm = access.membership.role === "dm";
 
   const [
     { data: cardsData, error: cardsError },
@@ -82,16 +85,16 @@ export default async function FatePage() {
 
   let content;
 
-  if (currentProfile.role === "dm") {
+  if (isNattauDm) {
     const [
       { data: playersData, error: playersError },
       { data: drawsData, error: drawsError },
     ] = await Promise.all([
       supabase
-        .from("profiles")
-        .select("id, display_name, role")
-        .eq("role", "player")
-        .order("display_name", { ascending: true }),
+        .from("campaign_members")
+        .select("user_id, profiles!inner(id, display_name, role, planning_enabled)")
+        .eq("campaign_id", access.membership.campaignId)
+        .eq("role", "player"),
       supabase
         .from("fate_draws")
         .select(
@@ -109,17 +112,24 @@ export default async function FatePage() {
       throw new Error(`Fate history could not be loaded: ${drawsError.message}`);
     }
 
-    const players = (playersData ?? []) as FateProfile[];
+    const players = (playersData ?? []).flatMap((member) => {
+      const profile = Array.isArray(member.profiles)
+        ? member.profiles[0]
+        : member.profiles;
+      return profile && profile.planning_enabled !== false
+        ? [{ id: profile.id, display_name: profile.display_name, role: "player" as const }]
+        : [];
+    }).sort((a, b) => a.display_name.localeCompare(b.display_name));
     const playerNames = new Map(
       players.map((player) => [player.id, player.display_name])
     );
 
-    const adminDraws: FateAdminDraw[] = ((drawsData ?? []) as FateDraw[]).map(
-      (draw) => ({
+    const adminDraws: FateAdminDraw[] = ((drawsData ?? []) as FateDraw[])
+      .filter((draw) => playerNames.has(draw.player_id))
+      .map((draw) => ({
         ...attachCycle(draw, cyclesById),
         player_name: playerNames.get(draw.player_id) ?? "Unknown Player",
-      })
-    );
+      }));
 
     content = (
       <FateAdmin
