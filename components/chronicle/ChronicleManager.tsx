@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { CHRONICLE_TAGS, type ChronicleEntry } from "@/lib/chronicle/types";
@@ -49,7 +49,7 @@ export function ChronicleManager({ campaignId, initialEntries }: {
     router.refresh();
   }
 
-  async function save(event: React.FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
     const title = draft.title.trim();
