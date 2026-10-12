@@ -4,7 +4,7 @@ import { CommandCenterHero } from "@/components/home/CommandCenterHero";
 import { GmOverview } from "@/components/home/GmOverview";
 import { HomeShortcuts } from "@/components/home/HomeShortcuts";
 import { RecentCampaignEvents } from "@/components/home/RecentCampaignEvents";
-import { campaignConfig } from "@/config/campaign";
+import { loadChronicleEntries } from "@/lib/chronicle/loadChronicleEntries";
 import { loadCommandCenterData } from "@/lib/home/loadCommandCenterData";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 
@@ -18,6 +18,8 @@ export default async function CommandCenterPage() {
   if (!data) {
     redirect("/login");
   }
+  const chronicleEntries = await loadChronicleEntries(access.membership.campaignId);
+  const isChronicleDm = access.membership.role === "dm";
   const fateStatus =
     data.role === "dm"
       ? data.activeFateCycle
@@ -88,12 +90,12 @@ export default async function CommandCenterPage() {
             nextSessionAt={data.nextSessionAt}
           />
         ) : (
-          <RecentCampaignEvents events={campaignConfig.recentEvents} />
+          <RecentCampaignEvents events={chronicleEntries.slice(0, 5)} isDm={isChronicleDm} />
         )}
       </div>
       {data.role === "dm" && (
         <div className="mt-6">
-          <RecentCampaignEvents events={campaignConfig.recentEvents} />
+          <RecentCampaignEvents events={chronicleEntries.slice(0, 5)} isDm={isChronicleDm} />
         </div>
       )}
 
