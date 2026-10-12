@@ -71,8 +71,11 @@ export function SessionControls({
   const [status, setStatus] = useState<CampaignSessionStatus>(
     initialSettings.status,
   );
-  const [dateTime, setDateTime] = useState(
-    toLocalInputValue(initialSettings.nextSessionAt),
+  const [date, setDate] = useState(() =>
+    toLocalInputValue(initialSettings.nextSessionAt).slice(0, 10),
+  );
+  const [time, setTime] = useState(() =>
+    toLocalInputValue(initialSettings.nextSessionAt).slice(11, 16),
   );
   const [message, setMessage] = useState(initialSettings.message);
   const [debuffs, setDebuffs] = useState<string[]>(initialSettings.debuffs);
@@ -81,13 +84,23 @@ export function SessionControls({
   const [success, setSuccess] = useState<string | null>(null);
 
   const previewDate = useMemo(() => {
-    if (status !== "scheduled" || !dateTime) {
+    if (status !== "scheduled" || !date || !time) {
       return null;
     }
 
-    const parsed = new Date(dateTime);
-    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-  }, [dateTime, status]);
+    const parsed = new Date(`${date}T${time}`);
+    if (
+      Number.isNaN(parsed.getTime()) ||
+      parsed.getFullYear() !== Number(date.slice(0, 4)) ||
+      parsed.getMonth() + 1 !== Number(date.slice(5, 7)) ||
+      parsed.getDate() !== Number(date.slice(8, 10)) ||
+      parsed.getHours() !== Number(time.slice(0, 2)) ||
+      parsed.getMinutes() !== Number(time.slice(3, 5))
+    ) {
+      return null;
+    }
+    return parsed.toISOString();
+  }, [date, time, status]);
 
   const previewDebuffs = useMemo(() => normalizeDebuffs(debuffs), [debuffs]);
 
@@ -118,6 +131,11 @@ export function SessionControls({
 
     if (status === "scheduled" && !previewDate) {
       setError("Choose a valid date and time for the next session.");
+      return;
+    }
+
+    if (status === "scheduled" && previewDate && new Date(previewDate).getTime() < Date.now()) {
+      setError("The next session must be scheduled for a future date and time.");
       return;
     }
 
@@ -235,18 +253,29 @@ export function SessionControls({
         </fieldset>
 
         {status === "scheduled" ? (
-          <label className="mt-5 block">
-            <span className="text-sm font-semibold text-slate-200">
-              Date and time
-            </span>
-            <input
-              type="datetime-local"
-              value={dateTime}
-              onChange={(event) => setDateTime(event.target.value)}
-              required
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-500/50"
-            />
-          </label>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-200">Date</span>
+              <input
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                required
+                className="mt-2 w-full min-w-0 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-500/50 [color-scheme:dark]"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-200">Time</span>
+              <input
+                type="time"
+                value={time}
+                onChange={(event) => setTime(event.target.value)}
+                step={60}
+                required
+                className="mt-2 w-full min-w-0 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-500/50 [color-scheme:dark]"
+              />
+            </label>
+          </div>
         ) : null}
 
         <label className="mt-5 block">
