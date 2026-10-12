@@ -92,7 +92,7 @@ export default async function FatePage() {
     ] = await Promise.all([
       supabase
         .from("campaign_members")
-        .select("user_id, profiles!inner(id, display_name, role, planning_enabled)")
+        .select("user_id")
         .eq("campaign_id", access.membership.campaignId)
         .eq("role", "player"),
       supabase
@@ -112,14 +112,26 @@ export default async function FatePage() {
       throw new Error(`Fate history could not be loaded: ${drawsError.message}`);
     }
 
-    const players = (playersData ?? []).flatMap((member) => {
-      const profile = Array.isArray(member.profiles)
-        ? member.profiles[0]
-        : member.profiles;
-      return profile && profile.planning_enabled !== false
-        ? [{ id: profile.id, display_name: profile.display_name, role: "player" as const }]
-        : [];
-    }).sort((a, b) => a.display_name.localeCompare(b.display_name));
+    const eligibleIds = (playersData ?? []).map((member) => member.user_id);
+    const { data: eligibleProfiles, error: eligibleProfilesError } = eligibleIds.length
+      ? await supabase
+          .from("profiles")
+          .select("id, display_name, role, planning_enabled")
+          .in("id", eligibleIds)
+          .eq("planning_enabled", true)
+      : { data: [], error: null };
+
+    if (eligibleProfilesError) {
+      throw new Error(`Nattau player profiles could not be loaded: ${eligibleProfilesError.message}`);
+    }
+
+    const players = (eligibleProfiles ?? [])
+      .map((profile) => ({
+        id: profile.id,
+        display_name: profile.display_name,
+        role: "player" as const,
+      }))
+      .sort((a, b) => a.display_name.localeCompare(b.display_name));
     const playerNames = new Map(
       players.map((player) => [player.id, player.display_name])
     );
