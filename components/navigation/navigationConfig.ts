@@ -63,6 +63,8 @@ export function getNavigationSections(
       label: "Campaign",
       items: [
         { label: "Map", href: "/map", icon: "map" },
+        { label: "Campaign Chronicle", href: "/campaigns/nattau/chronicle", icon: "history",
+          description: "Explore the expedition's recorded events and decisions." },
         {
           label: "VTT Alpha",
           href: "/vtt",
@@ -116,6 +118,12 @@ export function getNavigationSections(
     sections.push({
       label: "GM Tools",
       items: [
+        {
+          label: "Chronicle Editor",
+          href: "/campaigns/nattau/gm/chronicle",
+          icon: "history",
+          description: "Add, edit and delete events in the Campaign Chronicle.",
+        },
         {
           label: "Session Controls",
           href: "/gm/session",
