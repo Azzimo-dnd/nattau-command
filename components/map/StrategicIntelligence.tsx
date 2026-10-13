@@ -6,15 +6,13 @@ import {GalleonDossier} from "./GalleonDossier";
 import type {StrategicSpecialUnit} from "@/lib/strategic-map/specialUnits";
 import {SpecialUnitsIntelligence} from "./SpecialUnitsIntelligence";
 import type {StrategicMapState} from "@/lib/strategic-map/types";
-import {mapLocations} from "./mapLocations";
 import {getFactionLabel,getProvinceControlLabel,type FactionId} from "./provinceData";
 type Tab="overview"|"factions"|"armies"|"special-units"|"provinces";
-type Props={state:StrategicMapState;armyGroups:ArmyGroup[];specialUnits:StrategicSpecialUnit[];selectedSpecialUnitKey:string|null;onSpecialUnit:(key:string|null)=>void;galleon:StrategicGalleon|null;isDm:boolean;selectedLocationId:string;selectedProvinceId:string;selectedFactionId:FactionId|null;selectedArmyId:string|null;activeTab:Tab;onTabChange:(v:Tab)=>void;onLocation:(v:string)=>void;onProvince:(v:string)=>void;onFaction:(v:FactionId|null)=>void;onArmy:(v:string|null)=>void;};
+type Props={state:StrategicMapState;armyGroups:ArmyGroup[];specialUnits:StrategicSpecialUnit[];selectedSpecialUnitKey:string|null;onSpecialUnit:(key:string|null)=>void;galleon:StrategicGalleon|null;isDm:boolean;selectedProvinceId:string;selectedFactionId:FactionId|null;selectedArmyId:string|null;activeTab:Tab;onTabChange:(v:Tab)=>void;onProvince:(v:string)=>void;onFaction:(v:FactionId|null)=>void;onArmy:(v:string|null)=>void;};
 const selectedClass="border-amber-500/60 bg-amber-500/10 text-amber-100";
 const normalClass="border-slate-700/70 bg-slate-950/40 text-slate-300 hover:border-amber-500/40";
-export function StrategicIntelligence({state,armyGroups,specialUnits,selectedSpecialUnitKey,onSpecialUnit,galleon,isDm,selectedLocationId,selectedProvinceId,selectedFactionId,selectedArmyId,activeTab,onTabChange,onLocation,onProvince,onFaction,onArmy}:Props){
+export function StrategicIntelligence({state,armyGroups,specialUnits,selectedSpecialUnitKey,onSpecialUnit,galleon,isDm,selectedProvinceId,selectedFactionId,selectedArmyId,activeTab,onTabChange,onProvince,onFaction,onArmy}:Props){
  const [collapsed,setCollapsed]=useState(false);
- const location=mapLocations.find(l=>l.id===selectedLocationId)??mapLocations[0];
  const province=state.provinces.find(p=>p.id===selectedProvinceId)??state.provinces[0];
  const faction=state.factions.find(f=>f.id===selectedFactionId);
  const army=armyGroups.find(g=>g.id===selectedArmyId);
@@ -26,7 +24,6 @@ export function StrategicIntelligence({state,armyGroups,specialUnits,selectedSpe
   <div role="tablist" aria-label="Strategic intelligence sections" className="mt-5 flex flex-wrap gap-2 border-b border-slate-700 pb-3">{tabNames.map(tab=><button key={tab.id} role="tab" type="button" aria-selected={activeTab===tab.id} onClick={()=>onTabChange(tab.id)} className={`rounded-lg border px-4 py-2 text-sm font-medium ${activeTab===tab.id?selectedClass:normalClass}`}>{tab.label}</button>)}</div>
   {activeTab==="overview"&&<div className="mt-5 grid gap-4 lg:grid-cols-2">
    {galleon&&<div className="lg:col-span-2"><GalleonDossier galleon={galleon}/></div>}
-   <div className={surface}><p className="text-xs uppercase tracking-widest text-amber-500">Selected location</p><h3 className="mt-2 text-xl font-bold">{location.name}</h3><p className="mt-1 text-sm text-amber-300">{location.owner} · {location.type}</p><p className="mt-3 text-sm leading-6 text-slate-400">{location.description}</p></div>
    <div className={surface}><p className="text-xs uppercase tracking-widest text-amber-500">Selected province</p>{province&&<><h3 className="mt-2 text-xl font-bold">{province.name}</h3><p className="mt-1 text-sm text-amber-300">Province {province.number} · {getProvinceControlLabel(province.number,state.provinceControl)}</p><p className="mt-2 text-xs uppercase text-slate-400">{province.status} · Threat: {province.threatLevel}</p><p className="mt-3 text-sm leading-6 text-slate-400">{province.description}</p></>}</div>
    <div className={surface}><p className="text-xs uppercase tracking-widest text-amber-500">Campaign at a glance</p><div className="mt-3 grid grid-cols-3 gap-3 text-center">{[[state.factions.length,"Factions"],[state.provinces.length,"Provinces"],[armyGroups.length,"Visible groups"]].map(([n,label])=><div key={label} className="rounded-lg border border-slate-800 p-3"><div className="text-xl font-bold">{n}</div><div className="text-xs text-slate-400">{label}</div></div>)}</div></div>
    <div className={surface}><p className="text-xs uppercase tracking-widest text-amber-500">Army briefing</p>{army?<><h3 className="mt-2 text-xl font-bold">{army.name}</h3><p className="mt-2 text-sm text-slate-400">{army.visibility==="rumored"&&!isDm?"Scouts report military activity. Strength and exact location unknown.":`${army.commander||"Commander unknown"} · ${army.strength??"?"} PZ`}</p><button onClick={()=>onTabChange("armies")} className="mt-3 text-sm text-amber-400 underline">Open army dossier</button></>:<p className="mt-3 text-sm text-slate-400">Select an army banner to inspect its intelligence.</p>}</div>
@@ -44,7 +41,6 @@ export function StrategicIntelligence({state,armyGroups,specialUnits,selectedSpe
    <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">{state.provinces.map(p=><button type="button" key={p.id} onClick={()=>onProvince(p.id)} className={`w-full rounded-xl border p-3 text-left ${selectedProvinceId===p.id?selectedClass:normalClass}`}><div className="font-semibold">{p.number}. {p.name}</div><p className="mt-1 text-xs text-slate-400">{getProvinceControlLabel(p.number,state.provinceControl)}</p></button>)}</div>
    <div className={surface}>{province&&<><p className="text-xs uppercase tracking-widest text-amber-500">Province dossier</p><h3 className="mt-2 text-2xl font-bold">{province.name}</h3><p className="mt-2 text-sm text-amber-300">{getProvinceControlLabel(province.number,state.provinceControl)}</p><p className="mt-2 text-sm text-slate-400">Status: {province.status} · Threat: {province.threatLevel}</p><p className="mt-4 text-sm leading-6 text-slate-300">{province.description}</p></>}</div>
   </div>}
-  <div className="mt-5 border-t border-slate-800 pt-3"><p className="mb-2 text-xs text-slate-500">Jump to location</p><div className="flex flex-wrap gap-2">{mapLocations.map(l=><button type="button" key={l.id} onClick={()=>onLocation(l.id)} className={`rounded-lg border px-3 py-1.5 text-xs ${l.id===selectedLocationId?selectedClass:normalClass}`}>{l.name}</button>)}</div></div>
   </>}
  </section>;
 }
