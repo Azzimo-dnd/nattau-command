@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { ArmyGroup } from "@/lib/strategic-map/armyGroups";
 import type { StrategicGalleon } from "@/lib/strategic-map/galleon";
+import type { StrategicSpecialUnit } from "@/lib/strategic-map/specialUnits";
 import { InteractiveMap } from "@/components/map/InteractiveMap";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 import { loadStrategicMap } from "@/lib/strategic-map/loadStrategicMap";
@@ -29,6 +30,12 @@ export default async function MapPage() {
     if(vessel.error)console.error("Unable to load visible galleon:",vessel.error.message);
     galleon=(vessel.data?.[0]??null) as StrategicGalleon|null;
   }
+
+  const specialResult=dm
+    ? await supabase.from("campaign_strategic_special_units").select("*").eq("campaign_id",access.membership.campaignId)
+    : await supabase.rpc("get_visible_strategic_special_units",{p_campaign_id:access.membership.campaignId});
+  if(specialResult.error) console.error("Unable to load strategic special units:",specialResult.error.message);
+  const specialUnits=(specialResult.data??[]) as StrategicSpecialUnit[];
 
   return (
     <main className="min-h-screen bg-slate-950 p-4 text-slate-100 md:p-8">
@@ -59,6 +66,7 @@ export default async function MapPage() {
           state={state}
           armyGroups={armyGroups}
           galleon={galleon}
+          specialUnits={specialUnits}
           isDm={access.membership.role === "dm"}
         />
       </section>

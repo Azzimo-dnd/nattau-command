@@ -6,110 +6,46 @@ import type { ArmyGroup } from "@/lib/strategic-map/armyGroups";
 import { provinceCenter } from "@/lib/strategic-map/armyGroups";
 import type { StrategicMapState } from "@/lib/strategic-map/types";
 import type { StrategicGalleon } from "@/lib/strategic-map/galleon";
+import {specialUnitByKey, type StrategicSpecialUnit} from "@/lib/strategic-map/specialUnits";
 import { StrategicIntelligence } from "./StrategicIntelligence";
-import { mapLocations } from "./mapLocations";
 import { ProvinceOverlay } from "./ProvinceOverlay";
 import type { FactionId } from "./provinceData";
-
-function getLocationIcon(type: string) {
-  switch (type) {
-    case "capital":
-      return "⭐";
-    case "fortress":
-      return "🏰";
-    case "port":
-      return "⚓";
-    case "city":
-      return "🏛";
-    default:
-      return "📍";
-  }
-}
-
-function getOwnerClass(owner: string) {
-  if (owner.includes("Kainites") && owner.includes("Cult")) {
-    return "text-yellow-300";
-  }
-
-  switch (owner) {
-    case "Kainites":
-      return "text-yellow-400";
-    case "Merrydock":
-      return "text-green-400";
-    case "Jin Yan Chao":
-    case "Jin Yan Chao Empire":
-      return "text-orange-400";
-    case "Cult of Lord Mazamundi":
-      return "text-purple-400";
-    case "Wild Lizardfolk":
-      return "text-red-400";
-    case "Unknown":
-      return "text-slate-400";
-    default:
-      return "text-slate-400";
-  }
-}
-
-function getThreatClass(threatLevel: string) {
-  switch (threatLevel) {
-    case "low":
-      return "text-green-400";
-    case "medium":
-      return "text-yellow-400";
-    case "high":
-      return "text-red-400";
-    default:
-      return "text-slate-400";
-  }
-}
-
-function getStatusClass(status: string) {
-  switch (status) {
-    case "controlled":
-      return "text-green-400";
-    case "neutral":
-      return "text-slate-400";
-    case "hostile":
-      return "text-red-400";
-    case "contested":
-      return "text-orange-400";
-    default:
-      return "text-slate-400";
-  }
-}
 
 export function InteractiveMap({
   state,
   isDm = false,
   armyGroups = [],
   galleon = null,
+  specialUnits = [],
 }: {
   state: StrategicMapState;
   isDm?: boolean;
   armyGroups?: ArmyGroup[];
   galleon?: StrategicGalleon | null;
+  specialUnits?: StrategicSpecialUnit[];
 }) {
-  const [selectedId, setSelectedId] = useState(mapLocations[0].id);
   const [selectedProvinceId, setSelectedProvinceId] = useState(
     state.provinces[0]?.id ?? ""
   );
   const [selectedFactionId, setSelectedFactionId] = useState<FactionId | null>(
     null
   );
-  const [intelligenceTab,setIntelligenceTab] = useState<"overview"|"factions"|"armies"|"provinces">("overview");
-  const [showLocations, setShowLocations] = useState(true);
+  const [intelligenceTab,setIntelligenceTab] = useState<"overview"|"factions"|"armies"|"special-units"|"provinces">("overview");
   const [showArmies,setShowArmies] = useState(true);
   const [showVessel,setShowVessel] = useState(true);
+  const [showSpecialUnits,setShowSpecialUnits] = useState(true);
+  const [selectedSpecialUnitKey,setSelectedSpecialUnitKey] = useState<string|null>(null);
   const [vesselSelected,setVesselSelected] = useState(false);
   const [selectedArmyId,setSelectedArmyId] = useState<string | null>(null);
 
-  type IntelligenceTab = "overview" | "factions" | "armies" | "provinces";
+  type IntelligenceTab = "overview" | "factions" | "armies" | "special-units" | "provinces";
   function switchTab(tab: IntelligenceTab) {
     setIntelligenceTab(tab);
     setSelectedFactionId(null);
     setSelectedArmyId(null);
     setSelectedProvinceId("");
     setVesselSelected(false);
+    setSelectedSpecialUnitKey(null);
   }
   function selectProvince(id: string) {
     switchTab("provinces");
@@ -119,6 +55,11 @@ export function InteractiveMap({
     switchTab("armies");
     setSelectedArmyId(id);
     setShowArmies(true);
+  }
+  function selectSpecialUnit(key:string|null){
+    switchTab("special-units");
+    setSelectedSpecialUnitKey(key);
+    setShowSpecialUnits(true);
   }
   function selectFaction(id: FactionId | null) {
     switchTab("factions");
@@ -135,7 +76,7 @@ export function InteractiveMap({
                 Strategic Map
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                Toggle location markers when the map becomes too crowded.
+                Inspect province control and toggle the strategic markers you need.
               </p>
               {state.mapOriginalName ? (
                 <p className="mt-1 text-xs text-slate-600">
@@ -154,18 +95,8 @@ export function InteractiveMap({
                 </Link>
               ) : null}
               {galleon && <button type="button" onClick={()=>setShowVessel(value=>!value)} className={`rounded-xl border px-4 py-2 text-sm ${showVessel?"border-amber-400 bg-amber-400/10 text-amber-200":"border-slate-700 bg-slate-950/70 text-slate-300"}`}>{showVessel?"Hide Galleon":"Show Galleon"}</button>}
+              <button type="button" onClick={()=>setShowSpecialUnits(value=>!value)} className={`rounded-xl border px-4 py-2 text-sm ${showSpecialUnits?"border-teal-400/60 bg-teal-500/10 text-teal-200":"border-slate-700 bg-slate-950/70 text-slate-300"}`}>{showSpecialUnits?"Hide Special Units":"Show Special Units"}</button>
               <button type="button" onClick={()=>setShowArmies(value=>!value)} className={`rounded-xl border px-4 py-2 text-sm ${showArmies?"border-yellow-500 bg-yellow-500/15 text-yellow-300":"border-slate-700 bg-slate-950/70 text-slate-300"}`}>{showArmies?"Hide Armies":"Show Armies"}</button>
-              <button
-                type="button"
-                onClick={() => setShowLocations((current) => !current)}
-                className={`rounded-xl border px-4 py-2 text-sm transition ${
-                  showLocations
-                    ? "border-yellow-500 bg-yellow-500/15 text-yellow-300"
-                    : "border-slate-700 bg-slate-950/70 text-slate-300 hover:border-yellow-600/40 hover:text-yellow-300"
-                }`}
-              >
-                {showLocations ? "Hide Locations" : "Show Locations"}
-              </button>
             </div>
           </div>
 
@@ -197,6 +128,27 @@ export function InteractiveMap({
                 <span aria-hidden="true" className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-amber-300 bg-slate-950 text-lg shadow-lg transition-transform group-hover/vessel:scale-110 ${vesselSelected?"ring-2 ring-amber-300 ring-offset-1 ring-offset-slate-950":""}`}>⛵</span>
                 <span className="pointer-events-none max-w-28 truncate rounded-md bg-slate-950/90 px-1.5 py-0.5 text-center text-[10px] font-bold text-amber-100 shadow-sm md:max-w-36">{galleon.name}</span>
               </button>}
+            {showSpecialUnits && specialUnits.map(unit=>{
+              if(unit.pos_x===null||unit.pos_y===null)return null;
+              const def=specialUnitByKey(unit.unit_key);
+              if(!def)return null;
+              const isSelected=selectedSpecialUnitKey===unit.unit_key;
+              const isPrivate=isDm && unit.visible_to_players===false;
+              const collisions=specialUnits.filter(other=>
+                other.unit_key<unit.unit_key && other.pos_x!==null&&other.pos_y!==null
+                &&Math.abs(other.pos_x-unit.pos_x!)<1.5
+                &&Math.abs(other.pos_y-unit.pos_y!)<1.5
+              ).length;
+              const offset=Math.min(collisions,4);
+              return <button type="button" key={unit.unit_key} onClick={()=>selectSpecialUnit(unit.unit_key)}
+                aria-label={`View special unit: ${def.name}`}
+                title={`${def.name} — ${unit.status}${isPrivate?" (GM only)":""}`}
+                style={{left:`calc(${unit.pos_x}% + ${offset*12}px)`,top:`calc(${unit.pos_y}% - ${offset*10}px)`}}
+                className="group/special absolute z-[35] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300">
+                <span aria-hidden="true" className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-sm shadow-lg transition-transform group-hover/special:scale-110 ${def.color} ${isPrivate?"opacity-55":""} ${isSelected?"ring-2 ring-teal-300 ring-offset-1 ring-offset-slate-950":""}`}>{def.icon}</span>
+                <span className={`pointer-events-none max-w-24 truncate rounded bg-slate-950/85 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight text-slate-100 md:max-w-32 md:text-[10px] ${isPrivate?"opacity-60":""}`}>{def.name}</span>
+              </button>;
+            })}
             {showArmies && armyGroups.map(group=>{
               const rumor=group.visibility==="rumored"&&!isDm;
               const province=state.provinces.find(p=>p.number===group.province_number);
@@ -231,63 +183,22 @@ export function InteractiveMap({
                 <span className={`pointer-events-none max-w-24 truncate rounded bg-slate-950/85 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight text-slate-100 shadow-sm md:max-w-32 md:text-[10px] ${selectedArmyId===group.id?"text-yellow-200":""}`}>{label}</span>
               </button>;
             })}
-            {showLocations &&
-              mapLocations.map((location) => {
-                const isSelected = selectedId === location.id;
-
-                return (
-                  <button
-                    key={location.id}
-                    type="button"
-                    onClick={() => {switchTab("overview");setSelectedId(location.id);}}
-                    style={{
-                      left: `${location.x}%`,
-                      top: `${location.y}%`,
-                    }}
-                    className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
-                    title={location.name}
-                  >
-                    {isSelected && (
-                      <span className="absolute -inset-3 animate-ping rounded-full bg-yellow-500/40" />
-                    )}
-
-                    <span
-                      className={`relative flex h-7 w-7 items-center justify-center rounded-full border text-xs shadow-lg md:h-8 md:w-8 md:text-sm ${
-                        isSelected
-                          ? "border-yellow-300 bg-yellow-500 text-slate-950"
-                          : "border-slate-300 bg-slate-950/80 text-slate-100 hover:border-yellow-400"
-                      }`}
-                    >
-                      {getLocationIcon(location.type)}
-                    </span>
-
-                    <span
-                      className={`absolute left-1/2 top-8 hidden -translate-x-1/2 whitespace-nowrap rounded-full border px-2 py-1 text-xs md:block ${
-                        isSelected
-                          ? "border-yellow-600/40 bg-slate-950 text-yellow-300"
-                          : "border-slate-700 bg-slate-950/80 text-slate-300"
-                      }`}
-                    >
-                      {location.name}
-                    </span>
-                  </button>
-                );
-              })}
           </div>
         </div>
 
         <StrategicIntelligence
           state={state}
           armyGroups={armyGroups}
+          specialUnits={specialUnits}
+          selectedSpecialUnitKey={selectedSpecialUnitKey}
+          onSpecialUnit={selectSpecialUnit}
           galleon={galleon}
           isDm={isDm}
-          selectedLocationId={selectedId}
           selectedProvinceId={selectedProvinceId}
           selectedFactionId={selectedFactionId}
           selectedArmyId={selectedArmyId}
           activeTab={intelligenceTab}
           onTabChange={switchTab}
-          onLocation={(id)=>{switchTab("overview");setSelectedId(id);setShowLocations(true);}}
           onProvince={selectProvince}
           onFaction={selectFaction}
           onArmy={selectArmy}

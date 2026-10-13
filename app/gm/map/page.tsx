@@ -6,6 +6,8 @@ import {
 } from "@/components/campaigns/CampaignWorkspace";
 import { ArmyGroupManager } from "@/components/map/ArmyGroupManager";
 import { GalleonManager } from "@/components/map/GalleonManager";
+import { SpecialUnitsManager } from "@/components/map/SpecialUnitsManager";
+import type { StrategicSpecialUnit } from "@/lib/strategic-map/specialUnits";
 import type { StrategicGalleon } from "@/lib/strategic-map/galleon";
 import { createClient } from "@/lib/supabase/server";
 import type { ArmyGroup } from "@/lib/strategic-map/armyGroups";
@@ -32,6 +34,8 @@ export default async function StrategicMapControlPage() {
   if (armyError) console.error("Unable to load strategic army groups:", armyError.message);
   const {data:galleon,error:galleonError}=await supabase.from("campaign_strategic_galleon").select("*").eq("campaign_id",access.membership.campaignId).maybeSingle();
   if(galleonError) console.error("Unable to load flying galleon:",galleonError.message);
+  const {data:specialUnits,error:specialError}=await supabase.from("campaign_strategic_special_units").select("*").eq("campaign_id",access.membership.campaignId).order("unit_key");
+  if(specialError) console.error("Unable to load special units:",specialError.message);
 
   return (
     <CampaignWorkspace
@@ -40,6 +44,7 @@ export default async function StrategicMapControlPage() {
       description="Replace the Hinewai strategic map, revise province ownership and update faction information. Manage strategic army groups and visibility alongside provinces, faction control and the map background."
       actions={<WorkspaceLink href="/map">View Strategic Map</WorkspaceLink>}
     >
+      <SpecialUnitsManager campaignId={access.membership.campaignId} state={state} initialUnits={(specialUnits??[]) as StrategicSpecialUnit[]}/>
       <GalleonManager campaignId={access.membership.campaignId} state={state} initialGalleon={(galleon??null) as StrategicGalleon|null}/>
       <ArmyGroupManager campaignId={access.membership.campaignId} state={state} initialGroups={(armyGroups ?? []) as ArmyGroup[]} />
       <StrategicMapManager
