@@ -230,7 +230,34 @@ export function InteractiveMap({
               const province=state.provinces.find(p=>p.number===group.province_number);
               const p=rumor?(province?provinceCenter(province.points):null):(group.pos_x!==null&&group.pos_y!==null?{x:group.pos_x,y:group.pos_y}:null);
               if(!p)return null;
-              return <button key={group.id} type="button" onClick={()=>setSelectedArmyId(group.id)} title={rumor?"Reports of military activity":group.name} style={{left:`${p.x}%`,top:`${p.y}%`}} className={`absolute z-30 -translate-x-1/2 -translate-y-1/2 rounded-lg border px-2 py-1 shadow-xl ${selectedArmyId===group.id?"border-yellow-300 bg-yellow-800":"border-yellow-600 bg-slate-950/90"}`}><span className="block text-xl">{rumor?"?":"⚑"}</span><span className="hidden text-[10px] font-semibold text-yellow-100 md:block">{rumor?"Rumor":group.name}</span></button>;
+              const colors:Record<string,string>={
+                "kainites":"border-amber-400 bg-amber-900 text-amber-100",
+                "empire":"border-orange-400 bg-orange-950 text-orange-100",
+                "mazamundi-cult":"border-violet-400 bg-violet-950 text-violet-100",
+                "wild-lizardfolk":"border-red-400 bg-red-950 text-red-100",
+                "merrydock":"border-emerald-400 bg-emerald-950 text-emerald-100",
+              };
+              const factionColor=rumor?"border-slate-300 bg-slate-800 text-white":(colors[group.faction_key]??"border-slate-300 bg-slate-900 text-white");
+              const label=rumor?"Unknown force":group.name;
+              const overlaps=armyGroups.filter(other=>{
+                if(other.id===group.id)return false;
+                const r=other.visibility==="rumored"&&!isDm;
+                const pp=state.provinces.find(v=>v.number===other.province_number);
+                const q=r?(pp?provinceCenter(pp.points):null):(other.pos_x!==null&&other.pos_y!==null?{x:other.pos_x,y:other.pos_y}:null);
+                return q && Math.abs(p.x-q.x)<1.5 && Math.abs(p.y-q.y)<1.5 && other.id<group.id;
+              }).length;
+              return <button
+                key={group.id}
+                type="button"
+                onClick={()=>setSelectedArmyId(group.id)}
+                title={label}
+                aria-label={`View army group: ${label}`}
+                style={{left:`calc(${p.x}% + ${Math.min(overlaps,4)*15}px)`,top:`calc(${p.y}% - ${Math.min(overlaps,4)*9}px)`}}
+                className="group/army absolute z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300"
+              >
+                <span className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-base leading-none shadow-md transition-transform group-hover/army:scale-110 ${factionColor} ${selectedArmyId===group.id?"ring-2 ring-yellow-300 ring-offset-1 ring-offset-slate-950":""}`} aria-hidden="true">{rumor?"?":"⚑"}</span>
+                <span className={`pointer-events-none max-w-24 truncate rounded bg-slate-950/85 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight text-slate-100 shadow-sm md:max-w-32 md:text-[10px] ${selectedArmyId===group.id?"text-yellow-200":""}`}>{label}</span>
+              </button>;
             })}
             {showLocations &&
               mapLocations.map((location) => {
