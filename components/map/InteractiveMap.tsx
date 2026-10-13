@@ -5,11 +5,10 @@ import { useState } from "react";
 import type { ArmyGroup } from "@/lib/strategic-map/armyGroups";
 import { provinceCenter } from "@/lib/strategic-map/armyGroups";
 import type { StrategicMapState } from "@/lib/strategic-map/types";
-import { FactionInfluence } from "./FactionInfluence";
+import { StrategicIntelligence } from "./StrategicIntelligence";
 import { mapLocations } from "./mapLocations";
 import { ProvinceOverlay } from "./ProvinceOverlay";
 import type { FactionId } from "./provinceData";
-import { getProvinceControlLabel } from "./provinceData";
 
 function getLocationIcon(type: string) {
   switch (type) {
@@ -94,77 +93,13 @@ export function InteractiveMap({
   const [selectedFactionId, setSelectedFactionId] = useState<FactionId | null>(
     null
   );
+  const [intelligenceTab,setIntelligenceTab] = useState<"overview"|"factions"|"armies"|"provinces">("overview");
   const [showLocations, setShowLocations] = useState(true);
   const [showArmies,setShowArmies] = useState(true);
   const [selectedArmyId,setSelectedArmyId] = useState<string | null>(null);
-  const selectedArmy = armyGroups.find(g=>g.id===selectedArmyId);
-
-  const selectedLocation =
-    mapLocations.find((location) => location.id === selectedId) ??
-    mapLocations[0];
-
-  const selectedProvince =
-    state.provinces.find((province) => province.id === selectedProvinceId) ??
-    state.provinces[0];
-
-  const selectedProvinceControlLabel = selectedProvince
-    ? getProvinceControlLabel(
-        selectedProvince.number,
-        state.provinceControl
-      )
-    : "Unknown";
 
   return (
-    <section className="grid gap-6 xl:grid-cols-[340px_1fr]">
-      <aside className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-        <h2 className="text-2xl font-bold text-yellow-500">Locations</h2>
-        <p className="mt-2 text-sm text-slate-500">
-          Select a known location to ping it on the strategic map.
-        </p>
-
-        <div className="mt-5 space-y-3">
-          {mapLocations.map((location) => {
-            const isSelected = selectedId === location.id;
-
-            return (
-              <button
-                key={location.id}
-                type="button"
-                onClick={() => {
-                  setSelectedId(location.id);
-                  setShowLocations(true);
-                }}
-                className={`w-full rounded-xl border p-4 text-left transition ${
-                  isSelected
-                    ? "border-yellow-600/50 bg-yellow-500/10"
-                    : "border-slate-800 bg-slate-950/60 hover:border-yellow-600/30"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">
-                    {getLocationIcon(location.type)}
-                  </span>
-
-                  <div>
-                    <h3 className="font-bold text-slate-100">
-                      {location.name}
-                    </h3>
-
-                    <p
-                      className={`mt-1 text-sm ${getOwnerClass(
-                        location.owner
-                      )}`}
-                    >
-                      {location.owner}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </aside>
-
+    <section className="space-y-6">
       <div className="space-y-6">
         <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-3">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -222,7 +157,7 @@ export function InteractiveMap({
               provinceControl={state.provinceControl}
               selectedProvinceId={selectedProvinceId}
               selectedFactionId={selectedFactionId}
-              onSelectProvince={setSelectedProvinceId}
+              onSelectProvince={(id)=>{setSelectedProvinceId(id);setIntelligenceTab("provinces");}}
             />
 
             {showArmies && armyGroups.map(group=>{
@@ -249,7 +184,7 @@ export function InteractiveMap({
               return <button
                 key={group.id}
                 type="button"
-                onClick={()=>setSelectedArmyId(group.id)}
+                onClick={()=>{setSelectedArmyId(group.id);setIntelligenceTab("armies");}}
                 title={label}
                 aria-label={`View army group: ${label}`}
                 style={{left:`calc(${p.x}% + ${Math.min(overlaps,4)*15}px)`,top:`calc(${p.y}% - ${Math.min(overlaps,4)*9}px)`}}
@@ -267,7 +202,7 @@ export function InteractiveMap({
                   <button
                     key={location.id}
                     type="button"
-                    onClick={() => setSelectedId(location.id)}
+                    onClick={() => {setSelectedId(location.id);setIntelligenceTab("overview");}}
                     style={{
                       left: `${location.x}%`,
                       top: `${location.y}%`,
@@ -304,91 +239,21 @@ export function InteractiveMap({
           </div>
         </div>
 
-        {showArmies&&selectedArmy&&<div className="rounded-2xl border border-yellow-600/40 bg-slate-900 p-5"><div className="flex justify-between gap-3"><div><p className="text-xs uppercase tracking-widest text-yellow-500">Army Group</p><h3 className="mt-2 text-xl font-bold">{selectedArmy.name}</h3></div><button type="button" onClick={()=>setSelectedArmyId(null)} aria-label="Close army group details" className="text-slate-400">✕</button></div><div className="mt-3 text-sm text-slate-300">{selectedArmy.visibility==="rumored"&&!isDm?"Scouts report military activity in this province. Strength and exact location remain unknown.":<><p>Faction: {state.factions.find(f=>f.id===selectedArmy.faction_key)?.name??selectedArmy.faction_key}</p><p>Commander: {selectedArmy.commander||"Unknown"}</p><p>Strength: {selectedArmy.strength??"Unknown"} PZ</p><p>Orders: {selectedArmy.orders||"Unknown"}</p><p>Condition: {selectedArmy.condition||"Unknown"}</p><p className="mt-2 whitespace-pre-wrap">{selectedArmy.composition}</p>{isDm&&selectedArmy.gm_notes&&<p className="mt-2 border-t border-slate-700 pt-2 text-yellow-200">GM notes: {selectedArmy.gm_notes}</p>}</>}</div></div>}
-        <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-              <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
-                Selected Location
-              </p>
-
-              <h2 className="mt-3 text-3xl font-bold">
-                {selectedLocation.name}
-              </h2>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide text-slate-400">
-                  {selectedLocation.type}
-                </span>
-
-                <span
-                  className={`rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide ${getOwnerClass(
-                    selectedLocation.owner
-                  )}`}
-                >
-                  {selectedLocation.owner}
-                </span>
-              </div>
-
-              <p className="mt-4 text-sm leading-6 text-slate-400">
-                {selectedLocation.description}
-              </p>
-            </div>
-
-            {selectedProvince ? (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-                <p className="text-xs uppercase tracking-[0.35em] text-yellow-500">
-                  Selected Province
-                </p>
-
-                <h2 className="mt-3 text-3xl font-bold">
-                  {selectedProvince.name}
-                </h2>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="rounded-full border border-yellow-600/40 bg-yellow-500/10 px-3 py-1 text-xs uppercase tracking-wide text-yellow-300">
-                    Province {selectedProvince.number}
-                  </span>
-
-                  <span
-                    className={`rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide ${getOwnerClass(
-                      selectedProvinceControlLabel
-                    )}`}
-                  >
-                    {selectedProvinceControlLabel}
-                  </span>
-
-                  <span
-                    className={`rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide ${getStatusClass(
-                      selectedProvince.status
-                    )}`}
-                  >
-                    {selectedProvince.status}
-                  </span>
-
-                  <span
-                    className={`rounded-full border border-slate-700 px-3 py-1 text-xs uppercase tracking-wide ${getThreatClass(
-                      selectedProvince.threatLevel
-                    )}`}
-                  >
-                    threat: {selectedProvince.threatLevel}
-                  </span>
-                </div>
-
-                <p className="mt-4 text-sm leading-6 text-slate-400">
-                  {selectedProvince.description}
-                </p>
-              </div>
-            ) : null}
-          </div>
-
-          <FactionInfluence
-            factions={state.factions}
-            provinceControl={state.provinceControl}
-            selectedFactionId={selectedFactionId}
-            onSelectFaction={setSelectedFactionId}
-          />
-        </section>
+        <StrategicIntelligence
+          state={state}
+          armyGroups={armyGroups}
+          isDm={isDm}
+          selectedLocationId={selectedId}
+          selectedProvinceId={selectedProvinceId}
+          selectedFactionId={selectedFactionId}
+          selectedArmyId={selectedArmyId}
+          activeTab={intelligenceTab}
+          onTabChange={setIntelligenceTab}
+          onLocation={(id)=>{setSelectedId(id);setShowLocations(true);setIntelligenceTab("overview");}}
+          onProvince={(id)=>{setSelectedProvinceId(id);setIntelligenceTab("provinces");}}
+          onFaction={(id)=>{setSelectedFactionId(id);setIntelligenceTab("factions");}}
+          onArmy={(id)=>{setSelectedArmyId(id);setShowArmies(true);setIntelligenceTab("armies");}}
+        />
       </div>
     </section>
   );
