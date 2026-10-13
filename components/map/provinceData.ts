@@ -59,8 +59,12 @@ export function getFactionLabel(factionId: FactionId) {
   }
 }
 
-export function getProvinceControlLabel(provinceNumber: number) {
-  const controlledBy = provinceControl[provinceNumber] ?? ["unknown"];
+export function getProvinceControlLabel(
+  provinceNumber: number,
+  control: Record<number, FactionId[]> = provinceControl
+) {
+  const controlledBy = control[provinceNumber] ?? [];
+  if (controlledBy.length === 0) return "Unknown";
 
   return controlledBy.map(getFactionLabel).join(" / ");
 }
