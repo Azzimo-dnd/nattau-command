@@ -5,6 +5,8 @@ import {
   WorkspaceLink,
 } from "@/components/campaigns/CampaignWorkspace";
 import { ArmyGroupManager } from "@/components/map/ArmyGroupManager";
+import { GalleonManager } from "@/components/map/GalleonManager";
+import type { StrategicGalleon } from "@/lib/strategic-map/galleon";
 import { createClient } from "@/lib/supabase/server";
 import type { ArmyGroup } from "@/lib/strategic-map/armyGroups";
 import { StrategicMapManager } from "@/components/map/StrategicMapManager";
@@ -28,6 +30,8 @@ export default async function StrategicMapControlPage() {
   const supabase = await createClient();
   const { data: armyGroups, error: armyError } = await supabase.from("campaign_strategic_army_groups").select("*").eq("campaign_id", access.membership.campaignId).is("archived_at", null).order("name");
   if (armyError) console.error("Unable to load strategic army groups:", armyError.message);
+  const {data:galleon,error:galleonError}=await supabase.from("campaign_strategic_galleon").select("*").eq("campaign_id",access.membership.campaignId).maybeSingle();
+  if(galleonError) console.error("Unable to load flying galleon:",galleonError.message);
 
   return (
     <CampaignWorkspace
@@ -36,6 +40,7 @@ export default async function StrategicMapControlPage() {
       description="Replace the Hinewai strategic map, revise province ownership and update faction information. Manage strategic army groups and visibility alongside provinces, faction control and the map background."
       actions={<WorkspaceLink href="/map">View Strategic Map</WorkspaceLink>}
     >
+      <GalleonManager campaignId={access.membership.campaignId} state={state} initialGalleon={(galleon??null) as StrategicGalleon|null}/>
       <ArmyGroupManager campaignId={access.membership.campaignId} state={state} initialGroups={(armyGroups ?? []) as ArmyGroup[]} />
       <StrategicMapManager
         campaignId={access.membership.campaignId}

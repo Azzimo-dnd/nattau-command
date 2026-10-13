@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { ArmyGroup } from "@/lib/strategic-map/armyGroups";
+import type { StrategicGalleon } from "@/lib/strategic-map/galleon";
 import { InteractiveMap } from "@/components/map/InteractiveMap";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 import { loadStrategicMap } from "@/lib/strategic-map/loadStrategicMap";
@@ -17,6 +18,17 @@ export default async function MapPage() {
     : await supabase.rpc("get_visible_strategic_army_groups",{p_campaign_id:access.membership.campaignId});
   if(result.error) console.error("Unable to load visible strategic armies:",result.error.message);
   const armyGroups = (result.data ?? []) as ArmyGroup[];
+
+  let galleon:StrategicGalleon|null=null;
+  if(dm){
+    const vessel=await supabase.from("campaign_strategic_galleon").select("*").eq("campaign_id",access.membership.campaignId).maybeSingle();
+    if(vessel.error)console.error("Unable to load strategic galleon:",vessel.error.message);
+    galleon=(vessel.data??null) as StrategicGalleon|null;
+  }else{
+    const vessel=await supabase.rpc("get_visible_strategic_galleon",{p_campaign_id:access.membership.campaignId});
+    if(vessel.error)console.error("Unable to load visible galleon:",vessel.error.message);
+    galleon=(vessel.data?.[0]??null) as StrategicGalleon|null;
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 p-4 text-slate-100 md:p-8">
@@ -46,6 +58,7 @@ export default async function MapPage() {
         <InteractiveMap
           state={state}
           armyGroups={armyGroups}
+          galleon={galleon}
           isDm={access.membership.role === "dm"}
         />
       </section>
