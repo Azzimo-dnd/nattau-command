@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import type { ArmyGroup } from "@/lib/strategic-map/armyGroups";
 import { InteractiveMap } from "@/components/map/InteractiveMap";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 import { loadStrategicMap } from "@/lib/strategic-map/loadStrategicMap";
@@ -8,6 +10,13 @@ export const dynamic = "force-dynamic";
 export default async function MapPage() {
   const access = await requireCampaignMembership("nattau");
   const state = await loadStrategicMap(access.membership.campaignId);
+  const supabase = await createClient();
+  const dm = access.membership.role === "dm";
+  const result = dm
+    ? await supabase.from("campaign_strategic_army_groups").select("*").eq("campaign_id",access.membership.campaignId).is("archived_at",null)
+    : await supabase.rpc("get_visible_strategic_army_groups",{p_campaign_id:access.membership.campaignId});
+  if(result.error) console.error("Unable to load visible strategic armies:",result.error.message);
+  const armyGroups = (result.data ?? []) as ArmyGroup[];
 
   return (
     <main className="min-h-screen bg-slate-950 p-4 text-slate-100 md:p-8">
@@ -36,6 +45,7 @@ export default async function MapPage() {
 
         <InteractiveMap
           state={state}
+          armyGroups={armyGroups}
           isDm={access.membership.role === "dm"}
         />
       </section>
