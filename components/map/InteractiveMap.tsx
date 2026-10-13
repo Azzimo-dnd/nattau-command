@@ -98,6 +98,27 @@ export function InteractiveMap({
   const [showArmies,setShowArmies] = useState(true);
   const [selectedArmyId,setSelectedArmyId] = useState<string | null>(null);
 
+  type IntelligenceTab = "overview" | "factions" | "armies" | "provinces";
+  function switchTab(tab: IntelligenceTab) {
+    setIntelligenceTab(tab);
+    setSelectedFactionId(null);
+    setSelectedArmyId(null);
+    setSelectedProvinceId("");
+  }
+  function selectProvince(id: string) {
+    switchTab("provinces");
+    setSelectedProvinceId(id);
+  }
+  function selectArmy(id: string | null) {
+    switchTab("armies");
+    setSelectedArmyId(id);
+    setShowArmies(true);
+  }
+  function selectFaction(id: FactionId | null) {
+    switchTab("factions");
+    setSelectedFactionId(id);
+  }
+
   return (
     <section className="space-y-6">
       <div className="space-y-6">
@@ -157,7 +178,7 @@ export function InteractiveMap({
               provinceControl={state.provinceControl}
               selectedProvinceId={selectedProvinceId}
               selectedFactionId={selectedFactionId}
-              onSelectProvince={(id)=>{setSelectedProvinceId(id);setIntelligenceTab("provinces");}}
+              onSelectProvince={selectProvince}
             />
 
             {showArmies && armyGroups.map(group=>{
@@ -184,7 +205,7 @@ export function InteractiveMap({
               return <button
                 key={group.id}
                 type="button"
-                onClick={()=>{setSelectedArmyId(group.id);setIntelligenceTab("armies");}}
+                onClick={()=>selectArmy(group.id)}
                 title={label}
                 aria-label={`View army group: ${label}`}
                 style={{left:`calc(${p.x}% + ${Math.min(overlaps,4)*15}px)`,top:`calc(${p.y}% - ${Math.min(overlaps,4)*9}px)`}}
@@ -202,7 +223,7 @@ export function InteractiveMap({
                   <button
                     key={location.id}
                     type="button"
-                    onClick={() => {setSelectedId(location.id);setIntelligenceTab("overview");}}
+                    onClick={() => {switchTab("overview");setSelectedId(location.id);}}
                     style={{
                       left: `${location.x}%`,
                       top: `${location.y}%`,
@@ -248,11 +269,11 @@ export function InteractiveMap({
           selectedFactionId={selectedFactionId}
           selectedArmyId={selectedArmyId}
           activeTab={intelligenceTab}
-          onTabChange={setIntelligenceTab}
-          onLocation={(id)=>{setSelectedId(id);setShowLocations(true);setIntelligenceTab("overview");}}
-          onProvince={(id)=>{setSelectedProvinceId(id);setIntelligenceTab("provinces");}}
-          onFaction={(id)=>{setSelectedFactionId(id);setIntelligenceTab("factions");}}
-          onArmy={(id)=>{setSelectedArmyId(id);setShowArmies(true);setIntelligenceTab("armies");}}
+          onTabChange={switchTab}
+          onLocation={(id)=>{switchTab("overview");setSelectedId(id);setShowLocations(true);}}
+          onProvince={selectProvince}
+          onFaction={selectFaction}
+          onArmy={selectArmy}
         />
       </div>
     </section>
