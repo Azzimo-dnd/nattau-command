@@ -14,6 +14,7 @@ const nattauLegacyPrefixes = [
   "/vtt",
   "/war-room",
   "/gm/dice-lab",
+  "/gm/map",
   "/gm/miniatures",
   "/gm/puzzles",
   "/gm/session",

@@ -119,6 +119,12 @@ export function getNavigationSections(
       label: "GM Tools",
       items: [
         {
+          label: "Strategic Map Control",
+          href: "/gm/map",
+          icon: "map",
+          description: "Replace the strategic map and revise province and faction control.",
+        },
+        {
           label: "Chronicle Editor",
           href: "/campaigns/nattau/gm/chronicle",
           icon: "history",

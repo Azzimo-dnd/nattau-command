@@ -1,7 +1,8 @@
 import type { FactionId, Province } from "./provinceData";
-import { provinceControl, provinces } from "./provinceData";
 
 type Props = {
+  provinces: Province[];
+  provinceControl: Record<number, FactionId[]>;
   selectedProvinceId: string;
   selectedFactionId: FactionId | null;
   onSelectProvince: (provinceId: string) => void;
@@ -27,9 +28,10 @@ function getFactionHighlightClass(factionId: FactionId) {
 function getProvinceStyle(
   province: Province,
   isSelected: boolean,
-  selectedFactionId: FactionId | null
+  selectedFactionId: FactionId | null,
+  provinceControl: Record<number, FactionId[]>
 ) {
-  const controlledBy = provinceControl[province.number] ?? ["unknown"];
+  const controlledBy = provinceControl[province.number] ?? [];
 
   const isFactionHighlighted =
     selectedFactionId !== null && controlledBy.includes(selectedFactionId);
@@ -61,6 +63,8 @@ function getProvinceStyle(
 }
 
 export function ProvinceOverlay({
+  provinces,
+  provinceControl,
   selectedProvinceId,
   selectedFactionId,
   onSelectProvince,
@@ -94,7 +98,8 @@ export function ProvinceOverlay({
             className={`cursor-pointer stroke-[0.22] transition ${getProvinceStyle(
               province,
               isSelected,
-              selectedFactionId
+              selectedFactionId,
+              provinceControl
             )}`}
             vectorEffect="non-scaling-stroke"
           />
