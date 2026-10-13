@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { ArmyGroup } from "@/lib/strategic-map/armyGroups";
 import { provinceCenter } from "@/lib/strategic-map/armyGroups";
 import type { StrategicMapState } from "@/lib/strategic-map/types";
+import type { StrategicGalleon } from "@/lib/strategic-map/galleon";
 import { StrategicIntelligence } from "./StrategicIntelligence";
 import { mapLocations } from "./mapLocations";
 import { ProvinceOverlay } from "./ProvinceOverlay";
@@ -81,10 +82,12 @@ export function InteractiveMap({
   state,
   isDm = false,
   armyGroups = [],
+  galleon = null,
 }: {
   state: StrategicMapState;
   isDm?: boolean;
   armyGroups?: ArmyGroup[];
+  galleon?: StrategicGalleon | null;
 }) {
   const [selectedId, setSelectedId] = useState(mapLocations[0].id);
   const [selectedProvinceId, setSelectedProvinceId] = useState(
@@ -96,6 +99,8 @@ export function InteractiveMap({
   const [intelligenceTab,setIntelligenceTab] = useState<"overview"|"factions"|"armies"|"provinces">("overview");
   const [showLocations, setShowLocations] = useState(true);
   const [showArmies,setShowArmies] = useState(true);
+  const [showVessel,setShowVessel] = useState(true);
+  const [vesselSelected,setVesselSelected] = useState(false);
   const [selectedArmyId,setSelectedArmyId] = useState<string | null>(null);
 
   type IntelligenceTab = "overview" | "factions" | "armies" | "provinces";
@@ -104,6 +109,7 @@ export function InteractiveMap({
     setSelectedFactionId(null);
     setSelectedArmyId(null);
     setSelectedProvinceId("");
+    setVesselSelected(false);
   }
   function selectProvince(id: string) {
     switchTab("provinces");
@@ -147,6 +153,7 @@ export function InteractiveMap({
                   GM Map Controls
                 </Link>
               ) : null}
+              {galleon && <button type="button" onClick={()=>setShowVessel(value=>!value)} className={`rounded-xl border px-4 py-2 text-sm ${showVessel?"border-amber-400 bg-amber-400/10 text-amber-200":"border-slate-700 bg-slate-950/70 text-slate-300"}`}>{showVessel?"Hide Galleon":"Show Galleon"}</button>}
               <button type="button" onClick={()=>setShowArmies(value=>!value)} className={`rounded-xl border px-4 py-2 text-sm ${showArmies?"border-yellow-500 bg-yellow-500/15 text-yellow-300":"border-slate-700 bg-slate-950/70 text-slate-300"}`}>{showArmies?"Hide Armies":"Show Armies"}</button>
               <button
                 type="button"
@@ -181,6 +188,15 @@ export function InteractiveMap({
               onSelectProvince={selectProvince}
             />
 
+            {showVessel && galleon && galleon.pos_x !== null && galleon.pos_y !== null &&
+              <button type="button" onClick={()=>{switchTab("overview");setVesselSelected(true);}}
+                aria-label={`View vessel: ${galleon.name}`}
+                title={galleon.name}
+                style={{left:`${galleon.pos_x}%`,top:`${galleon.pos_y}%`}}
+                className="group/vessel absolute z-40 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">
+                <span aria-hidden="true" className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-amber-300 bg-slate-950 text-lg shadow-lg transition-transform group-hover/vessel:scale-110 ${vesselSelected?"ring-2 ring-amber-300 ring-offset-1 ring-offset-slate-950":""}`}>⛵</span>
+                <span className="pointer-events-none max-w-28 truncate rounded-md bg-slate-950/90 px-1.5 py-0.5 text-center text-[10px] font-bold text-amber-100 shadow-sm md:max-w-36">{galleon.name}</span>
+              </button>}
             {showArmies && armyGroups.map(group=>{
               const rumor=group.visibility==="rumored"&&!isDm;
               const province=state.provinces.find(p=>p.number===group.province_number);
@@ -263,6 +279,7 @@ export function InteractiveMap({
         <StrategicIntelligence
           state={state}
           armyGroups={armyGroups}
+          galleon={galleon}
           isDm={isDm}
           selectedLocationId={selectedId}
           selectedProvinceId={selectedProvinceId}
