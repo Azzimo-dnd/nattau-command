@@ -1,79 +1,12 @@
+import type { StrategicFaction } from "@/lib/strategic-map/types";
 import type { FactionId } from "./provinceData";
 
-type Faction = {
-  id: FactionId;
-  name: string;
-  shortName: string;
-  provinces: number;
-  armies: number;
-  status: string;
-  relations: string[];
-};
-
 type Props = {
+  factions: StrategicFaction[];
+  provinceControl: Record<number, FactionId[]>;
   selectedFactionId: FactionId | null;
   onSelectFaction: (factionId: FactionId | null) => void;
 };
-
-const factions: Faction[] = [
-  {
-    id: "kainites",
-    name: "Kainites & Allies",
-    shortName: "Kainites",
-    provinces: 3,
-    armies: 1,
-    status: "Expedition command",
-    relations: [
-      "Trade with Merrydock",
-      "Non-aggression with Cult of Lord Mazamundi",
-    ],
-  },
-  {
-    id: "empire",
-    name: "Jin Yan Chao",
-    shortName: "Empire",
-    provinces: 2,
-    armies: 7,
-    status: "Imperial power",
-    relations: [
-      "Enemy of Wild Lizardfolk",
-      "Enemy of Cult of Lord Mazamundi",
-    ],
-  },
-  {
-    id: "mazamundi-cult",
-    name: "Cult of Lord Mazamundi",
-    shortName: "Mazamundi",
-    provinces: 4,
-    armies: 3,
-    status: "Dangerous allies?",
-    relations: [
-      "Non-aggression with Kainites",
-      "Enemy of Jin Yan Chao",
-    ],
-  },
-  {
-    id: "wild-lizardfolk",
-    name: "Wild Lizardfolk",
-    shortName: "Lizardfolk",
-    provinces: 1,
-    armies: 3,
-    status: "Hostile tribes",
-    relations: ["Enemy of everyone"],
-  },
-  {
-    id: "merrydock",
-    name: "Merrydock",
-    shortName: "Merrydock",
-    provinces: 1,
-    armies: 0,
-    status: "Trade settlement",
-    relations: [
-      "Trade with Kainites",
-      "Neutral with Jin Yan Chao",
-    ],
-  },
-];
 
 function getFactionCardClass(factionId: FactionId, isSelected: boolean) {
   if (!isSelected) {
@@ -114,6 +47,8 @@ function getFactionTextClass(factionId: FactionId) {
 }
 
 export function FactionInfluence({
+  factions,
+  provinceControl,
   selectedFactionId,
   onSelectFaction,
 }: Props) {
@@ -148,6 +83,9 @@ export function FactionInfluence({
       <div className="mt-5 space-y-3">
         {factions.map((faction) => {
           const isSelected = selectedFactionId === faction.id;
+          const controlledProvinceCount = Object.values(provinceControl).filter(
+            (controlledBy) => controlledBy.includes(faction.id)
+          ).length;
 
           return (
             <button
@@ -185,13 +123,17 @@ export function FactionInfluence({
                 </span>
               </div>
 
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                {faction.description}
+              </p>
+
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
                   <p className="text-xs uppercase tracking-wide text-slate-500">
                     Provinces
                   </p>
                   <p className="mt-1 text-xl font-bold text-slate-100">
-                    {faction.provinces}
+                    {controlledProvinceCount}
                   </p>
                 </div>
 
@@ -200,7 +142,7 @@ export function FactionInfluence({
                     Armies
                   </p>
                   <p className="mt-1 text-xl font-bold text-slate-100">
-                    {faction.armies}
+                    {faction.armyCount}
                   </p>
                 </div>
               </div>
