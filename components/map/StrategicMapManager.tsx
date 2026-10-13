@@ -492,8 +492,50 @@ export function StrategicMapManager({
             </span>
           </div>
           <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={mapUrl} alt="Current strategic map" className="h-auto w-full" />
+            <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={mapUrl} alt="Current strategic map" className="block h-auto w-full" />
+              <svg
+                className="absolute inset-0 h-full w-full"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                aria-label="Select a province on the strategic map"
+              >
+                {provinces.map((province) => {
+                  const isSelected = province.number === selectedProvinceNumber;
+                  return (
+                    <polygon
+                      key={province.id}
+                      points={province.points}
+                      onClick={() => selectProvince(province.number)}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected
+                          ? "fill-yellow-400/35 stroke-yellow-200 hover:fill-yellow-400/45"
+                          : "fill-transparent stroke-white/20 hover:fill-yellow-400/15 hover:stroke-yellow-300/70"
+                      }`}
+                      strokeWidth={isSelected ? 0.55 : 0.18}
+                      vectorEffect="non-scaling-stroke"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Select province ${province.number}: ${province.name}`}
+                      aria-pressed={isSelected}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          selectProvince(province.number);
+                        }
+                      }}
+                    />
+                  );
+                })}
+              </svg>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-slate-800 px-3 py-2 text-xs text-slate-400">
+              <span>
+                Highlighted: <strong className="text-yellow-300">{provinces.find((province) => province.number === selectedProvinceNumber)?.name ?? "None"}</strong>
+              </span>
+              <span>Click a province to edit it</span>
+            </div>
           </div>
         </div>
 
