@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import type { ArmyGroup } from "@/lib/strategic-map/armyGroups";
+import { provinceCenter } from "@/lib/strategic-map/armyGroups";
 import type { StrategicMapState } from "@/lib/strategic-map/types";
 import { FactionInfluence } from "./FactionInfluence";
 import { mapLocations } from "./mapLocations";
@@ -79,9 +81,11 @@ function getStatusClass(status: string) {
 export function InteractiveMap({
   state,
   isDm = false,
+  armyGroups = [],
 }: {
   state: StrategicMapState;
   isDm?: boolean;
+  armyGroups?: ArmyGroup[];
 }) {
   const [selectedId, setSelectedId] = useState(mapLocations[0].id);
   const [selectedProvinceId, setSelectedProvinceId] = useState(
@@ -91,6 +95,9 @@ export function InteractiveMap({
     null
   );
   const [showLocations, setShowLocations] = useState(true);
+  const [showArmies,setShowArmies] = useState(true);
+  const [selectedArmyId,setSelectedArmyId] = useState<string | null>(null);
+  const selectedArmy = armyGroups.find(g=>g.id===selectedArmyId);
 
   const selectedLocation =
     mapLocations.find((location) => location.id === selectedId) ??
@@ -184,6 +191,7 @@ export function InteractiveMap({
                   GM Map Controls
                 </Link>
               ) : null}
+              <button type="button" onClick={()=>setShowArmies(value=>!value)} className={`rounded-xl border px-4 py-2 text-sm ${showArmies?"border-yellow-500 bg-yellow-500/15 text-yellow-300":"border-slate-700 bg-slate-950/70 text-slate-300"}`}>{showArmies?"Hide Armies":"Show Armies"}</button>
               <button
                 type="button"
                 onClick={() => setShowLocations((current) => !current)}
@@ -217,6 +225,13 @@ export function InteractiveMap({
               onSelectProvince={setSelectedProvinceId}
             />
 
+            {showArmies && armyGroups.map(group=>{
+              const rumor=group.visibility==="rumored"&&!isDm;
+              const province=state.provinces.find(p=>p.number===group.province_number);
+              const p=rumor?(province?provinceCenter(province.points):null):(group.pos_x!==null&&group.pos_y!==null?{x:group.pos_x,y:group.pos_y}:null);
+              if(!p)return null;
+              return <button key={group.id} type="button" onClick={()=>setSelectedArmyId(group.id)} title={rumor?"Reports of military activity":group.name} style={{left:`${p.x}%`,top:`${p.y}%`}} className={`absolute z-30 -translate-x-1/2 -translate-y-1/2 rounded-lg border px-2 py-1 shadow-xl ${selectedArmyId===group.id?"border-yellow-300 bg-yellow-800":"border-yellow-600 bg-slate-950/90"}`}><span className="block text-xl">{rumor?"?":"⚑"}</span><span className="hidden text-[10px] font-semibold text-yellow-100 md:block">{rumor?"Rumor":group.name}</span></button>;
+            })}
             {showLocations &&
               mapLocations.map((location) => {
                 const isSelected = selectedId === location.id;
@@ -262,6 +277,7 @@ export function InteractiveMap({
           </div>
         </div>
 
+        {showArmies&&selectedArmy&&<div className="rounded-2xl border border-yellow-600/40 bg-slate-900 p-5"><div className="flex justify-between gap-3"><div><p className="text-xs uppercase tracking-widest text-yellow-500">Army Group</p><h3 className="mt-2 text-xl font-bold">{selectedArmy.name}</h3></div><button type="button" onClick={()=>setSelectedArmyId(null)} aria-label="Close army group details" className="text-slate-400">✕</button></div><div className="mt-3 text-sm text-slate-300">{selectedArmy.visibility==="rumored"&&!isDm?"Scouts report military activity in this province. Strength and exact location remain unknown.":<><p>Faction: {state.factions.find(f=>f.id===selectedArmy.faction_key)?.name??selectedArmy.faction_key}</p><p>Commander: {selectedArmy.commander||"Unknown"}</p><p>Strength: {selectedArmy.strength??"Unknown"} PZ</p><p>Orders: {selectedArmy.orders||"Unknown"}</p><p>Condition: {selectedArmy.condition||"Unknown"}</p><p className="mt-2 whitespace-pre-wrap">{selectedArmy.composition}</p>{isDm&&selectedArmy.gm_notes&&<p className="mt-2 border-t border-slate-700 pt-2 text-yellow-200">GM notes: {selectedArmy.gm_notes}</p>}</>}</div></div>}
         <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
