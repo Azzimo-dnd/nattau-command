@@ -4,8 +4,10 @@ import { useMemo, useState, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { StrategicMapState } from "@/lib/strategic-map/types";
+import { SpecialUnitProfileFields } from "@/components/military/SpecialUnitProfileFields";
 import {
   specialUnitDefaults, specialUnitDefinitions, specialUnitByKey, specialUnitStatusOptions,
+  resolveSpecialUnitProfile, resolvedDisplayName, validateSpecialUnitProfile,
   type StrategicSpecialUnit,
 } from "@/lib/strategic-map/specialUnits";
 
@@ -38,6 +40,7 @@ export function SpecialUnitsManager({
   const [error,setError]=useState("");
   const current=units.find(item=>item.unit_key===selectedKey);
   const definition=specialUnitByKey(selectedKey);
+  const currentProfile=resolveSpecialUnitProfile(selectedKey,current?.unit_profile);
   const setField=<K extends keyof StrategicSpecialUnit>(field:K,value:StrategicSpecialUnit[K])=>{
     setUnits(prev=>prev.map(unit=>unit.unit_key===selectedKey?{...unit,[field]:value}:unit));
     setFeedback("");setError("");
@@ -49,6 +52,9 @@ export function SpecialUnitsManager({
   function choose(key:string){setSelectedKey(key);setPlacement(false);setFeedback("");setError("");}
   async function save(){
     if(!current||busy)return;
+    if(!currentProfile){setError("Unknown unit profile.");return;}
+    const profileError=validateSpecialUnitProfile(currentProfile);
+    if(profileError){setError(profileError);return;}
     if(!current.status.trim()||current.status.length>80){setError("Enter a status (maximum 80 characters).");return;}
     if(current.mission.length>1000||current.location_note.length>320||(current.gm_notes??"").length>2500){setError("A note exceeds its length limit.");return;}
     if(current.visible_to_players&&(current.pos_x===null||current.pos_y===null)){setError("Place the unit on the map before making it visible to players.");return;}
@@ -56,6 +62,7 @@ export function SpecialUnitsManager({
     try{
       const payload={
         campaign_id:campaignId,unit_key:current.unit_key,
+        unit_profile:currentProfile,
         status:current.status.trim(),mission:current.mission.trim(),
         location_note:current.location_note.trim(),gm_notes:(current.gm_notes??"").trim(),
         pos_x:current.pos_x,pos_y:current.pos_y,
@@ -108,7 +115,7 @@ export function SpecialUnitsManager({
         const publicMarker=placed&&unit?.visible_to_players;
         return <button type="button" key={def.key} onClick={()=>choose(def.key)} className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${selectedKey===def.key?"border-amber-400 bg-amber-500/10":"border-slate-700 bg-slate-950/60 hover:border-amber-500/40"}`}>
           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-lg ${def.color}`}>{def.icon}</span>
-          <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{def.name}</strong><span className="block text-xs text-slate-400">{unit?.status??def.unit.status} · {publicMarker?"Visible":placed?"GM only":"Unplaced"}</span></span>
+          <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{resolvedDisplayName(def.key,unit?.unit_profile)}</strong><span className="block text-xs text-slate-400">{unit?.status??def.unit.status} · {publicMarker?"Visible":placed?"GM only":"Unplaced"}</span></span>
         </button>;
       })}</div>
       <div className="space-y-3">
@@ -132,13 +139,13 @@ export function SpecialUnitsManager({
             if(!def)return null;
             const isSelected=unit.unit_key===selectedKey;
             return <button type="button" key={unit.unit_key}
-              title={def.name}
+              title={resolvedDisplayName(unit.unit_key,unit.unit_profile)}
               disabled={placement}
               onClick={()=>choose(unit.unit_key)}
               style={{left:`${unit.pos_x}%`,top:`${unit.pos_y}%`}}
               className={`absolute z-20 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 ${placement?"pointer-events-none":""}`}>
               <span className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-lg shadow-lg ${def.color} ${isSelected?"ring-2 ring-amber-300 ring-offset-1 ring-offset-slate-950":""} ${unit.visible_to_players?"":"opacity-65"}`}>{def.icon}</span>
-              {(isSelected||!placement)&&<span className="max-w-24 truncate rounded bg-slate-950/90 px-1 text-[9px] text-slate-100">{def.name}</span>}
+              {(isSelected||!placement)&&<span className="max-w-24 truncate rounded bg-slate-950/90 px-1 text-[9px] text-slate-100">{resolvedDisplayName(unit.unit_key,unit.unit_profile)}</span>}
             </button>;
           })}
         </div>
@@ -151,10 +158,14 @@ export function SpecialUnitsManager({
       </div>
       {current&&definition&&<div className="space-y-3">
         <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-3">
-          <h3 className="font-semibold">{definition.name}</h3>
-          <p className="mt-1 text-xs text-amber-400">{definition.unit.commander} · {definition.unit.size}</p>
-          <p className="mt-2 text-xs leading-5 text-slate-400">{definition.unit.detail}</p>
+          <h3 className="font-semibold">{currentProfile?.name??definition.name}</h3>
+          <p className="mt-1 text-xs text-amber-400">{currentProfile?.commander??definition.unit.commander} · {currentProfile?.size??definition.unit.size}</p>
+          <p className="mt-2 text-xs leading-5 text-slate-400">{currentProfile?.detail??definition.unit.detail}</p>
         </div>
+        {currentProfile&&<details className="rounded-xl border border-amber-500/25 bg-slate-950/40 p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-amber-300">Edit unit profile · cost · durability · HQ</summary>
+          <div className="mt-4"><SpecialUnitProfileFields value={currentProfile} disabled={busy} onChange={profile=>setField("unit_profile",profile)}/></div>
+        </details>}
         <label className="block text-sm text-slate-300">Status<select className={input} value={current.status} onChange={e=>setField("status",e.target.value)}>
           {!specialUnitStatusOptions.some(status=>status===current.status)&&<option value={current.status}>{current.status}</option>}
           {specialUnitStatusOptions.map(status=><option key={status} value={status}>{status}</option>)}
@@ -166,7 +177,7 @@ export function SpecialUnitsManager({
         <p className="text-xs text-slate-500">Player visibility reveals the unit's map position, status, location note and mission. Private notes never appear to players.</p>
         {error&&<p role="alert" className="rounded-lg border border-red-500/40 bg-red-950/30 p-3 text-sm text-red-200">{error}</p>}
         {feedback&&<p role="status" className="rounded-lg border border-emerald-500/40 bg-emerald-950/20 p-3 text-sm text-emerald-300">{feedback}</p>}
-        <button type="button" disabled={busy} onClick={()=>void save()} className="w-full rounded-lg bg-amber-500 px-4 py-3 font-bold text-slate-950 disabled:opacity-50">{busy?"Saving…":"Save special unit"}</button>
+        <button type="button" disabled={busy} onClick={()=>void save()} className="w-full rounded-lg bg-amber-500 px-4 py-3 font-bold text-slate-950 disabled:opacity-50">{busy?"Saving…":"Save all special unit changes"}</button>
       </div>}
     </div>
   </section>;
