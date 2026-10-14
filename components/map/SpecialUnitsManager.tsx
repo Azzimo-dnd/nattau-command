@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { StrategicMapState } from "@/lib/strategic-map/types";
 import {
-  specialUnitDefaults, specialUnitDefinitions, specialUnitByKey,
+  specialUnitDefaults, specialUnitDefinitions, specialUnitByKey, specialUnitStatusOptions,
   type StrategicSpecialUnit,
 } from "@/lib/strategic-map/specialUnits";
 
 const input="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-amber-400 focus:outline-none";
-const statuses=["Ready","Operational","Expanded","On Mission","Travelling","Reconnaissance","Garrisoned","Supporting","Resting","Inactive","Wounded","Missing"];
+
 
 function relativePoint(event:PointerEvent<HTMLDivElement>){
   const rect=event.currentTarget.getBoundingClientRect();
@@ -62,12 +62,35 @@ export function SpecialUnitsManager({
         visible_to_players:current.visible_to_players??false,
         updated_at:new Date().toISOString(),
       };
-      const {data,error:saveError}=await client.from("campaign_strategic_special_units")
-        .upsert(payload,{onConflict:"campaign_id,unit_key"}).select("*").single();
+      // The map editor must not overwrite a status changed in the War Room
+      // while this page was open. Update only the revision we originally read.
+      const query=client.from("campaign_strategic_special_units");
+      const result=current.updated_at
+        ? await query.update(payload)
+            .eq("campaign_id",campaignId).eq("unit_key",current.unit_key)
+            .eq("updated_at",current.updated_at).select("*").maybeSingle()
+        : await query.insert(payload).select("*").maybeSingle();
+      const {data,error:saveError}=result;
       if(saveError)throw saveError;
+      if(!data)throw new Error("This unit was updated elsewhere. Reload live unit data before saving again.");
       setUnits(prev=>prev.map(item=>item.unit_key===data.unit_key?data as StrategicSpecialUnit:item));
       setPlacement(false);setFeedback("Special unit saved.");router.refresh();
     }catch(err){setError(err instanceof Error?err.message:"Unable to save the unit.");}
+    finally{setBusy(false);}
+  }
+
+  async function reload(){
+    if(busy)return;
+    setBusy(true);setError("");setFeedback("");
+    try{
+      const {data,error:fetchError}=await client.from("campaign_strategic_special_units")
+        .select("*").eq("campaign_id",campaignId).order("unit_key");
+      if(fetchError)throw fetchError;
+      const defaults=specialUnitDefaults(campaignId);
+      setUnits(defaults.map(def=>data?.find(unit=>unit.unit_key===def.unit_key)??def));
+      setPlacement(false);setFeedback("Latest unit data loaded.");
+      router.refresh();
+    }catch(e){setError(e instanceof Error?e.message:"Could not reload units.");}
     finally{setBusy(false);}
   }
 
@@ -76,6 +99,7 @@ export function SpecialUnitsManager({
       <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-500">Strategic forces · Independent layer</p>
       <h2 className="mt-1 text-2xl font-bold">Special Units Control</h2>
       <p className="mt-2 text-sm text-slate-400">Track the eight existing War Room detachments. Set positions, current orders and publication for each unit independently. Nothing appears for players until positioned and published.</p>
+      <button type="button" disabled={busy} onClick={()=>void reload()} className="mt-3 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 disabled:opacity-50">Reload live unit data</button>
     </header>
     <div className="grid items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)_320px]">
       <div className="space-y-2">{specialUnitDefinitions.map(def=>{
@@ -132,8 +156,8 @@ export function SpecialUnitsManager({
           <p className="mt-2 text-xs leading-5 text-slate-400">{definition.unit.detail}</p>
         </div>
         <label className="block text-sm text-slate-300">Status<select className={input} value={current.status} onChange={e=>setField("status",e.target.value)}>
-          {!statuses.includes(current.status)&&<option value={current.status}>{current.status}</option>}
-          {statuses.map(status=><option key={status} value={status}>{status}</option>)}
+          {!specialUnitStatusOptions.some(status=>status===current.status)&&<option value={current.status}>{current.status}</option>}
+          {specialUnitStatusOptions.map(status=><option key={status} value={status}>{status}</option>)}
         </select></label>
         <label className="block text-sm text-slate-300">Current mission / task<textarea rows={3} maxLength={1000} className={input} value={current.mission} onChange={e=>setField("mission",e.target.value)} placeholder="e.g. Scouting the eastern border"/></label>
         <label className="block text-sm text-slate-300">Location notes (shown to players)<input maxLength={320} className={input} value={current.location_note} onChange={e=>setField("location_note",e.target.value)} placeholder="e.g. North of Whangaroa"/></label>
