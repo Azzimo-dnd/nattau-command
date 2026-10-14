@@ -1,4 +1,6 @@
 import { DurabilityBar } from "./DurabilityBar";
+import { SpecialUnitStatusEditor } from "./SpecialUnitStatusEditor";
+import type { SpecialUnitRosterRow } from "@/lib/strategic-map/specialUnits";
 import {
   formatDeploymentCost,
   type MilitaryUnit,
@@ -6,9 +8,13 @@ import {
 
 type Props = {
   unit: MilitaryUnit;
+  unitKey: string;
+  campaignId: string;
+  canEdit: boolean;
+  liveRecord?: SpecialUnitRosterRow;
 };
 
-function getStatusClass(status: MilitaryUnit["status"]) {
+function getStatusClass(status: string) {
   switch (status) {
     case "Ready":
     case "Operational":
@@ -43,7 +49,8 @@ function renderHeadquarters(unit: MilitaryUnit) {
   return <p className="text-sm text-red-400">{unit.headquarters.reason}</p>;
 }
 
-export function MilitaryCard({ unit }: Props) {
+export function MilitaryCard({ unit, unitKey, campaignId, canEdit, liveRecord }: Props) {
+  const effectiveStatus=liveRecord?.status??unit.status;
   const isAzzimo = unit.theme === "azzimo";
   const isDebuffCost = unit.cost.type === "session-debuff";
 
@@ -86,9 +93,9 @@ export function MilitaryCard({ unit }: Props) {
             </p>
           </div>
           <span
-            className={`rounded-full border px-3 py-1 text-xs ${getStatusClass(unit.status)}`}
+            className={`rounded-full border px-3 py-1 text-xs ${getStatusClass(effectiveStatus)}`}
           >
-            {unit.status}
+            {effectiveStatus}
           </span>
         </div>
 
@@ -150,6 +157,11 @@ export function MilitaryCard({ unit }: Props) {
             : "mt-5 border-t border-slate-800 pt-4"
         }
       >
+        {liveRecord?.mission && <div className="mb-4 rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-400">Current assignment</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-200">{liveRecord.mission}</p>
+        </div>}
+        {canEdit && liveRecord && <div className="mb-4"><SpecialUnitStatusEditor campaignId={campaignId} unitKey={unitKey} record={liveRecord}/></div>}
         <div className="mb-4">
           <p className="mb-1 text-xs uppercase tracking-wide text-slate-500">
             Headquarters
