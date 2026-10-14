@@ -122,7 +122,7 @@ export function MilitaryCard({ unit, unitKey, campaignId, canEdit, liveRecord }:
 
         {isDebuffCost ? (
           <p className="mt-2 text-xs italic text-rose-200/75">
-            Azzimo collects his payment during the next session.
+            {unitKey === "azzimos-carnival" ? "Azzimo collects his payment during the next session." : "This unit costs a debuff during the next session."}
           </p>
         ) : null}
 
