@@ -13,9 +13,9 @@ export default async function WarRoomPage(){
   // GM reads the same canonical rows directly, including private missions and revisions.
   const result=isDm
     ? await db.from("campaign_strategic_special_units")
-        .select("unit_key,status,mission,updated_at")
+        .select("unit_key,status,mission,updated_at,unit_profile")
         .eq("campaign_id",access.membership.campaignId)
-    : await db.rpc("get_campaign_special_unit_roster",{p_campaign_id:access.membership.campaignId});
+    : await db.rpc("get_campaign_special_unit_roster_v2",{p_campaign_id:access.membership.campaignId});
   const loadError=result.error?.message??null;
   if(loadError)console.error("War Room: unable to load canonical unit state:",loadError);
   const roster=(result.data??[]) as SpecialUnitRosterRow[];
