@@ -6,7 +6,7 @@ import type { ArmyGroup } from "@/lib/strategic-map/armyGroups";
 import { provinceCenter } from "@/lib/strategic-map/armyGroups";
 import type { StrategicMapState } from "@/lib/strategic-map/types";
 import type { StrategicGalleon } from "@/lib/strategic-map/galleon";
-import {specialUnitByKey, type StrategicSpecialUnit} from "@/lib/strategic-map/specialUnits";
+import {specialUnitByKey, resolvedDisplayName, type StrategicSpecialUnit} from "@/lib/strategic-map/specialUnits";
 import { StrategicIntelligence } from "./StrategicIntelligence";
 import { ProvinceOverlay } from "./ProvinceOverlay";
 import type { FactionId } from "./provinceData";
@@ -141,12 +141,12 @@ export function InteractiveMap({
               ).length;
               const offset=Math.min(collisions,4);
               return <button type="button" key={unit.unit_key} onClick={()=>selectSpecialUnit(unit.unit_key)}
-                aria-label={`View special unit: ${def.name}`}
-                title={`${def.name} — ${unit.status}${isPrivate?" (GM only)":""}`}
+                aria-label={`View special unit: ${resolvedDisplayName(unit.unit_key,unit.unit_profile)}`}
+                title={`${resolvedDisplayName(unit.unit_key,unit.unit_profile)} — ${unit.status}${isPrivate?" (GM only)":""}`}
                 style={{left:`calc(${unit.pos_x}% + ${offset*12}px)`,top:`calc(${unit.pos_y}% - ${offset*10}px)`}}
                 className="group/special absolute z-[35] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300">
                 <span aria-hidden="true" className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-sm shadow-lg transition-transform group-hover/special:scale-110 ${def.color} ${isPrivate?"opacity-55":""} ${isSelected?"ring-2 ring-teal-300 ring-offset-1 ring-offset-slate-950":""}`}>{def.icon}</span>
-                <span className={`pointer-events-none max-w-24 truncate rounded bg-slate-950/85 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight text-slate-100 md:max-w-32 md:text-[10px] ${isPrivate?"opacity-60":""}`}>{def.name}</span>
+                <span className={`pointer-events-none max-w-24 truncate rounded bg-slate-950/85 px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight text-slate-100 md:max-w-32 md:text-[10px] ${isPrivate?"opacity-60":""}`}>{resolvedDisplayName(unit.unit_key,unit.unit_profile)}</span>
               </button>;
             })}
             {showArmies && armyGroups.map(group=>{
