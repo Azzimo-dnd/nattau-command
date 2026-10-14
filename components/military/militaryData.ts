@@ -60,6 +60,7 @@ export type MilitaryUnit = {
   commander: string;
   size: string;
   cost: DeploymentCost;
+  /** Reference value only. Live status comes from Supabase. */
   status: MilitaryStatus;
   detail: string;
   durability: MilitaryDurability;
@@ -162,7 +163,7 @@ export const militaryUnits: MilitaryUnit[] = [
     },
     status: "Inactive",
     detail:
-      "Faith, battlefield support and morale control. Currently inactive due to Mother Tyllen's poor health.",
+      "Faith, battlefield support and morale control.",
     durability: { type: "finite", current: 4, max: 4 },
     headquarters: {
       state: "unavailable",
