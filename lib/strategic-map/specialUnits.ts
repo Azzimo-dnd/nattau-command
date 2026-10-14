@@ -40,3 +40,17 @@ export function specialUnitDefaults(campaignId: string): StrategicSpecialUnit[] 
     location_note:"",gm_notes:"",pos_x:null,pos_y:null,visible_to_players:false,
   }));
 }
+
+/** Canonical roster state is saved in campaign_strategic_special_units. */
+export type SpecialUnitRosterRow = {
+  unit_key: string;
+  status: string;
+  mission: string | null;
+  updated_at?: string;
+};
+
+export const specialUnitStatusOptions = [
+  "Ready", "Operational", "Expanded", "On Mission", "Travelling",
+  "Reconnaissance", "Garrisoned", "Supporting", "Resting",
+  "Inactive", "Wounded", "Missing",
+] as const;
