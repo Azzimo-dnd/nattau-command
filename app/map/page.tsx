@@ -33,7 +33,7 @@ export default async function MapPage() {
 
   const specialResult=dm
     ? await supabase.from("campaign_strategic_special_units").select("*").eq("campaign_id",access.membership.campaignId)
-    : await supabase.rpc("get_visible_strategic_special_units",{p_campaign_id:access.membership.campaignId});
+    : await supabase.rpc("get_visible_strategic_special_units_v2",{p_campaign_id:access.membership.campaignId});
   if(specialResult.error) console.error("Unable to load strategic special units:",specialResult.error.message);
   const specialUnits=(specialResult.data??[]) as StrategicSpecialUnit[];
 
