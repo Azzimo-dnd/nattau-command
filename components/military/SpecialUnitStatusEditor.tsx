@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { specialUnitStatusOptions, type SpecialUnitRosterRow } from "@/lib/strategic-map/specialUnits";
+import { specialUnitStatusOptions, resolveSpecialUnitProfile, validateSpecialUnitProfile, type SpecialUnitProfile, type SpecialUnitRosterRow } from "@/lib/strategic-map/specialUnits";
+import { SpecialUnitProfileFields } from "./SpecialUnitProfileFields";
 
 type Props={
   campaignId:string;
@@ -16,16 +17,20 @@ export function SpecialUnitStatusEditor({campaignId,unitKey,record}:Props){
   const router=useRouter();
   const [status,setStatus]=useState(record.status);
   const [mission,setMission]=useState(record.mission??"");
+  const [profile,setProfile]=useState<SpecialUnitProfile>(()=>resolveSpecialUnitProfile(unitKey,record.unit_profile)!);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [success,setSuccess]=useState("");
-  useEffect(()=>{setStatus(record.status);setMission(record.mission??"");},[record.status,record.mission,record.updated_at]);
-  const dirty=status!==record.status||mission!==(record.mission??"");
+  useEffect(()=>{setStatus(record.status);setMission(record.mission??"");setProfile(resolveSpecialUnitProfile(unitKey,record.unit_profile)!);},[record.status,record.mission,record.updated_at,record.unit_profile,unitKey]);
+  const baseline=resolveSpecialUnitProfile(unitKey,record.unit_profile);
+  const dirty=status!==record.status||mission!==(record.mission??"")||JSON.stringify(profile)!==JSON.stringify(baseline);
   async function save(){
     if(busy||!dirty)return;
     if(status.trim().length<1||status.length>80||mission.length>1000){
       setError("Status must have 1–80 characters; mission must be at most 1000 characters.");return;
     }
+    const profileError=validateSpecialUnitProfile(profile);
+    if(profileError){setError(profileError);return;}
     if(!record.updated_at){
       setError("Missing current database revision. Refresh the page before editing.");return;
     }
@@ -33,21 +38,21 @@ export function SpecialUnitStatusEditor({campaignId,unitKey,record}:Props){
     try{
       const db=createClient();
       const {data,error:saveError}=await db.from("campaign_strategic_special_units")
-        .update({status:status.trim(),mission:mission.trim(),updated_at:new Date().toISOString()})
+        .update({status:status.trim(),mission:mission.trim(),unit_profile:profile,updated_at:new Date().toISOString()})
         .eq("campaign_id",campaignId)
         .eq("unit_key",unitKey)
         .eq("updated_at",record.updated_at)
-        .select("unit_key, status, mission, updated_at")
+        .select("unit_key, status, mission, unit_profile, updated_at")
         .maybeSingle();
       if(saveError)throw saveError;
       if(!data)throw new Error("This unit changed elsewhere. Refresh the page to load its newest status before saving.");
-      setSuccess("Saved to Supabase. Strategic Map now uses these values.");
+      setSuccess("Saved all unit attributes to Supabase. Strategic Map and War Room now use these values.");
       router.refresh();
     }catch(e){setError(e instanceof Error?e.message:"Unable to update this unit.");}
     finally{setBusy(false);}
   }
   return <div className="rounded-xl border border-amber-500/30 bg-slate-900/70 p-3">
-    <div className="mb-3 flex items-center justify-between gap-2"><p className="text-xs font-bold uppercase tracking-widest text-amber-400">GM · Live unit orders</p><span className="text-xs text-slate-500">Shared with Strategic Map</span></div>
+    <div className="mb-3 flex items-center justify-between gap-2"><p className="text-xs font-bold uppercase tracking-widest text-amber-400">GM · Full unit editor</p><span className="text-xs text-slate-500">Shared with Strategic Map</span></div>
     <label className="block text-xs text-slate-300">Current status
       <select className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-white" value={status} onChange={e=>{setStatus(e.target.value);setError("");setSuccess("");}}>
         {!specialUnitStatusOptions.some(option=>option===status)&&<option value={status}>{status}</option>}
@@ -57,9 +62,10 @@ export function SpecialUnitStatusEditor({campaignId,unitKey,record}:Props){
     <label className="mt-3 block text-xs text-slate-300">Current mission / assignment
       <textarea rows={2} maxLength={1000} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-white" value={mission} onChange={e=>{setMission(e.target.value);setError("");setSuccess("");;}} placeholder="The unit's current assignment"/>
     </label>
-    <p className="mt-1 text-xs text-slate-500">Missions are shared with players only when the unit is published on the map. Status is visible in the War Room roster.</p>
+    <p className="mt-1 text-xs text-slate-500">Missions are shared with players only when the unit is published on the map. Status and unit profile are always part of the War Room roster.</p>
+    <details className="mt-4 rounded-xl border border-slate-700 p-3" open><summary className="cursor-pointer text-sm font-semibold text-amber-300">Edit all attributes · cost · durability · HQ</summary><div className="mt-4"><SpecialUnitProfileFields value={profile} onChange={next=>{setProfile(next);setError("");setSuccess("");}} disabled={busy}/></div></details>
     <div className="mt-3 flex flex-wrap items-center gap-2">
-      <button type="button" disabled={busy||!dirty} onClick={()=>void save()} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy?"Saving…":"Save status & mission"}</button>
+      <button type="button" disabled={busy||!dirty} onClick={()=>void save()} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy?"Saving…":"Save all unit changes"}</button>
       <button type="button" disabled={busy} onClick={()=>{setSuccess("");setError("");router.refresh();}} className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300">Refresh live data</button>
     </div>
     {error&&<p role="alert" className="mt-2 text-xs text-red-300">{error}</p>}
