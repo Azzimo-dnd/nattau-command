@@ -5,8 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { createClient } from "@/lib/supabase/client";
-import { applyMiniaturePaintDocumentToGeometry, parseMiniaturePaintDocument } from "@/components/miniatures/miniaturePaintData";
-import { loadMiniatureGeometry } from "@/components/miniatures/miniatureModelFiles";
+import { parseMiniaturePaintDocument, type MiniaturePaintDocument } from "@/components/miniatures/miniaturePaintData";
+import { disposeMiniatureScene, loadMiniatureAsset, type MiniatureAsset } from "@/components/miniatures/miniatureAsset";
+import { MiniatureObject } from "@/components/miniatures/MiniatureObject";
 import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-physics/dicePhysicsTypes";
 import { VttDiceLayer } from "./VttDiceLayer";
 import { VttFogDraftOverlay, VttFogLayer } from "./VttFogLayer";
@@ -26,7 +27,7 @@ export type VttPing = { id: string; x: number; z: number };
 export type VttCameraCommand = { id: number; type: "fit" | "reset" | "focus"; x?: number; z?: number };
 export type VttAssetProgress = { loaded: number; failed: number; total: number };
 
-type LoadedTokenAsset = { geometry: THREE.BufferGeometry; baseScale: number; hasColors: boolean };
+type LoadedTokenAsset = MiniatureAsset;
 
 type Props = {
   scene: VttScene;
@@ -91,22 +92,13 @@ async function loadTokenAsset(supabase: ReturnType<typeof createClient>, token: 
     const { data: modelBlob, error: modelError } = await supabase.storage.from(modelBucket).download(token.model_storage_path);
     if (modelError) throw modelError;
     const file = new File([modelBlob], token.model_file_name, { type: modelBlob.type || (token.model_format === "glb" ? "model/gltf-binary" : "application/octet-stream") });
-    const loaded = await loadMiniatureGeometry(file);
-    const geometry = loaded.geometry;
-    try {
-    let hasColors = false;
+    let paint: MiniaturePaintDocument | null = null;
     if (token.paint_storage_path) {
       const { data: paintBlob, error: paintError } = await supabase.storage.from(paintBucket).download(token.paint_storage_path);
       if (paintError) throw paintError;
-      const document = parseMiniaturePaintDocument(JSON.parse(await paintBlob.text()) as unknown);
-      hasColors = applyMiniaturePaintDocumentToGeometry(geometry, document);
+      paint = parseMiniaturePaintDocument(JSON.parse(await paintBlob.text()) as unknown);
     }
-    geometry.computeBoundingBox();
-    const box = geometry.boundingBox;
-    if (!box) throw new Error("Could not determine token model bounds.");
-    const footprint = Math.max(box.max.x - box.min.x, box.max.y - box.min.y, 0.001);
-    return { geometry, baseScale: 0.82 / footprint, hasColors };
-    } catch (error) { geometry.dispose(); throw error; }
+    return loadMiniatureAsset(file, paint);
   })().catch((error) => { assetCache.delete(key); throw error; });
   assetCache.set(key, promise);
   return promise;
@@ -270,16 +262,14 @@ function TokenMesh({ token, selected, currentTurn, showNameplate, isDm, canDrag,
     loadTokenAsset(supabase, descriptor, assetCache).then((next) => { if (alive) { setAsset(next); onAssetSettled(tokenAssetKey(descriptor), true); } }).catch(() => { if (alive) { setFailed(true); onAssetSettled(tokenAssetKey(descriptor), false); } });
     return () => { alive = false; };
   }, [assetCache, descriptor, onAssetSettled, supabase]);
-  const material = useMemo(() => new THREE.MeshStandardMaterial({ color: asset?.hasColors ? 0xffffff : token.source_kind === "enemy" ? 0x93615a : 0x8f949b, roughness: 0.7, metalness: 0.06, vertexColors: Boolean(asset?.hasColors), transparent: isDm && !token.visible_to_players, opacity: isDm && !token.visible_to_players ? 0.42 : 1 }), [asset?.hasColors, isDm, token.source_kind, token.visible_to_players]);
-  useEffect(() => () => material.dispose(), [material]);
   const down = (event: ThreeEvent<PointerEvent>) => { event.stopPropagation(); const additive = event.shiftKey || event.ctrlKey || event.metaKey; onSelect(token.id, additive); if (isDm && canDrag && event.button === 0 && !additive) onDragStart(token.id); };
-  const worldScale = (asset?.baseScale ?? 1) * token.scale * token.size_squares;
+  const worldScale = (asset?.baseScale ?? 1) * (asset?.visualScale ?? 1) * token.scale * token.size_squares;
   const ringColor = token.source_kind === "enemy" ? (token.visible_to_players ? "#fb7185" : "#a855f7") : "#22d3ee";
   return <group position={[token.x, 0.02, token.z]} rotation={[0, token.rotation, 0]}>
     {currentTurn ? <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}><ringGeometry args={[0.5 * token.size_squares, 0.62 * token.size_squares, 64]} /><meshBasicMaterial color="#fbbf24" transparent opacity={0.95} depthTest={false} side={THREE.DoubleSide} /></mesh> : null}
     {selected ? <><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}><ringGeometry args={[0.42 * token.size_squares, 0.52 * token.size_squares, 48]} /><meshBasicMaterial color={ringColor} transparent opacity={0.9} side={THREE.DoubleSide} /></mesh><mesh position={[0, 0.045, -0.62 * token.size_squares]} rotation={[-Math.PI / 2, 0, 0]}><coneGeometry args={[0.11 * token.size_squares, 0.28 * token.size_squares, 3]} /><meshBasicMaterial color={ringColor} depthTest={false} /></mesh></> : null}
     {showNameplate ? <TokenNameplate name={token.name} size={token.size_squares} /> : null}
-    {asset ? <mesh dispose={null} geometry={asset.geometry} material={material} rotation={[-Math.PI / 2, 0, 0]} scale={worldScale} castShadow receiveShadow onPointerDown={down} /> : <mesh onPointerDown={down} position={[0, 0.34, 0]}><cylinderGeometry args={[0.34, 0.42, 0.68, 20]} /><meshStandardMaterial color={failed ? "#7f1d1d" : token.source_kind === "enemy" ? "#7f4650" : "#53657b"} /></mesh>}
+    {asset ? <MiniatureObject asset={asset} scale={worldScale} opacity={isDm && !token.visible_to_players ? 0.42 : 1} onPointerDown={down} /> : <mesh onPointerDown={down} position={[0, 0.34, 0]}><cylinderGeometry args={[0.34, 0.42, 0.68, 20]} /><meshStandardMaterial color={failed ? "#7f1d1d" : token.source_kind === "enemy" ? "#7f4650" : "#53657b"} /></mesh>}
   </group>;
 }
 
@@ -325,7 +315,7 @@ export function VttCanvas({
 
   const assetCache = useMemo<TokenAssetCache>(() => new Map(), []);
   useEffect(() => () => {
-    for (const pending of assetCache.values()) void pending.then((asset) => asset.geometry.dispose()).catch(() => undefined);
+    for (const pending of assetCache.values()) void pending.then((asset) => disposeMiniatureScene(asset.scene)).catch(() => undefined);
     assetCache.clear();
   }, [assetCache]);
   const loadedCount = tokens.filter((token) => assetState[tokenAssetKey(token)] === true).length;
