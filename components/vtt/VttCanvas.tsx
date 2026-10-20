@@ -35,9 +35,9 @@ type LoadedTokenAsset = MiniatureAsset;
 type Props = {
   scene: VttScene;
   tokens: VttToken[];
-  terrainInstances: VttSceneTerrainInstance[];
-  terrainAssets: TerrainAssetRow[];
-  selectedTerrainId: string | null;
+  terrainInstances?: VttSceneTerrainInstance[];
+  terrainAssets?: TerrainAssetRow[];
+  selectedTerrainId?: string | null;
   isDm: boolean;
   selectedIds: string[];
   supabase: ReturnType<typeof createClient>;
@@ -62,8 +62,8 @@ type Props = {
   onMeasureMove: (point: VttMeasurePoint) => void;
   onMeasureEnd: (point: VttMeasurePoint) => void;
   onPing: (point: VttMeasurePoint) => void;
-  onTerrainPlace: (point: VttMeasurePoint) => void;
-  onTerrainSelect: (id: string) => void;
+  onTerrainPlace?: (point: VttMeasurePoint) => void;
+  onTerrainSelect?: (id: string) => void;
   onFogPointerDown: (point: VttFogPoint) => void;
   onFogPointerMove: (point: VttFogPoint) => void;
   onFogPointerUp: (point: VttFogPoint) => void;
@@ -284,9 +284,9 @@ function TokenMesh({ token, selected, currentTurn, showNameplate, isDm, canDrag,
 export function VttCanvas({
   scene,
   tokens,
-  terrainInstances,
-  terrainAssets,
-  selectedTerrainId,
+  terrainInstances = [],
+  terrainAssets = [],
+  selectedTerrainId = null,
   isDm,
   selectedIds,
   supabase,
@@ -347,7 +347,7 @@ export function VttCanvas({
     }
     if (toolMode === "terrain") {
       event.stopPropagation();
-      if (isDm) onTerrainPlace([event.point.x, event.point.z]);
+      if (isDm) onTerrainPlace?.([event.point.x, event.point.z]);
       return;
     }
     if (toolMode === "ping") { event.stopPropagation(); onPing([event.point.x, event.point.z]); return; }
@@ -385,9 +385,9 @@ export function VttCanvas({
     {fogEditing ? <VttFogDraftOverlay points={fogDraftPoints} shape={fogShape} operation={fogOperation} /> : null}
     <MeasurementOverlay mode={toolMode} start={measureStart} end={measureEnd} />
     <PingOverlay ping={ping} />
-    {isDm ? <VttTerrainLayer instances={terrainInstances} assets={terrainAssets} supabase={supabase}
+    {isDm && terrainInstances.length > 0 ? <VttTerrainLayer instances={terrainInstances} assets={terrainAssets} supabase={supabase}
       selectedId={selectedTerrainId} canSelect={toolMode === "terrain" && !diceRequest && !fogEditing}
-      onSelect={onTerrainSelect} /> : null}
+      onSelect={(id) => onTerrainSelect?.(id)} /> : null}
     {tokens.map((token) => <TokenMesh key={`${token.id}:${tokenAssetKey(token)}:${assetAttempt}`} assetCache={assetCache} token={token} selected={selectedIds.includes(token.id)} currentTurn={scene.initiative_active && token.id === scene.initiative_current_token_id} showNameplate={scene.show_nameplates} isDm={isDm} canDrag={toolMode === "navigate" && !diceRequest && !fogEditing} supabase={supabase} onSelect={onSelect} onDragStart={(id) => setDraggingId(id)} onAssetSettled={assetSettled} />)}
     {diceRequest ? <VttDiceLayer key={diceRequest.rollId} request={diceRequest} sceneWidth={scene.grid_width} sceneHeight={scene.grid_height} onComplete={onDiceComplete} onImpact={onDiceImpact} /> : null}
     <VttOrbitControls disabled={Boolean(draggingId) || measuring || fogEditing} width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
