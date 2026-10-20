@@ -90,7 +90,8 @@ drop policy if exists "Terrain files GM create" on storage.objects;
 create policy "Terrain files GM create" on storage.objects for insert to authenticated
 with check (
  bucket_id = 'vtt-terrain-assets'
- and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[.]glb$'
+ and right(name,4) = '.glb'
+ and split_part(name,'/',3) = ''
  and public.is_campaign_dm(public.vtt_terrain_path_campaign(name))
 );
 drop policy if exists "Terrain files GM delete" on storage.objects;
