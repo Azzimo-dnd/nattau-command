@@ -47,14 +47,15 @@ test("private terrain bucket and campaign GM-only RLS", async () => {
     assert.equal(decision.rows[0].campaign,nattau,JSON.stringify(decision.rows[0]));
     assert.equal(decision.rows[0].allowed,true,JSON.stringify(decision.rows[0]));
     assert.equal(decision.rows[0].matches,true,JSON.stringify(decision.rows[0]));
-    await db.query("insert into storage.objects(bucket_id,name) values ('vtt-terrain-assets',$1)",[path]);
+    try { await db.query("insert into storage.objects(bucket_id,name) values ('vtt-terrain-assets',$1)",[path]); }
+    catch (cause) { throw new Error("GM storage insert: "+(cause instanceof Error ? cause.message : String(cause))); }
     assert.equal((await db.query("select name from storage.objects")).rows.length,1);
   });
   await asUser(player,async () => {
     assert.equal((await db.query("select * from vtt_terrain_assets")).rows.length,0);
     assert.equal((await db.query("select * from storage.objects")).rows.length,0);
     await assert.rejects(db.query(insertSQL,[nattau,nattau+"/"+uuid(11)+".glb",JSON.stringify({kind:"crate"})]),/row-level security|permission denied/i);
-    await assert.rejects(db.query("insert into storage.objects(bucket_id,name) values ('vtt-terrain-assets',$1)",[path]),/row-level security|permission denied/i);
+    await assert.rejects(db.query("insert into storage.objects(bucket_id,name) values ('vtt-terrain-assets',$1)",[path]),/row-level security|permission denied/i,"Player should not upload terrain.");
   });
 });
 
