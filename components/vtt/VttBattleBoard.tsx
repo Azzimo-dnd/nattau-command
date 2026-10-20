@@ -16,6 +16,8 @@ import { useVttBoard } from "./useVttBoard";
 import { useVttDice } from "./useVttDice";
 import { useVttFog } from "./useVttFog";
 import { useVttPresence } from "./useVttPresence";
+import { useSceneTerrain } from "./useSceneTerrain";
+import { VttTerrainPanel } from "./VttTerrainPanel";
 
 type Props = { campaignSlug?: string; campaignId: string; isDm: boolean; currentUserId: string; currentUserName: string };
 
@@ -28,6 +30,8 @@ function isEditableTarget(target: EventTarget | null) {
 export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, currentUserId, currentUserName }: Props) {
   const daggerheart = campaignSlug === "barovia";
   const board = useVttBoard(campaignId, isDm, currentUserId);
+  const terrain = useSceneTerrain(campaignId, board.scene?.id ?? null,
+    board.scene?.grid_width ?? 24, board.scene?.grid_height ?? 18, isDm);
   const dice = useVttDice({ daggerheart, campaignId, currentUserId, currentUserName, sceneId: board.scene?.id ?? null, sharedScene: Boolean(board.scene?.is_active && board.scene?.visible_to_players) });
   const presence = useVttPresence({ campaignId, currentUserId, currentUserName, isDm });
   const fog = useVttFog({
@@ -64,6 +68,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
     setUiSceneId(board.scene?.id);
     setHistoryOpen(false);
     setFogOpen(false);
+    terrain.setSelectedId(null);
     setAssetProgress({ loaded: 0, failed: 0, total: 0 });
   }
 
@@ -72,6 +77,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
     const onKeyDown = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target)) return;
       const key = event.key.toLowerCase();
+      if (board.toolMode !== "navigate") return;
       if (board.selectedTokens.length === 1 && key === "q") { event.preventDefault(); void board.rotateSelected(-Math.PI / 4); }
       else if (board.selectedTokens.length === 1 && key === "e") { event.preventDefault(); void board.rotateSelected(Math.PI / 4); }
       else if ((event.key === "Delete" || event.key === "Backspace") && board.selectedIds.length > 0) { event.preventDefault(); void board.removeSelected(); }
@@ -149,6 +155,8 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
         <div className={`relative overflow-hidden border border-slate-800 bg-[#070b11] ${isFullscreen ? "min-h-0 rounded-2xl" : "rounded-[30px]"}`}>
           <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5 rounded-2xl border border-slate-700/80 bg-slate-950/88 p-1.5 shadow-2xl backdrop-blur">
             {(["navigate", "ruler", "radius", "ping"] as VttToolMode[]).map((mode) => <button key={mode} type="button" onClick={() => { setFogOpen(false); fog.cancelDraft(); board.selectToolMode(mode); }} disabled={Boolean(dice.activeRoll)} className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${board.toolMode === mode && !fogOpen ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>{mode === "navigate" ? "Navigate" : mode === "ruler" ? "Ruler" : mode === "radius" ? daggerheart ? "Area" : "Spell radius" : "Ping"}</button>)}
+            {isDm ? <button type="button" disabled={Boolean(dice.activeRoll) || board.playerPreview || terrain.loading} onClick={() => { setFogOpen(false); fog.cancelDraft(); board.selectToken(null,false); board.selectToolMode(board.toolMode === "terrain" ? "navigate" : "terrain"); }}
+              className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${board.toolMode === "terrain" && !fogOpen ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>Terrain</button> : null}
             {isDm ? <button type="button" disabled={Boolean(dice.activeRoll) || board.playerPreview} onClick={() => { board.selectToolMode("navigate"); setFogOpen((current) => !current); fog.cancelDraft(); }} className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${fogOpen ? "border-sky-300 bg-sky-300/15 text-sky-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>Fog</button> : null}
             <span className="mx-0.5 h-7 w-px bg-slate-800" />
             <button type="button" onClick={() => commandCamera("fit")} className="min-h-9 rounded-xl border border-slate-800 px-2.5 text-[9px] font-black text-slate-400 hover:text-slate-100">Fit</button>
@@ -170,6 +178,9 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
               key={`${scene.id}:${scene.grid_width}:${scene.grid_height}`}
               scene={board.canvasScene}
               tokens={fog.displayTokens}
+              terrainInstances={isDm && !board.playerPreview ? terrain.instances : []}
+              terrainAssets={isDm && !board.playerPreview ? terrain.assets : []}
+              selectedTerrainId={isDm && !board.playerPreview ? terrain.selectedId : null}
               isDm={isDm && !board.playerPreview}
               selectedIds={board.playerPreview ? [] : board.selectedIds}
               supabase={board.supabase}
@@ -194,6 +205,8 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
               onMeasureMove={board.setMeasureEnd}
               onMeasureEnd={board.setMeasureEnd}
               onPing={board.sendPing}
+              onTerrainPlace={(point) => { if(isDm && !board.playerPreview && !dice.activeRoll) void terrain.place(point); }}
+              onTerrainSelect={(id) => { if(isDm && !board.playerPreview) terrain.setSelectedId(id); }}
               onFogPointerDown={fog.pointerDown}
               onFogPointerMove={fog.pointerMove}
               onFogPointerUp={fog.pointerUp}
@@ -222,6 +235,16 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
 
             <section className="rounded-[26px] border border-slate-800 bg-slate-900/70 p-4"><p className="text-xs font-black uppercase tracking-[0.2em] text-yellow-400">GM setup</p><button type="button" disabled={board.busy} onClick={() => void board.placeParty()} className="mt-3 min-h-11 w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 text-xs font-black text-cyan-100 disabled:opacity-40">Place / refresh party</button><p className="mt-2 text-[10px] leading-4 text-slate-600">Uses the saved Party Roster for this scene. Enemy tokens are never affected.</p></section>
 
+            <VttTerrainPanel assets={terrain.assets} instances={terrain.instances} activeAssetId={terrain.activeAssetId}
+              selected={terrain.selected} busy={terrain.busy || gmBusy} loading={terrain.loading} error={terrain.error}
+              notice={terrain.notice} toolActive={board.toolMode === "terrain"}
+              onAsset={(id)=>{terrain.setActiveAssetId(id); terrain.setSelectedId(null); board.selectToken(null,false); setFogOpen(false); fog.cancelDraft(); board.selectToolMode("terrain");}}
+              onSelect={terrain.setSelectedId}
+              onRotate={(delta)=>{if(terrain.selected)void terrain.updateSelected({rotation_y:terrain.selected.rotation_y+delta});}}
+              onScale={(scale)=>{void terrain.updateSelected({scale});}}
+              onDuplicate={()=>{void terrain.duplicateSelected();}}
+              onDelete={()=>{void terrain.removeSelected();}}
+              onRefresh={()=>{void terrain.refresh();}}/>
             <VttSceneSettings scene={scene} busy={gmBusy} mapInputRef={board.mapInputRef} mapFile={board.mapFile} draftName={board.draftName} draftWidth={board.draftWidth} draftHeight={board.draftHeight} draftMapOpacity={board.draftMapOpacity} draftGridOpacity={board.draftGridOpacity} draftShowGrid={board.draftShowGrid} draftMapScale={board.draftMapScale} draftMapOffsetX={board.draftMapOffsetX} draftMapOffsetZ={board.draftMapOffsetZ} onMapFile={board.setMapFile} onName={board.setDraftName} onWidth={board.setDraftWidth} onHeight={board.setDraftHeight} onMapOpacity={board.setDraftMapOpacity} onGridOpacity={board.setDraftGridOpacity} onShowGrid={board.setDraftShowGrid} onMapScale={board.setDraftMapScale} onMapOffsetX={board.setDraftMapOffsetX} onMapOffsetZ={board.setDraftMapOffsetZ} onSave={() => void board.saveScenePresentation()} onUpload={() => void board.uploadSceneMap()} onRemoveMap={() => void board.removeSceneMap()} />
 
             <section className="rounded-[26px] border border-slate-800 bg-slate-900/70 p-4"><div className="flex items-center justify-between gap-2"><p className="text-xs font-black uppercase tracking-[0.2em] text-rose-300">Enemy library</p><span className="text-[10px] font-bold text-slate-600">{board.enemyModels.length}</span></div>{board.enemyModels.length === 0 ? <p className="mt-3 text-xs leading-5 text-slate-500">No enemy STLs yet. Add them in the GM Enemy Studio.</p> : <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">{board.enemyModels.map((enemy) => <button key={enemy.id} type="button" disabled={board.busy} onClick={() => void board.spawnEnemy(enemy)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/50 px-3 text-left text-xs font-bold text-slate-200 hover:border-rose-400/30 disabled:opacity-40"><span className="truncate">{enemy.name}</span><span className="shrink-0 text-[9px] uppercase text-rose-300">Spawn hidden</span></button>)}</div>}</section>
