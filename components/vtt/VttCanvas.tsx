@@ -323,6 +323,7 @@ export function VttCanvas({
   const [measuring, setMeasuring] = useState(false);
   const [assetAttempt, setAssetAttempt] = useState(0);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [terrainError, setTerrainError] = useState<string | null>(null);
   const [assetState, setAssetState] = useState<Record<string, boolean>>({});
   const halfW = scene.grid_width / 2; const halfH = scene.grid_height / 2;
 
@@ -375,7 +376,7 @@ export function VttCanvas({
     if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) { event.stopPropagation(); setMeasuring(false); onMeasureEnd([event.point.x, event.point.z]); }
   };
 
-  return <>{(failedCount > 0 || (mapError && mapError === scene.map_storage_path)) && <div role="alert" className="absolute right-3 top-14 z-30 max-w-xs rounded-xl border border-rose-400/30 bg-slate-950 p-3 text-xs text-rose-100"><p>{mapError === scene.map_storage_path ? "The map image could not be loaded." : "Some miniature files could not be loaded."}</p><button type="button" onClick={() => { setMapError(null); setAssetState({}); setAssetAttempt((attempt) => attempt + 1); }} className="mt-2 min-h-9 rounded-lg border border-rose-300/30 px-3 font-bold">Retry assets</button></div>}<Canvas fallback={<div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-300">The 3D table needs WebGL. Enable hardware acceleration or open it in another browser.</div>} shadows dpr={[1, 1.5]} camera={{ position: defaultCameraPosition(scene.grid_width, scene.grid_height).toArray() as [number, number, number], fov: 44, near: 0.1, far: 300 }} onPointerMissed={() => { if (toolMode === "navigate" && !diceRequest && !fogEditing) onSelect(null, false); }}>
+  return <>{(failedCount > 0 || (mapError && mapError === scene.map_storage_path) || terrainError) && <div role="alert" className="absolute right-3 top-14 z-30 max-w-xs rounded-xl border border-rose-400/30 bg-slate-950 p-3 text-xs text-rose-100"><p>{terrainError ?? (mapError === scene.map_storage_path ? "The map image could not be loaded." : "Some miniature files could not be loaded.")}</p><button type="button" onClick={() => { setMapError(null); setTerrainError(null); setAssetState({}); setAssetAttempt((attempt) => attempt + 1); }} className="mt-2 min-h-9 rounded-lg border border-rose-300/30 px-3 font-bold">Retry assets</button></div>}<Canvas fallback={<div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-300">The 3D table needs WebGL. Enable hardware acceleration or open it in another browser.</div>} shadows dpr={[1, 1.5]} camera={{ position: defaultCameraPosition(scene.grid_width, scene.grid_height).toArray() as [number, number, number], fov: 44, near: 0.1, far: 300 }} onPointerMissed={() => { if (toolMode === "navigate" && !diceRequest && !fogEditing) onSelect(null, false); }}>
     <color attach="background" args={["#070b11"]} /><ambientLight intensity={1.25} /><directionalLight position={[12, 22, 10]} intensity={2.5} castShadow /><directionalLight position={[-12, 10, -8]} intensity={0.8} />
     <BoardBase width={scene.grid_width} height={scene.grid_height} />
     <BattleMap key={`${scene.map_storage_path}:${assetAttempt}`} scene={scene} supabase={supabase} onError={setMapError} />
@@ -385,9 +386,9 @@ export function VttCanvas({
     {fogEditing ? <VttFogDraftOverlay points={fogDraftPoints} shape={fogShape} operation={fogOperation} /> : null}
     <MeasurementOverlay mode={toolMode} start={measureStart} end={measureEnd} />
     <PingOverlay ping={ping} />
-    {isDm && terrainInstances.length > 0 ? <VttTerrainLayer instances={terrainInstances} assets={terrainAssets} supabase={supabase}
+    {isDm && terrainInstances.length > 0 ? <VttTerrainLayer key={assetAttempt} instances={terrainInstances} assets={terrainAssets} supabase={supabase}
       selectedId={selectedTerrainId} canSelect={toolMode === "terrain" && !diceRequest && !fogEditing}
-      onSelect={(id) => onTerrainSelect?.(id)} /> : null}
+      onSelect={(id) => onTerrainSelect?.(id)} onError={setTerrainError} /> : null}
     {tokens.map((token) => <TokenMesh key={`${token.id}:${tokenAssetKey(token)}:${assetAttempt}`} assetCache={assetCache} token={token} selected={selectedIds.includes(token.id)} currentTurn={scene.initiative_active && token.id === scene.initiative_current_token_id} showNameplate={scene.show_nameplates} isDm={isDm} canDrag={toolMode === "navigate" && !diceRequest && !fogEditing} supabase={supabase} onSelect={onSelect} onDragStart={(id) => setDraggingId(id)} onAssetSettled={assetSettled} />)}
     {diceRequest ? <VttDiceLayer key={diceRequest.rollId} request={diceRequest} sceneWidth={scene.grid_width} sceneHeight={scene.grid_height} onComplete={onDiceComplete} onImpact={onDiceImpact} /> : null}
     <VttOrbitControls disabled={Boolean(draggingId) || measuring || fogEditing} width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />

@@ -36,7 +36,7 @@ export function VttTerrainPanel({assets,instances,activeAssetId,selected,busy,lo
     {notice&&<p role="status" className="text-xs text-emerald-200">{notice}</p>}
     {loading&&<p className="text-xs text-slate-500">Loading saved models…</p>}
     <div className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
-      {assets.map(asset=><button type="button" key={asset.id} disabled={busy} onClick={()=>onAsset(asset.id)}
+      {assets.filter((asset)=>asset.status!=="archived").map(asset=><button type="button" key={asset.id} disabled={busy} onClick={()=>onAsset(asset.id)}
         className={`w-full rounded-xl border px-3 py-2.5 text-left disabled:opacity-40 ${activeAssetId===asset.id?"border-cyan-400 bg-cyan-400/15 text-cyan-50":"border-slate-700 bg-slate-950/60 text-slate-200 hover:border-cyan-400/35"}`}>
         <span className="block truncate text-xs font-bold">{asset.name}</span>
         <span className="block text-[10px] capitalize text-slate-500">{asset.category} · {asset.status} · {asset.default_scale.toFixed(2)}x</span>

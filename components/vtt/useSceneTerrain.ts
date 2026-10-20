@@ -33,7 +33,7 @@ export function useSceneTerrain(campaignId: string, sceneId: string | null, grid
     setLoading(true);
     try {
       const [modelResult, sceneResult] = await Promise.all([
-        supabase.from("vtt_terrain_assets").select(ASSET_FIELDS).eq("campaign_id",campaignId).neq("status","archived").order("name"),
+        supabase.from("vtt_terrain_assets").select(ASSET_FIELDS).eq("campaign_id",campaignId).order("name"),
         supabase.from("vtt_scene_terrain_instances").select(INSTANCE_FIELDS).eq("campaign_id",campaignId).eq("scene_id",sceneId).order("created_at"),
       ]);
       if (modelResult.error) throw modelResult.error;
@@ -87,7 +87,7 @@ export function useSceneTerrain(campaignId: string, sceneId: string | null, grid
   }, [isDm,refresh,sceneId]);
 
   const place = useCallback(async (point: [number,number]) => {
-    if (!sceneId || !activeAsset || !isDm) return false;
+    if (!sceneId || !activeAsset || !isDm || activeAsset.status === "archived") return false;
     const [x,z] = clampTerrainPoint(point[0],point[1],gridWidth,gridHeight);
     const assetId = activeAsset.id;
     return mutate(async () => {
