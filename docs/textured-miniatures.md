@@ -1,6 +1,19 @@
 # Textured miniatures and visual scale
 
-The GM character miniature manager and enemy studio accept STL and self-contained glTF 2.0 binary (`.glb`) files up to 50 MB. GLB imports retain every scene mesh, node transform, material and embedded texture. Source files remain unchanged; the web copy records calibration in `asset.extras.nattauMiniature` and keeps the original binary chunk byte for byte.
+The GM character miniature manager and enemy studio accept STL and self-contained glTF 2.0 binary (`.glb`) files up to 75 MB. GLB imports retain every scene mesh, node transform, material and embedded texture. Source files remain unchanged; the web copy records calibration in `asset.extras.nattauMiniature` and keeps the original binary chunk byte for byte.
+
+## 75 MB rollout status
+
+The 75 MB increase is prepared on `feature/miniature-75mb-limit` and is **not active** on the shared Supabase project. On 2026-10-20 the organization was verified to use Free, which caps individual uploads at 50 MB. Raising only the application or bucket limit cannot override that service limit.
+
+Before releasing this branch:
+
+1. Obtain approval for a paid Supabase plan and upgrade the organization.
+2. Set the project's global Storage file size limit to at least **78,643,200 bytes (75 MiB)**.
+3. Apply `supabase/migrations/20261020053537_miniature_file_limit_75mb.sql` after the existing GLB registration migration. It updates both model buckets, all four source/web table constraints, registration and legacy derivative attachment checks.
+4. Deploy this branch and verify a real upload between 50 and 75 MB. The original source and calibrated web file must each fit the limit; adding calibration metadata can make a file exactly at the limit slightly larger.
+
+The original GLB preview branch retains the working 50 MB limit until this rollout is approved. [Supabase file limits](https://supabase.com/docs/guides/storage/uploads/file-limits).
 
 ## Using the import
 

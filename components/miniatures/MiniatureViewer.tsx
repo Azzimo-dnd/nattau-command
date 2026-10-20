@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { disposeMiniatureScene, loadMiniatureAsset, type MiniatureAsset } from "./miniatureAsset";
 import { MiniatureObject } from "./MiniatureObject";
-import { scaleToReferenceHeight, validVisualScale } from "./miniatureGlb";
+import { MINIATURE_FILE_LIMIT, scaleToReferenceHeight, validVisualScale } from "./miniatureGlb";
 import { useMiniatureReference } from "./useMiniatureReference";
 
 export type MiniatureModelInfo = {
@@ -56,7 +56,7 @@ function CameraRig({ height, width, depth, resetKey }: { height: number; width: 
   return null;
 }
 
-export function MiniatureViewer({ sourceFile, allowFilePicker = true, disabled = false, campaignId, visualScale, onVisualScaleChange, onLocalFileLoaded, onLocalFileCleared, emptyTitle = "Choose a miniature", emptyCopy = "Drop an STL or a GLB with embedded textures here. Maximum 50 MB." }: Props = {}) {
+export function MiniatureViewer({ sourceFile, allowFilePicker = true, disabled = false, campaignId, visualScale, onVisualScaleChange, onLocalFileLoaded, onLocalFileCleared, emptyTitle = "Choose a miniature", emptyCopy = `Drop an STL or a GLB with embedded textures here. Maximum ${MINIATURE_FILE_LIMIT}.` }: Props = {}) {
   const [model, setModel] = useState<LoadedModel | null>(null);
   const modelRef = useRef<LoadedModel | null>(null);
   const [referenceModel, setReferenceModel] = useState<{ file: File; asset: MiniatureAsset } | null>(null);
@@ -153,7 +153,7 @@ export function MiniatureViewer({ sourceFile, allowFilePicker = true, disabled =
       {allowFilePicker ? <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
         <h3 className="font-bold text-slate-100">Import miniature</h3><p className="mt-2 text-xs leading-5 text-slate-400">GLB keeps embedded textures and all model parts. STL remains available for printable models.</p>
         <input aria-label="Miniature file" ref={inputRef} type="file" accept=".stl,.glb,model/gltf-binary,model/stl" className="hidden" disabled={disabled} onChange={(event) => { if (event.target.files?.[0]) pick(event.target.files[0]); event.currentTarget.value = ""; }} />
-        <button type="button" disabled={disabled || loading} onClick={() => inputRef.current?.click()} className={`${button} mt-3 w-full`}>Choose STL / GLB</button><p className="mt-2 text-[11px] text-slate-500">Up to 50 MB · Embedded PNG/JPEG textures · No Draco/KTX2 compression</p>
+        <button type="button" disabled={disabled || loading} onClick={() => inputRef.current?.click()} className={`${button} mt-3 w-full`}>Choose STL / GLB</button><p className="mt-2 text-[11px] text-slate-500">Up to {MINIATURE_FILE_LIMIT} · Embedded PNG/JPEG textures · No Draco/KTX2 compression</p>
       </section> : null}
       {onVisualScaleChange && model ? <section className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4">
         <label className="text-sm font-bold text-cyan-100">Default visual scale

@@ -3,7 +3,7 @@ import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
-import { calibrateGlb, MAX_MINIATURE_BYTES, miniatureFileFormat, readGlb } from "./miniatureGlb";
+import { calibrateGlb, MAX_MINIATURE_BYTES, MINIATURE_FILE_LIMIT, miniatureFileFormat, readGlb } from "./miniatureGlb";
 
 export type LoadedMiniatureGeometry = {
   geometry: THREE.BufferGeometry;
@@ -14,7 +14,7 @@ export type LoadedMiniatureGeometry = {
 };
 
 function fileFormat(file: File): "stl" | "glb" {
-  if (!file.size || file.size > MAX_MINIATURE_BYTES) throw new Error("Choose a non-empty miniature file up to 50 MB.");
+  if (!file.size || file.size > MAX_MINIATURE_BYTES) throw new Error(`Choose a non-empty miniature file up to ${MINIATURE_FILE_LIMIT}.`);
   return miniatureFileFormat(file.name);
 }
 
