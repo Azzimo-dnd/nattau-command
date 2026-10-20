@@ -73,7 +73,7 @@ test("GM can edit a saved asset and remove metadata + file; players cannot mutat
     assert.equal((await db.query("delete from storage.objects returning id")).rows.length,0);
   });
   await asUser(gm, async () => {
-    const changed = await db.query("update vtt_terrain_assets set name='UC Crates', status='approved', default_scale=1.6 where storage_path=$1 returning name,status,default_scale,updated_at",[path]);
+    const changed = await db.query<{name:string;status:string;default_scale:number;updated_at:string}>("update vtt_terrain_assets set name='UC Crates', status='approved', default_scale=1.6 where storage_path=$1 returning name,status,default_scale,updated_at",[path]);
     assert.equal(changed.rows.length,1);
     assert.equal(changed.rows[0].name,"UC Crates");
     assert.equal(changed.rows[0].status,"approved");
@@ -86,7 +86,7 @@ test("GM can edit a saved asset and remove metadata + file; players cannot mutat
 });
 
 test("invalid paths are denied safely without throwing UUID cast errors", async () => {
-  const result = await db.query("select public.vtt_terrain_path_campaign('not-a-uuid/test.glb') as campaign");
+  const result = await db.query<{campaign:string|null}>("select public.vtt_terrain_path_campaign('not-a-uuid/test.glb') as campaign");
   assert.equal(result.rows[0].campaign,null);
   await asUser(gm,async () => {
     await assert.rejects(db.query("insert into storage.objects(bucket_id,name) values ('vtt-terrain-assets','not-a-uuid/test.glb')"),/row-level security/i);
