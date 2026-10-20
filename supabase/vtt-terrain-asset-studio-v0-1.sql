@@ -25,7 +25,7 @@ create table if not exists public.vtt_terrain_assets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint terrain_asset_storage_key check (
-    storage_path ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.glb$'
+    storage_path ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[.]glb$'
     and split_part(storage_path,'/',1) = campaign_id::text
   ),
   constraint terrain_recipe_source check (
@@ -90,7 +90,7 @@ drop policy if exists "Terrain files GM create" on storage.objects;
 create policy "Terrain files GM create" on storage.objects for insert to authenticated
 with check (
  bucket_id = 'vtt-terrain-assets'
- and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.glb$'
+ and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[.]glb$'
  and public.is_campaign_dm(public.vtt_terrain_path_campaign(name))
 );
 drop policy if exists "Terrain files GM delete" on storage.objects;
