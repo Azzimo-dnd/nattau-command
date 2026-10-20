@@ -66,7 +66,12 @@ export function TerrainAssetViewer({ recipe, file, campaignId, scale, referenceM
   const [view, setView] = useState<View>("fit");
   const [viewTick, setViewTick] = useState(0);
   const [showGrid, setShowGrid] = useState(true);
-  const generated = useMemo(() => recipe && !file ? createTerrainModel(recipe) : null, [file, recipe]);
+  const generatedResult = useMemo(() => {
+    if (!recipe || file) return {model: null as THREE.Group | null, error: null as string | null};
+    try { return { model: createTerrainModel(recipe), error: null as string | null }; }
+    catch (cause) { return { model: null, error: cause instanceof Error ? cause.message : "Invalid generator parameters." }; }
+  }, [file, recipe]);
+  const generated = generatedResult.model;
   useEffect(() => () => { if (generated) disposeTerrainModel(generated); }, [generated]);
   useEffect(() => {
     let alive = true;
@@ -113,7 +118,7 @@ export function TerrainAssetViewer({ recipe, file, campaignId, scale, referenceM
           <MiniatureObject asset={actualReference} scale={actualReference.baseScale * actualReference.visualScale}/>
         </group>}
         <CameraController metrics={metrics} scale={scale} view={view} tick={viewTick}/>
-      </Canvas> : <div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-400">{loading ? "Loading 3D asset…" : error ?? "Select a UC preset or a saved terrain model."}</div>}
+      </Canvas> : <div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-400">{loading ? "Loading 3D asset…" : generatedResult.error ?? error ?? "Select a UC preset or a saved terrain model."}</div>}
       <div className="pointer-events-none absolute bottom-3 left-3 rounded-xl bg-slate-950/85 px-3 py-2 text-[11px] text-slate-300">1 grid unit = 1 VTT square · drag to orbit · scroll to zoom</div>
     </div>
     {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}

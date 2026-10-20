@@ -20,7 +20,19 @@ function downloadFile(file: File) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 function fmtSize(bytes: number) { return bytes >= 1024*1024 ? (bytes/(1024*1024)).toFixed(2) + " MB" : Math.round(bytes/1024) + " KB"; }
-function fmtUnits(value: number) { return value.toFixed(2) + " sq"; }
+function fmtUnits(value: number) { return value.toFixed(2) + " squares"; }
+type NumericParameter = { key: string; label: string; min: number; max: number; step: number };
+function recipeParameters(recipe: TerrainRecipe): NumericParameter[] {
+  const field = (key: string, label: string, min: number, max: number, step = 0.05) => ({key,label,min,max,step});
+  switch (recipe.kind) {
+    case "crate": return [field("width","Width",0.2,10),field("depth","Depth",0.2,10),field("height","Height",0.2,10),field("wear","Wear",0,1,0.05)];
+    case "barrel": return [field("radius","Radius",0.12,5),field("height","Height",0.2,10),field("hoops","Iron hoops",1,6,1),field("wear","Wear",0,1,0.05)];
+    case "fence": return [field("length","Length",0.3,20),field("height","Height",0.2,10),field("posts","Posts",2,30,1),field("wear","Wear",0,1,0.05)];
+    case "barricade": return [field("width","Width",0.5,20),field("height","Height",0.3,10),field("clutter","Boards",2,50,1)];
+    case "planks": return [field("width","Width",0.5,20),field("depth","Depth",0.5,20),field("beams","Broken beams",1,60,1),field("damage","Damage",0,1,0.05)];
+    case "hull": return [field("width","Width",0.5,20),field("height","Height",0.4,10),field("damage","Damage",0,1,0.05)];
+  }
+}
 
 export function TerrainAssetStudio({ campaignId, campaignSlug }: { campaignId: string; campaignSlug: string }) {
   const library = useTerrainAssets(campaignId);
@@ -192,7 +204,7 @@ export function TerrainAssetStudio({ campaignId, campaignSlug }: { campaignId: s
               <option value="dummy">Humanoid dummy (1.8 squares)</option><option value="pippo">Pippo / campaign miniature</option><option value="none">None</option>
             </select></label>
           <label className="flex-1 text-xs text-slate-300">Preview scale · {Math.round(visualScale*100)}%
-            <input type="range" min="0.1" max="3" step="0.05" value={visualScale} onChange={(e) => setVisualScale(Number(e.target.value))}
+            <input type="range" min="0.1" max="10" step="0.05" value={visualScale} onChange={(e) => setVisualScale(Number(e.target.value))}
               className="mt-4 block w-full accent-cyan-400"/></label>
         </div>
         {metrics && <div className="grid grid-cols-2 gap-2 text-xs text-slate-300 sm:grid-cols-4">
@@ -221,6 +233,21 @@ export function TerrainAssetStudio({ campaignId, campaignSlug }: { campaignId: s
             <input aria-label="Generator seed" type="number" min={0} max={4294967295} step={1} value={recipe.seed}
               onChange={(e) => setRecipe({...recipe,seed:Number(e.target.value)} as TerrainRecipe)}
               className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"/></label>
+          <div className="grid grid-cols-2 gap-2">
+            {recipeParameters(recipe).map((parameter) => <label key={parameter.key} className="block text-[11px] text-slate-400">
+              {parameter.label}
+              <input type="number" min={parameter.min} max={parameter.max} step={parameter.step}
+                value={Number((recipe as unknown as Record<string,unknown>)[parameter.key])}
+                onChange={(e) => setRecipe((current) => ({...current,[parameter.key]:Number(e.target.value)} as TerrainRecipe))}
+                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs"/>
+            </label>)}
+          </div>
+          {"reinforced" in recipe && <label className="flex items-center gap-2 text-xs text-slate-300">
+            <input type="checkbox" checked={recipe.reinforced} onChange={(e) => setRecipe({...recipe,reinforced:e.target.checked})}/> Iron reinforcements
+          </label>}
+          {"broken" in recipe && <label className="flex items-center gap-2 text-xs text-slate-300">
+            <input type="checkbox" checked={recipe.broken} onChange={(e) => setRecipe({...recipe,broken:e.target.checked})}/> Broken variant
+          </label>}
           <button type="button" onClick={regenerate} className="w-full rounded-lg border border-amber-400/35 px-3 py-2 text-xs font-bold text-amber-200">Generate next variant</button>
         </div>}
         {selectedSaved && <div className="space-y-2 text-xs text-slate-300">
