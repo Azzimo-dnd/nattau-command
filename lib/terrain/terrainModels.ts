@@ -49,8 +49,6 @@ export async function readTerrainFile(file: File) {
   try {
     const metrics = terrainMetrics(root);
     const normalized = new THREE.Group();
-    root.position.set(-metrics.width/2,0,0); // overwritten below using actual transformed bounds
-    root.position.set(0,0,0);
     root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(root, true);
     root.position.set(-(box.min.x + box.max.x)/2, -box.min.y, -(box.min.z + box.max.z)/2);

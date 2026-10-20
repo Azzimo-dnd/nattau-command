@@ -57,7 +57,7 @@ export function TerrainAssetStudio({ campaignId, campaignSlug }: { campaignId: s
     if (!incoming) return;
     try {
       validateTerrainFile(incoming);
-      setFile(incoming); setName(incoming.name.replace(/\\.glb$/i,"")); setCategory("cargo");
+      setFile(incoming); setName(incoming.name.replace(/\.glb$/i,"")); setCategory("cargo");
       setSelection({kind:"upload"}); setVisualScale(1); setLocalError(null); setMetrics(null);
     } catch (cause) { setLocalError(cause instanceof Error ? cause.message : "Invalid GLB."); }
   };
@@ -99,8 +99,8 @@ export function TerrainAssetStudio({ campaignId, campaignSlug }: { campaignId: s
     finally { setExporting(false); }
   };
   const save = () => {
-    if (activeRecipe) void library.saveGenerated(activeRecipe, name, category);
-    else if (selection.kind === "upload" && selectedFile) void library.saveUpload(selectedFile, name, category);
+    if (activeRecipe) void library.saveGenerated(activeRecipe, name, category, visualScale);
+    else if (selection.kind === "upload" && selectedFile) void library.saveUpload(selectedFile, name, category, visualScale);
   };
   const regenerate = () => {
     if (!activeRecipe) return;
@@ -244,7 +244,7 @@ export function TerrainAssetStudio({ campaignId, campaignSlug }: { campaignId: s
             onClick={save} className="w-full rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-3 py-3 text-xs font-black text-emerald-100 disabled:opacity-40">
             {library.busy ? "Saving…" : "Save draft to terrain library"}
           </button>}
-          <p className="text-xs leading-5 text-slate-500">Saving a draft does not place anything on a VTT scene. Terrain placement will be developed separately.</p>
+          <p className="text-xs leading-5 text-slate-500">Export downloads the original GLB geometry; preview scaling is saved as library metadata. Saving a draft does not place anything on a VTT scene.</p>
         </div>
       </aside>
     </div>

@@ -37,10 +37,11 @@ export function useTerrainAssets(campaignId: string) {
 
   const store = useCallback(async (
     file: File, metrics: TerrainModelMetrics,
-    name: string, category: TerrainCategory, sourceKind: "generated" | "uploaded", recipe: TerrainRecipe | null
+    name: string, category: TerrainCategory, sourceKind: "generated" | "uploaded", recipe: TerrainRecipe | null, visualScale: number
   ) => {
     if (!backendReady) throw new Error("Terrain persistence is not configured. Use the local preview and GLB export until the migration is applied.");
     validateTerrainFile(file);
+    if (!Number.isFinite(visualScale) || visualScale < 0.1 || visualScale > 10) throw new Error("Visual scale must be between 10% and 1000%.");
     if (!name.trim() || name.trim().length > 120) throw new Error("Name must have between 1 and 120 characters.");
     const storagePath = campaignId + "/" + crypto.randomUUID() + ".glb";
     const { error: storageError } = await supabase.storage.from(BUCKET).upload(storagePath, file, {
@@ -53,7 +54,7 @@ export function useTerrainAssets(campaignId: string) {
         storage_path: storagePath, original_name: file.name, file_size_bytes: file.size,
         mesh_count: metrics.meshes, triangle_count: metrics.triangles,
         width_units: metrics.width, height_units: metrics.height, depth_units: metrics.depth,
-        default_scale: 1, has_textures: metrics.hasTextures, pivot_mode: "centered_base",
+        default_scale: visualScale, has_textures: metrics.hasTextures, pivot_mode: "centered_base",
         generator_recipe: recipe,
       });
       if (insertError) throw insertError;
@@ -66,26 +67,26 @@ export function useTerrainAssets(campaignId: string) {
     await refresh();
   }, [backendReady, campaignId, refresh, supabase]);
 
-  const saveGenerated = useCallback(async (recipe: TerrainRecipe, name: string, category: TerrainCategory) => {
+  const saveGenerated = useCallback(async (recipe: TerrainRecipe, name: string, category: TerrainCategory, visualScale = 1) => {
     if (busy) return;
     setBusy(true); setError(null); setMessage(null);
     try {
       const prepared = await generateTerrainFile(recipe, name);
-      await store(prepared.file, prepared.metrics, name, category, "generated", recipe);
+      await store(prepared.file, prepared.metrics, name, category, "generated", recipe, visualScale);
       setMessage(name + " saved as a draft terrain asset.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save generated terrain.");
     } finally { setBusy(false); }
   }, [busy, store]);
 
-  const saveUpload = useCallback(async (file: File, name: string, category: TerrainCategory) => {
+  const saveUpload = useCallback(async (file: File, name: string, category: TerrainCategory, visualScale = 1) => {
     if (busy) return;
     setBusy(true); setError(null); setMessage(null);
     try {
       const parsed = await readTerrainFile(file);
       const metrics = parsed.metrics;
       disposeTerrainModel(parsed.model);
-      await store(file, metrics, name, category, "uploaded", null);
+      await store(file, metrics, name, category, "uploaded", null, visualScale);
       setMessage(name + " uploaded as a draft terrain asset.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not upload terrain.");
