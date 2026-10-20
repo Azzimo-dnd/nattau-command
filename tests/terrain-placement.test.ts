@@ -8,7 +8,7 @@ const db = new PGlite();
 const uuid = (n:number) => "00000000-0000-4000-8000-" + String(n).padStart(12,"0");
 const [nattau,barovia,gm,player,outsider,scene,asset,otherScene,otherAsset]=Array.from({length:9},(_,i)=>uuid(i+1));
 const initial=readFileSync(new URL("../supabase/migrations/20261020102957_vtt_terrain_asset_studio_alpha.sql",import.meta.url),"utf8");
-const placement=readFileSync(new URL("../supabase/migrations/20261020141000_vtt_scene_terrain_instances_alpha.sql",import.meta.url),"utf8");
+const placement=readFileSync(new URL("../supabase/migrations/20261020111442_vtt_scene_terrain_instances_alpha.sql",import.meta.url),"utf8");
 
 async function asUser<T>(user:string,fn:()=>Promise<T>){
   await db.query("select set_config('request.jwt.claim.sub',$1,false)",[user]);
