@@ -41,6 +41,12 @@ test("private terrain bucket and campaign GM-only RLS", async () => {
   await asUser(gm,async () => {
     await db.query(insertSQL,[nattau,path,JSON.stringify({kind:"crate",seed:1})]);
     assert.equal((await db.query("select name from vtt_terrain_assets")).rows.length,1);
+    const decision = await db.query<{campaign:string|null;allowed:boolean;matches:boolean}>(
+      "select public.vtt_terrain_path_campaign($1) as campaign,public.is_campaign_dm(public.vtt_terrain_path_campaign($1)) as allowed,$1::text ~ $2 as matches",
+      [path,"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.glb$"]);
+    assert.equal(decision.rows[0].campaign,nattau,JSON.stringify(decision.rows[0]));
+    assert.equal(decision.rows[0].allowed,true,JSON.stringify(decision.rows[0]));
+    assert.equal(decision.rows[0].matches,true,JSON.stringify(decision.rows[0]));
     await db.query("insert into storage.objects(bucket_id,name) values ('vtt-terrain-assets',$1)",[path]);
     assert.equal((await db.query("select name from storage.objects")).rows.length,1);
   });
