@@ -36,8 +36,8 @@ before(async ()=>{
   await db.query("insert into test_members values ($1,$2,'dm'),($3,$4,'player')",[nattau,gm,barovia,player]);
   await db.query("insert into vtt_scenes values ($1,$2,24,18),($3,$4,24,18)",[scene,nattau,otherScene,barovia]);
   await db.exec(initial);
-  await db.query("insert into vtt_terrain_assets(id,campaign_id,name,category,source_kind,storage_path,original_name,file_size_bytes,mesh_count,triangle_count,width_units,height_units,depth_units,generator_recipe,created_by) values ($1,$2,'Crate','cargo','generated',$3,'crate.glb',2048,2,48,1,1,1,'{\\"kind\\":\\"crate\\"}'::jsonb,$4),($5,$6,'Secret crate','cargo','generated',$7,'secret.glb',2048,2,48,1,1,1,'{\\"kind\\":\\"crate\\"}'::jsonb,$4)",
-    [asset,nattau,nattau+"/"+uuid(90)+".glb",gm,otherAsset,barovia,barovia+"/"+uuid(91)+".glb"]);
+  await db.query("insert into vtt_terrain_assets(id,campaign_id,name,category,source_kind,storage_path,original_name,file_size_bytes,mesh_count,triangle_count,width_units,height_units,depth_units,generator_recipe,created_by) values ($1,$2,'Crate','cargo','generated',$3,'crate.glb',2048,2,48,1,1,1,$8::jsonb,$4),($5,$6,'Secret crate','cargo','generated',$7,'secret.glb',2048,2,48,1,1,1,$8::jsonb,$4)",
+    [asset,nattau,nattau+"/"+uuid(90)+".glb",gm,otherAsset,barovia,barovia+"/"+uuid(91)+".glb",JSON.stringify({kind:"crate",seed:4})]);
   await db.exec(placement);
 });
 after(async()=>await db.close());
