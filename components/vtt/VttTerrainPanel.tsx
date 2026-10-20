@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { TerrainAssetRow } from "@/lib/terrain/terrainTypes";
 import type { VttSceneTerrainInstance } from "./terrainSceneTypes";
 
@@ -24,6 +25,8 @@ type Props={
 
 export function VttTerrainPanel({assets,instances,activeAssetId,selected,busy,loading,error,notice,toolActive,
   onAsset,onSelect,onRotate,onScale,onDuplicate,onDelete,onRefresh}:Props){
+  const [scaleDraft,setScaleDraft]=useState(selected?.scale??1);
+  useEffect(()=>{setScaleDraft(selected?.scale??1);},[selected?.id,selected?.scale]);
   const baseButton="min-h-9 rounded-xl border border-slate-700 bg-slate-950/70 px-3 text-xs font-bold text-slate-200 disabled:opacity-40 hover:border-cyan-400/40";
   return <section className="space-y-3 rounded-[26px] border border-cyan-300/20 bg-slate-900/75 p-4">
     <div className="flex items-center justify-between gap-2">
@@ -60,10 +63,12 @@ export function VttTerrainPanel({assets,instances,activeAssetId,selected,busy,lo
         <button type="button" className={baseButton} disabled={busy} onClick={()=>onRotate(-Math.PI/4)}>↶ Rotate 45°</button>
         <button type="button" className={baseButton} disabled={busy} onClick={()=>onRotate(Math.PI/4)}>↷ Rotate 45°</button>
       </div>
-      <label className="block text-xs text-slate-400">Size: {selected.scale.toFixed(2)}x
+      <label className="block text-xs text-slate-400">Size: {scaleDraft.toFixed(2)}x
         <input type="range" className="mt-2 w-full accent-cyan-400" min="0.1" max="5" step="0.05"
-          disabled={busy} value={selected.scale} onChange={e=>onScale(Number(e.target.value))}/>
+          disabled={busy} value={scaleDraft} onChange={e=>setScaleDraft(Number(e.target.value))}/>
       </label>
+      <button type="button" className={baseButton+" w-full"} disabled={busy||Math.abs(scaleDraft-selected.scale)<0.001}
+        onClick={()=>onScale(scaleDraft)}>Apply scale</button>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" className={baseButton} disabled={busy} onClick={onDuplicate}>Duplicate</button>
         <button type="button" className="min-h-9 rounded-xl border border-rose-400/30 px-3 text-xs font-bold text-rose-200 disabled:opacity-40" disabled={busy} onClick={onDelete}>Delete</button>
