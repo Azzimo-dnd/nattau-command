@@ -52,7 +52,7 @@ test("same recipe and seed reproduce identical geometry and stats", () => {
       const snapshot: number[][] = [];
       obj.traverse((child) => { if (child instanceof THREE.Mesh) {
         child.updateMatrixWorld(true);
-        snapshot.push([...child.matrixWorld.elements, ...Array.from(child.geometry.getAttribute("position").array)]);
+        snapshot.push([...child.matrixWorld.elements, ...Array.from(child.geometry.getAttribute("position").array as ArrayLike<number>)]);
       }});
       return snapshot;
     };
@@ -62,6 +62,7 @@ test("same recipe and seed reproduce identical geometry and stats", () => {
 
 test("reject unsafe procedural parameters and invalid terrain imports", () => {
   const source = TERRAIN_PRESETS[0].recipe;
+  if (source.kind !== "crate") throw new Error("Test fixture must be crate.");
   assert.throws(() => validateTerrainRecipe({...source,seed:-1}),/Seed/);
   assert.throws(() => validateTerrainRecipe({...source,seed:1.2}),/integer/);
   assert.throws(() => validateTerrainRecipe({...source,width:NaN}),/Width/);
