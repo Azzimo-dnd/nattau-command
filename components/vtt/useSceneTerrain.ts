@@ -102,6 +102,17 @@ export function useSceneTerrain(campaignId: string, sceneId: string | null, grid
     });
   }, [activeAsset,campaignId,gridHeight,gridWidth,isDm,mutate,sceneId,supabase]);
 
+  /** Persist a drag by stable object ID, not the selected row (which may change mid-drag). */
+  const moveInstance = useCallback((id:string,point:[number,number]) => mutate(async () => {
+    const [x,z]=clampTerrainPoint(point[0],point[1],gridWidth,gridHeight);
+    const {data,error:moveError}=await supabase.from("vtt_scene_terrain_instances")
+      .update({position_x:x,position_z:z})
+      .eq("id",id).eq("scene_id",sceneId!).eq("campaign_id",campaignId).select("id");
+    if(moveError)throw moveError;
+    if(data?.length!==1)throw new Error("Terrain object was not moved; please refresh.");
+    return "Terrain position saved.";
+  }),[campaignId,gridHeight,gridWidth,mutate,sceneId,supabase]);
+
   const removeSelected = useCallback(() => mutate(async () => {
     if (!selectedId) throw new Error("Select a placed object first.");
     const { data, error: deleteError } = await supabase.from("vtt_scene_terrain_instances")
@@ -144,5 +155,5 @@ export function useSceneTerrain(campaignId: string, sceneId: string | null, grid
   }),[campaignId,gridWidth,gridHeight,mutate,sceneId,selected,supabase]);
 
   return {assets,instances,activeAsset,activeAssetId,setActiveAssetId,
-    selected,selectedId,setSelectedId,loading,busy,error,notice,refresh,place,removeSelected,updateSelected,duplicateSelected};
+    selected,selectedId,setSelectedId,loading,busy,error,notice,refresh,place,moveInstance,removeSelected,updateSelected,duplicateSelected};
 }

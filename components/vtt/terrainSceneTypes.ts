@@ -32,3 +32,26 @@ export function normalizeTerrainRotation(value: number) {
   const tau = Math.PI * 2;
   return ((value % tau) + tau) % tau;
 }
+
+/** Calculate a new terrain pivot from a ground-plane drag, preserving where the GM grabbed it. */
+export function terrainDragPoint(
+  original: readonly [number,number],
+  originHit: readonly [number,number],
+  currentHit: readonly [number,number],
+  width:number,height:number,
+  snap:boolean,
+): [number,number] {
+  if (![...original,...originHit,...currentHit].every(Number.isFinite)) {
+    throw new Error("Invalid terrain pointer position.");
+  }
+  const rawX=original[0]+currentHit[0]-originHit[0];
+  const rawZ=original[1]+currentHit[1]-originHit[1];
+  const [x,z]=clampTerrainPoint(rawX,rawZ,width,height);
+  if (!snap) return [x,z];
+  const center=(value:number,extent:number) => {
+    const min=-extent/2+0.5;
+    const max=extent/2-0.5;
+    return Math.max(min,Math.min(max,min+Math.round(value-min)));
+  };
+  return [center(x,width),center(z,height)];
+}

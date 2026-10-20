@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { clampTerrainPoint, normalizeTerrainRotation } from "../components/vtt/terrainSceneTypes";
+import { clampTerrainPoint, normalizeTerrainRotation, terrainDragPoint } from "../components/vtt/terrainSceneTypes";
 
 const db = new PGlite();
 const uuid = (n:number) => "00000000-0000-4000-8000-" + String(n).padStart(12,"0");
@@ -87,4 +87,16 @@ test("placement geometry clamps to bounds and normalizes rotation",()=>{
   assert.deepEqual(clampTerrainPoint(1,-2,24,18),[1,-2]);
   assert.ok(Math.abs(normalizeTerrainRotation(-Math.PI/2)-3*Math.PI/2)<1e-10);
   assert.throws(()=>clampTerrainPoint(NaN,0,24,18),/Invalid/);
+});
+
+test("terrain drag keeps mouse grab offset and clamps to the battlefield",()=>{
+  assert.deepEqual(terrainDragPoint([2,3],[2.2,3.2],[4.7,1.9],24,18,false),[4.5,1.6999999999999997]);
+  assert.deepEqual(terrainDragPoint([11,0],[1,0],[100,0],24,18,false),[11.5,0]);
+  assert.deepEqual(terrainDragPoint([0,0],[0.2,0.2],[0.2,0.2],24,18,false),[0,0]);
+  assert.throws(()=>terrainDragPoint([0,0],[0,0],[NaN,1],24,18,false),/Invalid terrain pointer/);
+});
+
+test("terrain grid snap centers props on cells when requested",()=>{
+  assert.deepEqual(terrainDragPoint([0,0],[0,0],[2.4,3.4],24,18,true),[2.5,3.5]);
+  assert.deepEqual(terrainDragPoint([0,0],[0,0],[-100,100],24,18,true),[-11.5,8.5]);
 });
