@@ -7,6 +7,21 @@ import { generateTerrainFile, readTerrainFile, terrainMetrics, validateTerrainFi
 import { readGlb } from "../components/miniatures/miniatureGlb";
 
 if (!globalThis.ProgressEvent) Object.assign(globalThis, { ProgressEvent: class { constructor(public type: string) {} } });
+// GLTFExporter uses FileReader in browsers; this minimal polyfill is only for Node CI.
+if (!globalThis.FileReader) Object.assign(globalThis, { FileReader: class {
+  result: ArrayBuffer | string | null = null;
+  onloadend: ((event: unknown) => void) | null = null;
+  onload: ((event: unknown) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
+  private load(blob: Blob, dataURL: boolean) {
+    void blob.arrayBuffer().then((buffer) => {
+      this.result = dataURL ? "data:" + (blob.type || "application/octet-stream") + ";base64," + Buffer.from(buffer).toString("base64") : buffer;
+      this.onload?.({target:this}); this.onloadend?.({target:this});
+    }).catch((cause) => this.onerror?.(cause));
+  }
+  readAsArrayBuffer(blob: Blob) { this.load(blob,false); }
+  readAsDataURL(blob: Blob) { this.load(blob,true); }
+} });
 
 test("eight UC terrain presets generate actual grounded 3D meshes", () => {
   assert.equal(TERRAIN_PRESETS.length, 8);
