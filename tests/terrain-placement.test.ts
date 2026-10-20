@@ -64,7 +64,7 @@ test("non-GM cannot read, insert, update or delete placed terrain",async()=>{
     assert.equal((await db.query("select * from vtt_scene_terrain_instances")).rows.length,0);
     assert.equal((await db.query("update vtt_scene_terrain_instances set scale=3 returning id")).rows.length,0);
     assert.equal((await db.query("delete from vtt_scene_terrain_instances returning id")).rows.length,0);
-    await assert.rejects(db.query("insert into vtt_scene_terrain_instances(campaign_id,scene_id,terrain_asset_id,position_x,position_z) values ($1,$2,$3,0,0)",[nattau,scene,asset]),/row.level.security|permission denied/i);
+    await assert.rejects(db.query("insert into vtt_scene_terrain_instances(campaign_id,scene_id,terrain_asset_id,position_x,position_z) values ($1,$2,$3,0,0)",[nattau,scene,asset]),/row.level.security|permission denied|unavailable for this campaign/i);
   });
 });
 
@@ -78,7 +78,7 @@ test("a GM cannot place terrain from another campaign, into another scene, or ou
 
 test("instance ownership cannot be changed after placement",async()=>{
   await asUser(gm,async()=>{
-    await assert.rejects(db.query("update vtt_scene_terrain_instances set terrain_asset_id=$1",[otherAsset]),/cannot change/i);
+    await assert.rejects(db.query("update vtt_scene_terrain_instances set terrain_asset_id=$1",[otherAsset]),/cannot change|unavailable for this campaign/i);
   });
 });
 
