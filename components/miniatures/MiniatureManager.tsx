@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { MiniatureViewer, type MiniatureModelInfo } from "./MiniatureViewer";
 import { prepareMiniatureWebFile } from "./miniatureModelFiles";
+import { MAX_MINIATURE_BYTES, MINIATURE_FILE_LIMIT } from "./miniatureGlb";
 
 type RosterRow = {
   player_id: string;
@@ -52,7 +53,6 @@ type Props = {
 };
 
 const BUCKET = "character-miniatures";
-const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 function formatBytes(bytes: number | null) {
   if (bytes == null) return "—";
@@ -206,8 +206,8 @@ export function MiniatureManager({ campaignId }: Props) {
     setError(null);
     setMessage(null);
 
-    if (candidate.file.size > MAX_FILE_BYTES) {
-      setError("The model is larger than the 50 MB miniature limit.");
+    if (candidate.file.size > MAX_MINIATURE_BYTES) {
+      setError(`The model is larger than the ${MINIATURE_FILE_LIMIT} miniature limit.`);
       return;
     }
 
@@ -394,7 +394,7 @@ export function MiniatureManager({ campaignId }: Props) {
               <button type="button" disabled={!candidate || uploading || Boolean(generatingGlb)} onClick={() => void uploadCandidate()} className="mt-5 min-h-12 w-full rounded-xl bg-yellow-500 px-5 text-sm font-black text-slate-950 transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-30 sm:w-auto">
                 {uploading ? "Uploading miniature…" : "Upload miniature & save scale"}
               </button>
-              <p className="mt-3 text-[11px] leading-5 text-slate-600">Private files · 50 MB maximum · Original source preserved · Default scale saved with the web model.</p>
+              <p className="mt-3 text-[11px] leading-5 text-slate-600">Private files · {MINIATURE_FILE_LIMIT} maximum · Original source preserved · Default scale saved with the web model.</p>
             </div>
 
             <div className="rounded-[28px] border border-slate-800 bg-slate-900/65 p-5">

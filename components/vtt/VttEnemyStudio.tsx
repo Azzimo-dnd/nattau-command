@@ -5,13 +5,13 @@ import { campaignPath } from "@/lib/campaigns/campaignPresentation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MiniatureViewer, type MiniatureModelInfo } from "@/components/miniatures/MiniatureViewer";
 import { prepareMiniatureWebFile } from "@/components/miniatures/miniatureModelFiles";
+import { MAX_MINIATURE_BYTES, MINIATURE_FILE_LIMIT } from "@/components/miniatures/miniatureGlb";
 import { createClient } from "@/lib/supabase/client";
 import type { VttEnemyModel } from "./vttTypes";
 
 type Props = { campaignId: string; campaignSlug?: string };
 type Candidate = { file: File; info: MiniatureModelInfo };
 const BUCKET = "vtt-enemy-models";
-const MAX_BYTES = 50 * 1024 * 1024;
 
 function formatBytes(value: number | null) {
   if (value == null) return "—";
@@ -56,8 +56,8 @@ export function VttEnemyStudio({ campaignId, campaignSlug = "nattau" }: Props) {
 
   const upload = async () => {
     if (!candidate || uploading || !name.trim()) return;
-    if (candidate.file.size > MAX_BYTES) {
-      setError("Enemy model exceeds the 50 MB limit.");
+    if (candidate.file.size > MAX_MINIATURE_BYTES) {
+      setError(`Enemy model exceeds the ${MINIATURE_FILE_LIMIT} limit.`);
       return;
     }
     setUploading(true); setError(null); setMessage(null);

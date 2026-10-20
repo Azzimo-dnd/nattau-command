@@ -3,7 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone as cloneSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import { loadMiniatureGeometry } from "./miniatureModelFiles";
 import { applyMiniaturePaintDocumentToGeometry, type MiniaturePaintDocument } from "./miniaturePaintData";
-import { glbCalibration, MAX_MINIATURE_BYTES, MINIATURE_FOOTPRINT, miniatureFileFormat, readGlb } from "./miniatureGlb";
+import { glbCalibration, MAX_MINIATURE_BYTES, MINIATURE_FILE_LIMIT, MINIATURE_FOOTPRINT, miniatureFileFormat, readGlb } from "./miniatureGlb";
 
 export type MiniatureAsset = {
   scene: THREE.Group;
@@ -20,7 +20,7 @@ export type MiniatureAsset = {
 
 /** Full, Y-up scene used by previews and the VTT. Never flatten imported GLBs. */
 export async function loadMiniatureAsset(file: File, paint?: MiniaturePaintDocument | null): Promise<MiniatureAsset> {
-  if (!file.size || file.size > MAX_MINIATURE_BYTES) throw new Error("Choose a non-empty miniature file up to 50 MB.");
+  if (!file.size || file.size > MAX_MINIATURE_BYTES) throw new Error(`Choose a non-empty miniature file up to ${MINIATURE_FILE_LIMIT}.`);
   const format = miniatureFileFormat(file.name);
   let source: THREE.Object3D;
   let visualScale = 1;

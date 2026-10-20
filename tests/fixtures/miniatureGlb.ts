@@ -1,10 +1,10 @@
 /** Small, deterministic multi-part fixture; no proprietary character assets. */
-export function makeMiniatureGlb(textured = false) {
+export function makeMiniatureGlb(textured = false, paddingBytes = 0) {
   const positions = new Float32Array([-0.5,0,0, 0.5,0,0, 0,1.6,0]);
   const uv = new Float32Array([0,0, 1,0, 0.5,1]);
   // Two-colour embedded PNG, rendered by browser regression checks.
   const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGElEQVR4nAXBAQEAAAjDIG7/zhMWiRPGAzIHBAEZ7zcwAAAAAElFTkSuQmCC"), (char) => char.charCodeAt(0));
-  const bin = new Uint8Array(Math.ceil((positions.byteLength + uv.byteLength + (textured ? png.length : 0)) / 4) * 4);
+  const bin = new Uint8Array(Math.ceil((positions.byteLength + uv.byteLength + (textured ? png.length : 0) + paddingBytes) / 4) * 4);
   bin.set(new Uint8Array(positions.buffer)); bin.set(new Uint8Array(uv.buffer), positions.byteLength);
   if (textured) bin.set(png, positions.byteLength + uv.byteLength);
   const json = {

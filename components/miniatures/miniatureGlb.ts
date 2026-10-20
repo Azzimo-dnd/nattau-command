@@ -1,6 +1,8 @@
 // Keep calibration in the GLB asset metadata. Updating this JSON chunk preserves
 // every mesh, material, texture, extension and byte of the original binary data.
-export const MAX_MINIATURE_BYTES = 50 * 1024 * 1024;
+export const MAX_MINIATURE_MB = 75;
+export const MAX_MINIATURE_BYTES = MAX_MINIATURE_MB * 1024 * 1024;
+export const MINIATURE_FILE_LIMIT = `${MAX_MINIATURE_MB} MB`;
 export const MIN_VISUAL_SCALE = 0.1;
 export const MAX_VISUAL_SCALE = 10;
 export const MINIATURE_FOOTPRINT = 0.82;
@@ -69,7 +71,7 @@ export function calibrateGlb(buffer: ArrayBuffer, calibration: MiniatureCalibrat
   const paddedLength = Math.ceil(encoded.length / 4) * 4;
   const tail = new Uint8Array(buffer, 20 + jsonLength);
   const result = new ArrayBuffer(20 + paddedLength + tail.length);
-  if (result.byteLength > MAX_MINIATURE_BYTES) throw new Error("The prepared GLB exceeds the 50 MB limit.");
+  if (result.byteLength > MAX_MINIATURE_BYTES) throw new Error(`The prepared GLB exceeds the ${MINIATURE_FILE_LIMIT} limit.`);
   const output = new Uint8Array(result);
   output.set(new Uint8Array(buffer, 0, 20));
   new DataView(result).setUint32(8, result.byteLength, true);

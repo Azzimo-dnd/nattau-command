@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as THREE from "three";
-import { calibrateGlb, glbCalibration, readGlb, scaleToReferenceHeight, miniatureFileFormat } from "../components/miniatures/miniatureGlb";
+import { calibrateGlb, glbCalibration, readGlb, scaleToReferenceHeight, miniatureFileFormat, MAX_MINIATURE_BYTES } from "../components/miniatures/miniatureGlb";
 import { disposeMiniatureScene, instantiateMiniature, loadMiniatureAsset } from "../components/miniatures/miniatureAsset";
 import { makeMiniatureGlb } from "./fixtures/miniatureGlb";
+import { prepareMiniatureWebFile } from "../components/miniatures/miniatureModelFiles";
 
 // GLTFLoader uses browser ProgressEvent even when parsing embedded buffers in Node.
 if (!globalThis.ProgressEvent) Object.assign(globalThis, { ProgressEvent: class { constructor(public type: string) {} } });
@@ -48,4 +49,18 @@ test("rejects invalid formats, truncated GLBs and invalid scales before upload",
   assert.equal(scaleToReferenceHeight(0, 3), null);
   assert.equal(scaleToReferenceHeight(0.01, 3), null);
   await assert.rejects(loadMiniatureAsset(new File([], "empty.glb")), /non-empty/);
+});
+
+test("loads and prepares a real GLB above 50 MB; rejects files above 75 MB", async () => {
+  assert.equal(MAX_MINIATURE_BYTES, 75 * 1024 * 1024);
+  const file = new File([makeMiniatureGlb(false, 60 * 1024 * 1024)], "large.glb");
+  const asset = await loadMiniatureAsset(file);
+  assert.equal(asset.meshCount, 2);
+  disposeMiniatureScene(asset.scene);
+  const prepared = await prepareMiniatureWebFile(file, 1.5);
+  assert.ok(prepared.size > 50 * 1024 * 1024 && prepared.size <= MAX_MINIATURE_BYTES);
+  assert.equal(glbCalibration(readGlb(await prepared.arrayBuffer()).json).visualScale, 1.5);
+  const tooLarge = new File([new Uint8Array(MAX_MINIATURE_BYTES + 1)], "oversized.glb");
+  await assert.rejects(loadMiniatureAsset(tooLarge), /75 MB/);
+  await assert.rejects(prepareMiniatureWebFile(tooLarge), /75 MB/);
 });
