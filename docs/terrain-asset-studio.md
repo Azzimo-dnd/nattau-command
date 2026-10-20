@@ -1,6 +1,6 @@
 # Terrain Asset Studio Alpha
 
-This feature is developed on `feature/vtt-terrain-asset-studio-alpha`, separate from production.
+Application code is developed on `feature/vtt-terrain-asset-studio-alpha`. The add-only database migration was independently approved and applied to production.
 
 ## Scope
 - Eight reproducible procedural terrain presets for the UC loading plaza.
@@ -9,12 +9,13 @@ This feature is developed on `feature/vtt-terrain-asset-studio-alpha`, separate 
 - Models use Y up, centered X/Z, base at Y=0; one world unit equals one VTT grid square.
 - Procedural source recipe includes a deterministic seed; generated GLBs are not player character miniatures.
 
-## Safe rollout
+## Migration and rollout
+Migration file: `supabase/migrations/20261020102957_vtt_terrain_asset_studio_alpha.sql` (version aligned with Supabase history).
 1. Check the generated models and route in a preview build.
 2. The user explicitly authorized applying this additive migration to the existing production database (no extra paid branch). Audit the SQL and run GM RLS checks; keep application code on preview until separately approved.
-3. Confirm normal players cannot access the studio, table, or storage bucket.
+3. Confirm normal players cannot access the studio, table, or storage bucket (policies installed; authenticated browser smoke test remains).
 4. Upload and reload a model, then edit metadata, delete it and verify storage cleanup.
-5. Only after acceptance apply the migration and merge/deploy as separate approved work.
+5. Database migration is now applied and verified. After GM browser smoke tests, merge/deploy the application only with separate approval.
 
 Existing VTT scenes and tokens are deliberately untouched.
 

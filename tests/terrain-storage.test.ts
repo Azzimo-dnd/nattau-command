@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 
 const db = new PGlite();
-const migration = readFileSync(new URL("../supabase/migrations/20261020103000_vtt_terrain_asset_studio_alpha.sql", import.meta.url), "utf8");
+const migration = readFileSync(new URL("../supabase/migrations/20261020102957_vtt_terrain_asset_studio_alpha.sql", import.meta.url), "utf8");
 const uuid = (n: number) => "00000000-0000-4000-8000-" + String(n).padStart(12,"0");
 const [nattau, barovia, gm, player, outsider, fileId] = Array.from({length:6},(_,i)=>uuid(i+1));
 const path = nattau + "/" + fileId + ".glb";
