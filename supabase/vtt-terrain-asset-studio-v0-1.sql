@@ -77,7 +77,7 @@ on conflict (id) do update set public = false, file_size_limit = excluded.file_s
 -- Safe conversion for malformed object paths; callers never cast arbitrary path parts.
 create or replace function public.vtt_terrain_path_campaign(object_name text)
 returns uuid language sql stable set search_path = '' as $$
- select case when split_part(object_name,'/',1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+ select case when pg_catalog.pg_input_is_valid(split_part(object_name,'/',1), 'uuid')
  then split_part(object_name,'/',1)::uuid else null::uuid end
 $$;
 revoke all on function public.vtt_terrain_path_campaign(text) from public;
