@@ -116,7 +116,7 @@ export function useTerrainAssets(campaignId: string) {
       return name + " uploaded as a draft terrain asset.";
     }), [operate, store]);
 
-  const updateAsset = useCallback((asset: TerrainAssetRow, patch: { name?: string; status?: TerrainStatus; category?: TerrainCategory }) =>
+  const updateAsset = useCallback((asset: TerrainAssetRow, patch: { name?: string; status?: TerrainStatus; category?: TerrainCategory; default_scale?: number }) =>
     operate(async () => {
       const updated = { ...patch };
       if (updated.name !== undefined) {
@@ -124,6 +124,10 @@ export function useTerrainAssets(campaignId: string) {
         if (!updated.name || updated.name.length > 120) throw new Error("Invalid terrain name.");
       }
       if (updated.category !== undefined && !isTerrainCategory(updated.category)) throw new Error("Unknown terrain category.");
+      if (updated.default_scale !== undefined &&
+        (!Number.isFinite(updated.default_scale) || updated.default_scale < 0.1 || updated.default_scale > 10)) {
+        throw new Error("Visual scale must be between 10% and 1000%.");
+      }
       if (updated.status !== undefined && !["draft","approved","archived"].includes(updated.status)) throw new Error("Unknown status.");
       const { data, error: updateError } = await supabase.from("vtt_terrain_assets")
         .update(updated).eq("id", asset.id).eq("campaign_id", campaignId).select("id");

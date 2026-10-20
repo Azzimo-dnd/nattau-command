@@ -122,16 +122,12 @@ export function TerrainAssetStudio({ campaignId, campaignSlug }: { campaignId: s
     if (selectedSaved) void library.updateAsset(selectedSaved, {status});
   };
   const updateSaved = () => {
-    if (selectedSaved) void library.updateAsset(selectedSaved, {name:name.trim(),category});
+    if (selectedSaved) void library.updateAsset(selectedSaved, {name:name.trim(),category,default_scale:visualScale});
   };
-  const removeSaved = () => {
-    if (selectedSaved && window.confirm("Permanently delete terrain asset " + selectedSaved.name + "?")) {
-      void library.removeAsset(selectedSaved);
-      setSelection({kind:"preset",id:TERRAIN_PRESETS[0].id});
-      setRecipe(TERRAIN_PRESETS[0].recipe);
-      setName(TERRAIN_PRESETS[0].name);
-      setCategory(TERRAIN_PRESETS[0].category);
-    }
+  const removeSaved = async () => {
+    if (!selectedSaved || !window.confirm("Permanently delete terrain asset " + selectedSaved.name + "?")) return;
+    const ok = await library.removeAsset(selectedSaved);
+    if (ok) selectPreset(TERRAIN_PRESETS[0]);
   };
 
   const selectedStatus = selectedSaved?.status ?? "local preset";
@@ -157,6 +153,11 @@ export function TerrainAssetStudio({ campaignId, campaignSlug }: { campaignId: s
       <aside className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/75 p-4">
         <div><h3 className="text-sm font-black">Terrain Library</h3>
           <p className="mt-1 text-xs text-slate-400">Select a model to inspect its geometry.</p></div>
+        <button type="button" disabled={library.loading || library.busy}
+          onClick={() => void library.refresh()}
+          className="w-full rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 disabled:opacity-40">
+          {library.loading ? "Checking library…" : "Refresh saved library"}
+        </button>
         <input aria-label="Search terrain" placeholder="Search props…" value={search} onChange={(e) => setSearch(e.target.value)}
           className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-500"/>
         <select aria-label="Filter category" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
@@ -258,8 +259,8 @@ export function TerrainAssetStudio({ campaignId, campaignSlug }: { campaignId: s
             <button disabled={controlsDisabled} onClick={() => changeStatus("approved")} className="flex-1 rounded-lg border border-emerald-500/40 p-2 text-emerald-200 disabled:opacity-50">Approve</button>
             <button disabled={controlsDisabled} onClick={() => changeStatus("archived")} className="flex-1 rounded-lg border border-slate-600 p-2 disabled:opacity-50">Archive</button>
           </div>
-          <button disabled={controlsDisabled} onClick={updateSaved} className="w-full rounded-lg border border-cyan-400/40 p-2 text-cyan-100 disabled:opacity-50">Save metadata</button>
-          <button disabled={controlsDisabled} onClick={removeSaved} className="w-full rounded-lg border border-rose-400/40 p-2 text-rose-200 disabled:opacity-50">Delete model and metadata</button>
+          <button disabled={controlsDisabled} onClick={updateSaved} className="w-full rounded-lg border border-cyan-400/40 p-2 text-cyan-100 disabled:opacity-50">Save name, category & scale</button>
+          <button disabled={controlsDisabled} onClick={() => void removeSaved()} className="w-full rounded-lg border border-rose-400/40 p-2 text-rose-200 disabled:opacity-50">Delete model and metadata</button>
         </div>}
         <div className="space-y-2 border-t border-slate-800 pt-4">
           <button type="button" disabled={!hasPreview || controlsDisabled} onClick={() => void exportGlb()}
