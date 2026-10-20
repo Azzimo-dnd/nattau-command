@@ -155,6 +155,12 @@ export function getNavigationSections(
           description: "Privately upload, convert and paint monster miniatures for the VTT.",
         },
         {
+          label: "Terrain Asset Studio",
+          href: "/gm/terrain",
+          icon: "map",
+          description: "Preview and generate 3D props for the tabletop.",
+        },
+        {
           label: "Fate Management",
           href: "/fate",
           icon: "fate",

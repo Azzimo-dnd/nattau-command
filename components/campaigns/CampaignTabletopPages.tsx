@@ -6,6 +6,7 @@ import { VttBattleBoard } from "@/components/vtt/VttBattleBoard";
 import { VttObjectUrlGuard } from "@/components/vtt/VttObjectUrlGuard";
 import { VttThreeMaterialPatch } from "@/components/vtt/VttThreeMaterialPatch";
 import { VttEnemyStudio } from "@/components/vtt/VttEnemyStudio";
+import { TerrainAssetStudio } from "@/components/terrain/TerrainAssetStudio";
 import { VttEnemyPainter } from "@/components/vtt/VttEnemyPainter";
 import { SessionControls } from "@/components/gm/SessionControls";
 import { loadCampaignSessionSettings } from "@/lib/campaign/sessionSettings";
@@ -22,7 +23,7 @@ export async function CampaignTabletopPage({ campaignSlug }: Props) {
   return (
     <CampaignWorkspace campaignSlug={campaignSlug} title={theme.tabletop}
       description={theme.barovia ? "Lanterns against the dark. Reveal the road one clearing at a time, share Hope and Fear, and pass the spotlight as the story demands." : "Unroll the expedition's maps, gather the company and take the field. Shared miniatures, physical dice and a tabletop directed by the Game Master."}
-      actions={<>{isDm && <WorkspaceLink href={campaignPath(campaignSlug, "/gm/vtt/enemies")}>{theme.enemies}</WorkspaceLink>}<WorkspaceLink href={campaignPath(campaignSlug, "/characters")}>{theme.characters}</WorkspaceLink></>}>
+      actions={<>{isDm && <><WorkspaceLink href={campaignPath(campaignSlug, "/gm/vtt/enemies")}>{theme.enemies}</WorkspaceLink><WorkspaceLink href={campaignPath(campaignSlug, "/gm/terrain")}>Terrain Studio</WorkspaceLink></>}<WorkspaceLink href={campaignPath(campaignSlug, "/characters")}>{theme.characters}</WorkspaceLink></>}>
       <VttObjectUrlGuard /><VttThreeMaterialPatch />
       <VttBattleBoard key={access.membership.campaignId} campaignId={access.membership.campaignId} campaignSlug={campaignSlug} isDm={isDm} currentUserId={access.userId} currentUserName={access.displayName} />
     </CampaignWorkspace>
@@ -81,4 +82,17 @@ export async function CampaignSessionPage({ campaignSlug }: Props) {
     actions={<WorkspaceLink href={campaignPath(campaignSlug, "/session-planner")}>Check availability</WorkspaceLink>}>
     <SessionControls key={access.membership.campaignId} initialSettings={settings} campaignSlug={campaignSlug} />
   </CampaignWorkspace>;
+}
+
+export async function CampaignTerrainStudioPage({ campaignSlug }: Props) {
+  const access = await requireCampaignMembership(campaignSlug);
+  if (access.membership.role !== "dm") redirect(access.membership.homeHref);
+  return (
+    <CampaignWorkspace campaignSlug={campaignSlug} title="Terrain Asset Studio"
+      description="Build the UC loading-plaza props, inspect them in 3D, compare their size with Pippo and curate the GM-only terrain library."
+      actions={<WorkspaceLink href={campaignPath(campaignSlug, "/vtt")}>Back to tabletop</WorkspaceLink>}>
+      <VttThreeMaterialPatch />
+      <TerrainAssetStudio key={access.membership.campaignId} campaignId={access.membership.campaignId} campaignSlug={campaignSlug} />
+    </CampaignWorkspace>
+  );
 }

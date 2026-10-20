@@ -79,6 +79,7 @@ const gmSessionItems: NavigationItem[] = [
   { label: "Relic Workshop", href: "/campaigns/barovia/gm/puzzles", icon: "spark" },
   { label: "Miniature Studio", href: "/campaigns/barovia/gm/miniatures", icon: "account" },
   { label: "Creatures of the Mists", href: "/campaigns/barovia/gm/vtt/enemies", icon: "war-room" },
+  { label: "Terrain Asset Studio", href: "/campaigns/barovia/gm/terrain", icon: "map" },
 ];
 
 function isActive(pathname: string, item: NavigationItem) {
