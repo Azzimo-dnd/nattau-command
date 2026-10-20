@@ -90,7 +90,9 @@ test("placement geometry clamps to bounds and normalizes rotation",()=>{
 });
 
 test("terrain drag keeps mouse grab offset and clamps to the battlefield",()=>{
-  assert.deepEqual(terrainDragPoint([2,3],[2.2,3.2],[4.7,1.9],24,18,false),[4.5,1.6999999999999997]);
+  const moved=terrainDragPoint([2,3],[2.2,3.2],[4.7,1.9],24,18,false);
+  assert.ok(Math.abs(moved[0]-4.5)<1e-10);
+  assert.ok(Math.abs(moved[1]-1.7)<1e-10);
   assert.deepEqual(terrainDragPoint([11,0],[1,0],[100,0],24,18,false),[11.5,0]);
   assert.deepEqual(terrainDragPoint([0,0],[0.2,0.2],[0.2,0.2],24,18,false),[0,0]);
   assert.throws(()=>terrainDragPoint([0,0],[0,0],[NaN,1],24,18,false),/Invalid terrain pointer/);

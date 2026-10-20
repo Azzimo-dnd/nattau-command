@@ -111,9 +111,11 @@ export function VttTerrainLayer({
   // A lost pointer capture or a tab switch must never leave the canvas in drag mode.
   useEffect(() => {
     window.addEventListener("pointercancel", cancelDrag);
+    window.addEventListener("pointerup", cancelDrag);
     window.addEventListener("blur", cancelDrag);
     return () => {
       window.removeEventListener("pointercancel", cancelDrag);
+      window.removeEventListener("pointerup", cancelDrag);
       window.removeEventListener("blur", cancelDrag);
       cancelDrag();
     };
@@ -131,7 +133,7 @@ export function VttTerrainLayer({
     onSelect(instance.id);
     const start: TerrainPosition = [instance.position_x, instance.position_z];
     dragRef.current = { id:instance.id, pointerId:event.pointerId, origin:start, hit, moved:false, current:start };
-    try { event.target.setPointerCapture(event.pointerId); }
+    try { (event.target as HTMLElement | null)?.setPointerCapture(event.pointerId); }
     catch { /* Window blur / pointercancel still reset the state. */ }
     onDraggingChange(true);
   };
@@ -154,7 +156,7 @@ export function VttTerrainLayer({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     event.stopPropagation();
-    try { event.target.releasePointerCapture(event.pointerId); }
+    try { (event.target as HTMLElement | null)?.releasePointerCapture(event.pointerId); }
     catch { /* The pointer may already have been released by the browser. */ }
     dragRef.current = null;
     onDraggingChange(false);
