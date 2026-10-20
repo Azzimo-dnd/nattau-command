@@ -48,7 +48,7 @@ test("private terrain bucket and campaign GM-only RLS", async () => {
     assert.equal(decision.rows[0].allowed,true,JSON.stringify(decision.rows[0]));
     assert.equal(decision.rows[0].matches,true,JSON.stringify(decision.rows[0]));
     try { await db.query("insert into storage.objects(bucket_id,name) values ('vtt-terrain-assets',$1)",[path]); }
-    catch (cause) { throw new Error("GM storage insert: "+(cause instanceof Error ? cause.message : String(cause))); }
+    catch (cause) { const policies = await db.query("select policyname,cmd,with_check from pg_policies where schemaname='storage' and tablename='objects'"); throw new Error("GM storage insert: "+(cause instanceof Error ? cause.message : String(cause))+"; policies: "+JSON.stringify(policies.rows)); }
     assert.equal((await db.query("select name from storage.objects")).rows.length,1);
   });
   await asUser(player,async () => {
