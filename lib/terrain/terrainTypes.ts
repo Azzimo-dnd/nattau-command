@@ -51,7 +51,7 @@ export const TERRAIN_PRESETS: TerrainPreset[] = [
   { id: "wreck-hull", name: "Broken hull section", category: "wreckage", description: "A rough section of the galleon's shattered side.", recipe: { kind: "hull", seed: 108, width: 2.65, height: 1.8, damage: 0.62 } },
 ];
 
-export const MAX_TERRAIN_BYTES = 75 * 1024 * 1024;
+export const MAX_TERRAIN_BYTES = 50 * 1024 * 1024;
 export function isTerrainCategory(value: string): value is TerrainCategory {
   return (TERRAIN_CATEGORIES as readonly string[]).includes(value);
 }

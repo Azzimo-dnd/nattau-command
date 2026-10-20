@@ -63,7 +63,7 @@ export function terrainRegistration(input: {
   if (!name || name.length > 120) throw new Error("Name must have between 1 and 120 characters.");
   if (!isTerrainCategory(category)) throw new Error("Unsupported terrain category.");
   if (!file.name.toLowerCase().endsWith(".glb") || file.size < 20 || file.size > MAX_TERRAIN_BYTES) {
-    throw new Error("Choose a valid self-contained GLB file up to 75 MB.");
+    throw new Error("Choose a valid self-contained GLB file up to 50 MB.");
   }
   if (file.name.trim().length > 180) throw new Error("Original file name is too long.");
   if (!Number.isFinite(scale) || scale < 0.1 || scale > 10) throw new Error("Invalid terrain scale.");

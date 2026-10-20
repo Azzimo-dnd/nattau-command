@@ -32,7 +32,7 @@ export function terrainMetrics(object: THREE.Object3D): TerrainModelMetrics {
 }
 export function validateTerrainFile(file: File) {
   if (!file.name.toLowerCase().endsWith(".glb")) throw new Error("Choose a self-contained .glb file.");
-  if (file.size < 20 || file.size > MAX_TERRAIN_BYTES) throw new Error("GLB must be between 20 bytes and 75 MB.");
+  if (file.size < 20 || file.size > MAX_TERRAIN_BYTES) throw new Error("GLB must be between 20 bytes and 50 MB.");
 }
 export async function readTerrainFile(file: File) {
   validateTerrainFile(file);

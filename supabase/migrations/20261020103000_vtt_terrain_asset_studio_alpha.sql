@@ -1,5 +1,5 @@
 -- Terrain Asset Studio Alpha: independent GM-only library. No scene placement.
--- Run on a Supabase development branch before enabling persistence in a preview.
+-- Approved by the owner for additive rollout on the existing Supabase production project. Do not alter existing VTT tables or buckets.
 begin;
 
 create table if not exists public.vtt_terrain_assets (
@@ -11,7 +11,7 @@ create table if not exists public.vtt_terrain_assets (
   source_kind text not null check (source_kind in ('generated','uploaded')),
   storage_path text not null unique,
   original_name text not null check (char_length(trim(original_name)) between 1 and 180),
-  file_size_bytes bigint not null check (file_size_bytes between 1 and 78643200),
+  file_size_bytes bigint not null check (file_size_bytes between 1 and 52428800),
   mesh_count integer not null check (mesh_count between 1 and 100000),
   triangle_count integer not null check (triangle_count between 1 and 2000000),
   width_units double precision not null check (width_units > 0 and width_units <= 1000),
@@ -71,7 +71,7 @@ create policy "Terrain GM delete" on public.vtt_terrain_assets for delete to aut
 using (public.is_campaign_dm(campaign_id));
 
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
-values ('vtt-terrain-assets','vtt-terrain-assets',false,78643200,array['model/gltf-binary','application/octet-stream'])
+values ('vtt-terrain-assets','vtt-terrain-assets',false,52428800,array['model/gltf-binary','application/octet-stream'])
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 -- Safe conversion for malformed object paths; callers never cast arbitrary path parts.
