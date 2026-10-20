@@ -14,7 +14,11 @@ type Props={
   error:string|null;
   notice:string|null;
   toolActive:boolean;
+  placementEnabled:boolean;
+  snapToGrid:boolean;
   onAsset:(id:string)=>void;
+  onPlacementMode:(place:boolean)=>void;
+  onSnapToGrid:(next:boolean)=>void;
   onSelect:(id:string|null)=>void;
   onRotate:(delta:number)=>void;
   onScale:(scale:number)=>void;
@@ -24,6 +28,7 @@ type Props={
 };
 
 export function VttTerrainPanel({assets,instances,activeAssetId,selected,busy,loading,error,notice,toolActive,
+  placementEnabled,snapToGrid,onPlacementMode,onSnapToGrid,
   onAsset,onSelect,onRotate,onScale,onDuplicate,onDelete,onRefresh}:Props){
   const [scaleDraft,setScaleDraft]=useState(selected?.scale??1);
   useEffect(()=>{setScaleDraft(selected?.scale??1);},[selected?.id,selected?.scale]);
@@ -34,7 +39,17 @@ export function VttTerrainPanel({assets,instances,activeAssetId,selected,busy,lo
         <p className="mt-1 text-[11px] text-slate-500">{instances.length} placed on this scene</p></div>
       <button type="button" className={baseButton} disabled={busy||loading} onClick={onRefresh}>Refresh</button>
     </div>
-    <p className="text-xs leading-5 text-slate-400">Choose a saved crate or other model, then enable <strong className="text-cyan-200">Terrain</strong> above the map and click the floor. Terrain is currently GM-only.</p>
+    <p className="text-xs leading-5 text-slate-400">To reposition a crate: choose <strong className="text-cyan-200">Move existing</strong>, hold the left mouse button on the model and drag it to a new position. Release to save.</p>
+    <div className="grid grid-cols-2 gap-2">
+      <button type="button" disabled={busy} onClick={()=>onPlacementMode(false)}
+        className={`min-h-10 rounded-xl border px-2 text-xs font-bold disabled:opacity-40 ${toolActive&&!placementEnabled?"border-cyan-400 bg-cyan-400/15 text-cyan-100":"border-slate-700 bg-slate-950 text-slate-300"}`}>Move existing</button>
+      <button type="button" disabled={busy||!activeAssetId} onClick={()=>onPlacementMode(true)}
+        className={`min-h-10 rounded-xl border px-2 text-xs font-bold disabled:opacity-40 ${toolActive&&placementEnabled?"border-cyan-400 bg-cyan-400/15 text-cyan-100":"border-slate-700 bg-slate-950 text-slate-300"}`}>Place new</button>
+    </div>
+    <label className="flex items-center gap-2 text-xs text-slate-300">
+      <input type="checkbox" checked={snapToGrid} onChange={e=>onSnapToGrid(e.target.checked)} className="accent-cyan-400"/>
+      Snap movement to grid squares
+    </label>
     {error&&<p role="alert" className="rounded-lg border border-rose-400/30 p-2 text-xs text-rose-200">{error}</p>}
     {notice&&<p role="status" className="text-xs text-emerald-200">{notice}</p>}
     {loading&&<p className="text-xs text-slate-500">Loading saved models…</p>}
@@ -47,7 +62,7 @@ export function VttTerrainPanel({assets,instances,activeAssetId,selected,busy,lo
       {!assets.length&&!loading&&<p className="text-xs text-slate-500">No saved models found. Save a model in Terrain Asset Studio first.</p>}
     </div>
     {activeAssetId&&<div className="rounded-lg bg-cyan-950/30 px-3 py-2 text-xs text-cyan-200">
-      {toolActive?"Click an empty area of the map to place another copy.":"Model selected. Click Terrain above the map to start placing."}
+      {toolActive && placementEnabled?"Click an empty area to place another copy; drag a placed model to move it.":toolActive?"Drag a placed model to move it. Empty floor clicks will not create copies.":"Terrain mode is off. Choose Move existing or Place new."}
     </div>}
     {instances.length>0&&<label className="block text-xs text-slate-400">Placed objects
       <select value={selected?.id??""} onChange={e=>onSelect(e.target.value||null)}

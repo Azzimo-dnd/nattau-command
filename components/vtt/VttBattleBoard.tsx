@@ -49,6 +49,8 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [fogOpen, setFogOpen] = useState(false);
+  const [terrainPlacementEnabled, setTerrainPlacementEnabled] = useState(false);
+  const [terrainSnapToGrid, setTerrainSnapToGrid] = useState(false);
   const [cameraCommand, setCameraCommand] = useState<VttCameraCommand | null>(null);
   const [assetProgress, setAssetProgress] = useState<VttAssetProgress>({ loaded: 0, failed: 0, total: 0 });
 
@@ -69,6 +71,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
     setHistoryOpen(false);
     setFogOpen(false);
     terrain.setSelectedId(null);
+    setTerrainPlacementEnabled(false);
     setAssetProgress({ loaded: 0, failed: 0, total: 0 });
   }
 
@@ -155,7 +158,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
         <div className={`relative overflow-hidden border border-slate-800 bg-[#070b11] ${isFullscreen ? "min-h-0 rounded-2xl" : "rounded-[30px]"}`}>
           <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5 rounded-2xl border border-slate-700/80 bg-slate-950/88 p-1.5 shadow-2xl backdrop-blur">
             {(["navigate", "ruler", "radius", "ping"] as VttToolMode[]).map((mode) => <button key={mode} type="button" onClick={() => { setFogOpen(false); fog.cancelDraft(); board.selectToolMode(mode); }} disabled={Boolean(dice.activeRoll)} className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${board.toolMode === mode && !fogOpen ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>{mode === "navigate" ? "Navigate" : mode === "ruler" ? "Ruler" : mode === "radius" ? daggerheart ? "Area" : "Spell radius" : "Ping"}</button>)}
-            {isDm ? <button type="button" disabled={Boolean(dice.activeRoll) || board.playerPreview || terrain.loading} onClick={() => { setFogOpen(false); fog.cancelDraft(); board.selectToken(null,false); board.selectToolMode(board.toolMode === "terrain" ? "navigate" : "terrain"); }}
+            {isDm ? <button type="button" disabled={Boolean(dice.activeRoll) || board.playerPreview || terrain.loading} onClick={() => { setFogOpen(false); fog.cancelDraft(); board.selectToken(null,false); board.selectToolMode(board.toolMode === "terrain" ? "navigate" : "terrain"); setTerrainPlacementEnabled(false); }}
               className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${board.toolMode === "terrain" && !fogOpen ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>Terrain</button> : null}
             {isDm ? <button type="button" disabled={Boolean(dice.activeRoll) || board.playerPreview} onClick={() => { board.selectToolMode("navigate"); setFogOpen((current) => !current); fog.cancelDraft(); }} className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${fogOpen ? "border-sky-300 bg-sky-300/15 text-sky-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>Fog</button> : null}
             <span className="mx-0.5 h-7 w-px bg-slate-800" />
@@ -181,6 +184,8 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
               terrainInstances={isDm && !board.playerPreview ? terrain.instances : []}
               terrainAssets={isDm && !board.playerPreview ? terrain.assets : []}
               selectedTerrainId={isDm && !board.playerPreview ? terrain.selectedId : null}
+              terrainPlacementEnabled={terrainPlacementEnabled}
+              terrainSnapToGrid={terrainSnapToGrid}
               isDm={isDm && !board.playerPreview}
               selectedIds={board.playerPreview ? [] : board.selectedIds}
               supabase={board.supabase}
@@ -207,6 +212,8 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
               onPing={board.sendPing}
               onTerrainPlace={(point) => { if(isDm && !board.playerPreview && !dice.activeRoll) void terrain.place(point); }}
               onTerrainSelect={(id) => { if(isDm && !board.playerPreview) terrain.setSelectedId(id); }}
+              onTerrainClearSelection={() => terrain.setSelectedId(null)}
+              onTerrainCommitMove={(id,point) => terrain.moveInstance(id,point)}
               onFogPointerDown={fog.pointerDown}
               onFogPointerMove={fog.pointerMove}
               onFogPointerUp={fog.pointerUp}
@@ -238,7 +245,10 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
             <VttTerrainPanel assets={terrain.assets} instances={terrain.instances} activeAssetId={terrain.activeAssetId}
               selected={terrain.selected} busy={terrain.busy || gmBusy} loading={terrain.loading} error={terrain.error}
               notice={terrain.notice} toolActive={board.toolMode === "terrain"}
-              onAsset={(id)=>{terrain.setActiveAssetId(id); terrain.setSelectedId(null); board.selectToken(null,false); setFogOpen(false); fog.cancelDraft(); board.selectToolMode("terrain");}}
+              placementEnabled={terrainPlacementEnabled} snapToGrid={terrainSnapToGrid}
+              onPlacementMode={(place)=>{setTerrainPlacementEnabled(place); board.selectToolMode("terrain"); setFogOpen(false);}}
+              onSnapToGrid={setTerrainSnapToGrid}
+              onAsset={(id)=>{setTerrainPlacementEnabled(true); terrain.setActiveAssetId(id); terrain.setSelectedId(null); board.selectToken(null,false); setFogOpen(false); fog.cancelDraft(); board.selectToolMode("terrain");}}
               onSelect={terrain.setSelectedId}
               onRotate={(delta)=>{if(terrain.selected)void terrain.updateSelected({rotation_y:terrain.selected.rotation_y+delta});}}
               onScale={(scale)=>{void terrain.updateSelected({scale});}}

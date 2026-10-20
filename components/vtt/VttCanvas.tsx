@@ -38,6 +38,8 @@ type Props = {
   terrainInstances?: VttSceneTerrainInstance[];
   terrainAssets?: TerrainAssetRow[];
   selectedTerrainId?: string | null;
+  terrainSnapToGrid?: boolean;
+  terrainPlacementEnabled?: boolean;
   isDm: boolean;
   selectedIds: string[];
   supabase: ReturnType<typeof createClient>;
@@ -64,6 +66,8 @@ type Props = {
   onPing: (point: VttMeasurePoint) => void;
   onTerrainPlace?: (point: VttMeasurePoint) => void;
   onTerrainSelect?: (id: string) => void;
+  onTerrainClearSelection?: () => void;
+  onTerrainCommitMove?: (id:string, position:VttMeasurePoint) => Promise<boolean>;
   onFogPointerDown: (point: VttFogPoint) => void;
   onFogPointerMove: (point: VttFogPoint) => void;
   onFogPointerUp: (point: VttFogPoint) => void;
@@ -287,6 +291,8 @@ export function VttCanvas({
   terrainInstances = [],
   terrainAssets = [],
   selectedTerrainId = null,
+  terrainSnapToGrid = false,
+  terrainPlacementEnabled = true,
   isDm,
   selectedIds,
   supabase,
@@ -313,6 +319,8 @@ export function VttCanvas({
   onPing,
   onTerrainPlace,
   onTerrainSelect,
+  onTerrainClearSelection,
+  onTerrainCommitMove,
   onFogPointerDown,
   onFogPointerMove,
   onFogPointerUp,
@@ -320,6 +328,7 @@ export function VttCanvas({
   onDiceImpact,
 }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [terrainDragging, setTerrainDragging] = useState(false);
   const [measuring, setMeasuring] = useState(false);
   const [assetAttempt, setAssetAttempt] = useState(0);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -348,7 +357,8 @@ export function VttCanvas({
     }
     if (toolMode === "terrain") {
       event.stopPropagation();
-      if (isDm) onTerrainPlace?.([event.point.x, event.point.z]);
+      if (isDm && terrainPlacementEnabled) onTerrainPlace?.([event.point.x, event.point.z]);
+      else onTerrainClearSelection?.();
       return;
     }
     if (toolMode === "ping") { event.stopPropagation(); onPing([event.point.x, event.point.z]); return; }
@@ -388,9 +398,11 @@ export function VttCanvas({
     <PingOverlay ping={ping} />
     {isDm && terrainInstances.length > 0 ? <VttTerrainLayer key={assetAttempt} instances={terrainInstances} assets={terrainAssets} supabase={supabase}
       selectedId={selectedTerrainId} canSelect={toolMode === "terrain" && !diceRequest && !fogEditing}
+      gridWidth={scene.grid_width} gridHeight={scene.grid_height} snapToGrid={terrainSnapToGrid}
+      onDraggingChange={setTerrainDragging} onCommitMove={(id,point)=>onTerrainCommitMove?.(id,point) ?? Promise.resolve(false)}
       onSelect={(id) => onTerrainSelect?.(id)} onError={setTerrainError} /> : null}
     {tokens.map((token) => <TokenMesh key={`${token.id}:${tokenAssetKey(token)}:${assetAttempt}`} assetCache={assetCache} token={token} selected={selectedIds.includes(token.id)} currentTurn={scene.initiative_active && token.id === scene.initiative_current_token_id} showNameplate={scene.show_nameplates} isDm={isDm} canDrag={toolMode === "navigate" && !diceRequest && !fogEditing} supabase={supabase} onSelect={onSelect} onDragStart={(id) => setDraggingId(id)} onAssetSettled={assetSettled} />)}
     {diceRequest ? <VttDiceLayer key={diceRequest.rollId} request={diceRequest} sceneWidth={scene.grid_width} sceneHeight={scene.grid_height} onComplete={onDiceComplete} onImpact={onDiceImpact} /> : null}
-    <VttOrbitControls disabled={Boolean(draggingId) || measuring || fogEditing} width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
+    <VttOrbitControls disabled={Boolean(draggingId) || terrainDragging || measuring || fogEditing} width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
   </Canvas></>;
 }
