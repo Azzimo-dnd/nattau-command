@@ -3,6 +3,7 @@ import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
+import { calibrateGlb, MAX_MINIATURE_BYTES, miniatureFileFormat, readGlb } from "./miniatureGlb";
 
 export type LoadedMiniatureGeometry = {
   geometry: THREE.BufferGeometry;
@@ -13,7 +14,8 @@ export type LoadedMiniatureGeometry = {
 };
 
 function fileFormat(file: File): "stl" | "glb" {
-  return file.name.toLowerCase().endsWith(".glb") ? "glb" : "stl";
+  if (!file.size || file.size > MAX_MINIATURE_BYTES) throw new Error("Choose a non-empty miniature file up to 50 MB.");
+  return miniatureFileFormat(file.name);
 }
 
 function normalizeZUpGeometry(geometry: THREE.BufferGeometry) {
@@ -27,14 +29,24 @@ function normalizeZUpGeometry(geometry: THREE.BufferGeometry) {
 }
 
 async function geometryFromGlb(buffer: ArrayBuffer) {
+  const { json } = readGlb(buffer);
+  const calibration = json.asset.extras?.nattauMiniature as { sourceFormat?: string } | undefined;
+  if (calibration?.sourceFormat === "glb" || json.images?.length) {
+    throw new Error("This imported GLB keeps its original materials. Texture painting is not available here; edit it in your 3D editor and import a new version.");
+  }
   const gltf = await new GLTFLoader().parseAsync(buffer, "");
   gltf.scene.updateMatrixWorld(true);
 
   let sourceMesh: THREE.Mesh | null = null;
+  let meshCount = 0;
   gltf.scene.traverse((object) => {
-    if (!sourceMesh && object instanceof THREE.Mesh && object.geometry) sourceMesh = object;
+    if (object instanceof THREE.Mesh && object.geometry) { meshCount += 1; if (!sourceMesh) sourceMesh = object; }
   });
   if (!sourceMesh) throw new Error("The GLB does not contain a mesh.");
+  if (meshCount !== 1) {
+    gltf.scene.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); (Array.isArray(object.material) ? object.material : [object.material]).forEach((material) => material.dispose()); } });
+    throw new Error("Multi-part GLB models keep their original materials and cannot be painted in this editor.");
+  }
 
   const mesh = sourceMesh as THREE.Mesh;
   let geometry = mesh.geometry.clone();
@@ -47,7 +59,15 @@ async function geometryFromGlb(buffer: ArrayBuffer) {
 
   // Web derivatives are exported Y-up. Convert back to the painter's canonical Z-up space.
   geometry.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+  mesh.geometry.dispose();
+  (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((material) => material.dispose());
   return normalizeZUpGeometry(geometry);
+}
+
+export async function prepareMiniatureWebFile(file: File, visualScale = 1): Promise<Blob> {
+  const format = fileFormat(file);
+  const buffer = format === "glb" ? await file.arrayBuffer() : await (await createWebGlbFromStl(file)).blob.arrayBuffer();
+  return new Blob([calibrateGlb(buffer, { version: 1, visualScale, sourceFormat: format })], { type: "model/gltf-binary" });
 }
 
 export async function loadMiniatureGeometry(file: File): Promise<LoadedMiniatureGeometry> {

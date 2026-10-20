@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { MiniatureViewer, type MiniatureModelInfo } from "./MiniatureViewer";
-import { createWebGlbFromStl } from "./miniatureModelFiles";
+import { prepareMiniatureWebFile } from "./miniatureModelFiles";
 
 type RosterRow = {
   player_id: string;
@@ -75,6 +75,7 @@ export function MiniatureManager({ campaignId }: Props) {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [history, setHistory] = useState<MiniatureRow[]>([]);
   const [storedFile, setStoredFile] = useState<File | null>(null);
+  const [visualScale, setVisualScale] = useState(1);
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingModel, setLoadingModel] = useState(false);
@@ -93,6 +94,7 @@ export function MiniatureManager({ campaignId }: Props) {
 
   const handleLocalFileLoaded = useCallback((file: File, info: MiniatureModelInfo) => {
     setCandidate({ file, info });
+    setVisualScale(info.visualScale);
     setMessage(null);
     setError(null);
   }, []);
@@ -142,7 +144,7 @@ export function MiniatureManager({ campaignId }: Props) {
   }, [downloadFileRaw]);
 
   const buildAndAttachWebGlb = useCallback(async (miniatureId: string, playerId: string, sourceFile: File) => {
-    const { blob, triangles } = await createWebGlbFromStl(sourceFile);
+    const blob = await prepareMiniatureWebFile(sourceFile);
     const path = `${campaignId}/${playerId}/${miniatureId}.web.glb`;
     const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, blob, {
       cacheControl: "86400",
@@ -157,13 +159,12 @@ export function MiniatureManager({ campaignId }: Props) {
       p_web_file_size_bytes: blob.size,
     });
     if (attachError) throw attachError;
-    return { size: blob.size, triangles };
+    return { size: blob.size };
   }, [campaignId, supabase]);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    refreshRoster()
+    void Promise.resolve().then(() => { if (cancelled) return; setLoading(true); return refreshRoster(); })
       .catch((cause) => {
         if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load the miniature roster.");
       })
@@ -175,21 +176,20 @@ export function MiniatureManager({ campaignId }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    setCandidate(null);
-    setStoredFile(null);
-    setMessage(null);
-    setError(null);
-    setHistory([]);
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      setCandidate(null); setStoredFile(null); setMessage(null); setError(null); setHistory([]);
+    });
 
     if (!selectedPlayerId) return () => { cancelled = true; };
 
     const current = roster.find((row) => row.player_id === selectedPlayerId);
-    void refreshHistory(selectedPlayerId).catch((cause) => {
+    void Promise.resolve().then(() => { if (!cancelled) return refreshHistory(selectedPlayerId); }).catch((cause) => {
       if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load miniature history.");
     });
 
     if (current?.storage_path && current.original_name) {
-      void downloadStoredFile(current.storage_path, current.original_name)
+      void Promise.resolve().then(() => downloadStoredFile(current.web_storage_path ?? current.storage_path!, current.web_storage_path ? current.original_name!.replace(/\.(stl|glb)$/i, ".web.glb") : current.original_name!))
         .then((file) => {
           if (!cancelled) setStoredFile(file);
         })
@@ -207,66 +207,56 @@ export function MiniatureManager({ campaignId }: Props) {
     setMessage(null);
 
     if (candidate.file.size > MAX_FILE_BYTES) {
-      setError("The STL is larger than the 50 MB miniature limit.");
+      setError("The model is larger than the 50 MB miniature limit.");
       return;
     }
 
-    const objectName = `${campaignId}/${selectedPlayerId}/${crypto.randomUUID()}.stl`;
+    const id = crypto.randomUUID();
+    const objectName = `${campaignId}/${selectedPlayerId}/${id}.${candidate.info.format}`;
+    const webPath = `${campaignId}/${selectedPlayerId}/${id}.web.glb`;
+    const uploaded: string[] = [];
+    let registered = false;
+    let registrationAttempted = false;
     setUploading(true);
-
-    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(objectName, candidate.file, {
-      cacheControl: "3600",
-      contentType: candidate.file.type || "application/octet-stream",
-      upsert: false,
-    });
-
-    if (uploadError) {
-      setUploading(false);
-      setError(uploadError.message);
-      return;
-    }
-
-    const { data: registeredId, error: registerError } = await supabase.rpc("register_character_miniature", {
-      p_campaign_id: campaignId,
-      p_player_id: selectedPlayerId,
-      p_storage_path: objectName,
-      p_original_name: candidate.file.name,
-      p_file_size_bytes: candidate.file.size,
-      p_triangle_count: candidate.info.triangles,
-      p_width_mm: candidate.info.width,
-      p_depth_mm: candidate.info.depth,
-      p_height_mm: candidate.info.height,
-    });
-
-    if (registerError || typeof registeredId !== "string") {
-      await supabase.storage.from(BUCKET).remove([objectName]);
-      setUploading(false);
-      setError(registerError?.message ?? "The miniature was uploaded but could not be registered.");
-      return;
-    }
-
-    let derivativeMessage = "";
     try {
-      setGeneratingGlb(registeredId);
-      setGlbProgress("Creating indexed GLB web derivative…");
-      const derivative = await buildAndAttachWebGlb(registeredId, selectedPlayerId, candidate.file);
-      derivativeMessage = ` Web GLB: ${formatBytes(derivative.size)}.`;
-    } catch (cause) {
-      derivativeMessage = ` The STL is saved, but GLB generation needs a retry: ${cause instanceof Error ? cause.message : "unknown conversion error"}`;
-    } finally {
-      setGeneratingGlb(null);
-      setGlbProgress(null);
-    }
-
-    setStoredFile(candidate.file);
-    setCandidate(null);
-    setMessage(`${selectedPlayer.display_name}'s new miniature is now current.${derivativeMessage}`);
-    try {
+      setGlbProgress("Preparing web model and scale…");
+      const webBlob = await prepareMiniatureWebFile(candidate.file, visualScale);
+      for (const [path, blob, contentType] of [
+        [objectName, candidate.file, candidate.info.format === "glb" ? "model/gltf-binary" : "application/octet-stream"],
+        [webPath, webBlob, "model/gltf-binary"],
+      ] as const) {
+        setGlbProgress("Uploading private miniature files…");
+        const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, blob, { cacheControl: "86400", contentType, upsert: false });
+        if (uploadError) throw uploadError;
+        uploaded.push(path);
+      }
+      registrationAttempted = true;
+      const { error: registerError } = await supabase.rpc("register_character_miniature_asset", {
+        p_campaign_id: campaignId,
+        p_player_id: selectedPlayerId,
+        p_storage_path: objectName,
+        p_web_storage_path: webPath,
+        p_original_name: candidate.file.name,
+        p_file_size_bytes: candidate.file.size,
+        p_web_file_size_bytes: webBlob.size,
+        p_triangle_count: candidate.info.triangles,
+        p_width_mm: candidate.info.width,
+        p_depth_mm: candidate.info.depth,
+        p_height_mm: candidate.info.height,
+      });
+      if (registerError) throw registerError;
+      registered = true;
+      setStoredFile(new File([webBlob], "miniature.web.glb", { type: "model/gltf-binary" }));
+      setCandidate(null);
+      setMessage(`${selectedPlayer.display_name}'s miniature and default scale are saved. Web GLB: ${formatBytes(webBlob.size)}.`);
       await Promise.all([refreshRoster(), refreshHistory(selectedPlayerId)]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The model was saved, but the list could not be refreshed.");
+      // A lost RPC response can hide a successful commit. Retain its files in that case.
+      if (!registrationAttempted && uploaded.length) await supabase.storage.from(BUCKET).remove(uploaded);
+      setError(registrationAttempted && !registered ? "Save could not be confirmed. Refresh the list before uploading again." : cause instanceof Error ? cause.message : "Could not save the miniature.");
     } finally {
       setUploading(false);
+      setGlbProgress(null);
     }
   };
 
@@ -281,7 +271,7 @@ export function MiniatureManager({ campaignId }: Props) {
       setGlbProgress(`Converting ${miniature.original_name} to indexed GLB…`);
       const derivative = await buildAndAttachWebGlb(miniature.id, miniature.player_id, source);
       await Promise.all([refreshRoster(), refreshHistory(miniature.player_id)]);
-      setMessage(`Web GLB generated: ${formatBytes(derivative.size)} for ${derivative.triangles.toLocaleString()} triangles.`);
+      setMessage(`Web GLB generated: ${formatBytes(derivative.size)} for ${miniature.triangle_count?.toLocaleString() ?? "?"} triangles.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not generate the web GLB.");
     } finally {
@@ -322,7 +312,7 @@ export function MiniatureManager({ campaignId }: Props) {
     setCandidate(null);
     setError(null);
     try {
-      const file = await downloadStoredFile(miniature.storage_path, miniature.original_name);
+      const file = await downloadStoredFile(miniature.web_storage_path ?? miniature.storage_path, miniature.web_storage_path ? "miniature.web.glb" : miniature.original_name);
       setStoredFile(file);
       setMessage(miniature.is_current ? "Showing the current miniature." : `Previewing ${miniature.original_name} from history.`);
     } catch (cause) {
@@ -347,7 +337,7 @@ export function MiniatureManager({ campaignId }: Props) {
     }
 
     try {
-      const file = await downloadStoredFile(miniature.storage_path, miniature.original_name);
+      const file = await downloadStoredFile(miniature.web_storage_path ?? miniature.storage_path, miniature.web_storage_path ? "miniature.web.glb" : miniature.original_name);
       setStoredFile(file);
       setCandidate(null);
       await Promise.all([refreshRoster(), refreshHistory(miniature.player_id)]);
@@ -367,7 +357,7 @@ export function MiniatureManager({ campaignId }: Props) {
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-yellow-500">Character assignment</p>
             <h2 className="mt-2 text-2xl font-black text-slate-100">Who owns this miniature?</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Keep the original STL for printing and automatically generate a smaller indexed GLB derivative for the web viewer and mobile painter.
+              Import a textured GLB or a printable STL. Compare its size with a party miniature before saving.
             </p>
             {missingWebGlbs.length > 0 ? (
               <button type="button" disabled={Boolean(generatingGlb) || uploading} onClick={() => void generateMissingWebGlbs()} className="mt-3 min-h-10 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 text-xs font-black text-cyan-100 disabled:opacity-30">
@@ -389,22 +379,22 @@ export function MiniatureManager({ campaignId }: Props) {
         <div className="h-[620px] animate-pulse rounded-[30px] border border-slate-800 bg-slate-900/50" />
       ) : selectedPlayer ? (
         <>
-          <MiniatureViewer sourceFile={storedFile} allowFilePicker emptyTitle={`Choose ${selectedPlayer.display_name}'s STL`} emptyCopy="Drop a miniature here or choose an STL. It stays a local preview until you press Upload & set current." onLocalFileLoaded={handleLocalFileLoaded} />
+          <MiniatureViewer key={selectedPlayerId} sourceFile={storedFile} campaignId={campaignId} disabled={uploading || Boolean(generatingGlb) || loadingModel} visualScale={candidate ? visualScale : undefined} onVisualScaleChange={candidate ? setVisualScale : undefined} allowFilePicker emptyTitle={`Choose ${selectedPlayer.display_name}'s miniature`} emptyCopy="Drop an STL or a GLB with embedded textures. Preview and adjust its scale before uploading." onLocalFileLoaded={handleLocalFileLoaded} onLocalFileCleared={() => setCandidate(null)} />
 
           <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div className="rounded-[28px] border border-slate-800 bg-slate-900/65 p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Pending upload</p>
-                  <h3 className="mt-2 text-xl font-black text-slate-100">{candidate ? candidate.file.name : "No new STL selected"}</h3>
-                  <p className="mt-2 text-xs leading-5 text-slate-500">{candidate ? `${formatBytes(candidate.file.size)} · ${candidate.info.triangles.toLocaleString()} triangles · ${candidate.info.height.toFixed(1)} mm high` : "The viewer may be showing the stored current model. Choose another STL only when you want to create a new version."}</p>
+                  <h3 className="mt-2 text-xl font-black text-slate-100">{candidate ? candidate.file.name : "No new model selected"}</h3>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">{candidate ? `${formatBytes(candidate.file.size)} · ${candidate.info.triangles.toLocaleString()} triangles · ${candidate.info.height.toFixed(1)} mm high` : "The viewer may be showing the stored current model. Choose another STL or GLB only when you want to create a new version."}</p>
                 </div>
                 {candidate ? <span className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-yellow-300">Local only</span> : null}
               </div>
               <button type="button" disabled={!candidate || uploading || Boolean(generatingGlb)} onClick={() => void uploadCandidate()} className="mt-5 min-h-12 w-full rounded-xl bg-yellow-500 px-5 text-sm font-black text-slate-950 transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-30 sm:w-auto">
-                {uploading ? "Uploading miniature…" : "Upload STL + generate web GLB"}
+                {uploading ? "Uploading miniature…" : "Upload miniature & save scale"}
               </button>
-              <p className="mt-3 text-[11px] leading-5 text-slate-600">Private bucket · 50 MB maximum · STL remains the print/source model · indexed GLB is generated in-browser and stored beside it for web delivery.</p>
+              <p className="mt-3 text-[11px] leading-5 text-slate-600">Private files · 50 MB maximum · Original source preserved · Default scale saved with the web model.</p>
             </div>
 
             <div className="rounded-[28px] border border-slate-800 bg-slate-900/65 p-5">
@@ -413,15 +403,15 @@ export function MiniatureManager({ campaignId }: Props) {
               {selectedPlayer.miniature_id ? (
                 <>
                   <dl className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-xl border border-slate-800 bg-black/15 p-3"><dt className="text-slate-600">STL</dt><dd className="mt-1 font-bold text-slate-300">{formatBytes(selectedPlayer.file_size_bytes)}</dd></div>
+                    <div className="rounded-xl border border-slate-800 bg-black/15 p-3"><dt className="text-slate-600">Source</dt><dd className="mt-1 font-bold text-slate-300">{formatBytes(selectedPlayer.file_size_bytes)}</dd></div>
                     <div className="rounded-xl border border-slate-800 bg-black/15 p-3"><dt className="text-slate-600">Web GLB</dt><dd className={`mt-1 font-bold ${selectedPlayer.web_storage_path ? "text-emerald-300" : "text-yellow-300"}`}>{selectedPlayer.web_storage_path ? formatBytes(selectedPlayer.web_file_size_bytes) : "Missing"}</dd></div>
                     <div className="col-span-2 rounded-xl border border-slate-800 bg-black/15 p-3"><dt className="text-slate-600">Triangles</dt><dd className="mt-1 font-bold text-slate-300">{selectedPlayer.triangle_count?.toLocaleString() ?? "—"}</dd></div>
                   </dl>
-                  <button type="button" disabled={Boolean(generatingGlb) || uploading || history.length === 0} onClick={() => { const current = history.find((row) => row.is_current); if (current) void generateWebGlb(current); }} className="mt-3 min-h-10 w-full rounded-xl border border-cyan-400/25 px-3 text-xs font-black text-cyan-200 disabled:opacity-30">
-                    {selectedPlayer.web_storage_path ? "Regenerate web GLB" : "Generate web GLB"}
+                  <button type="button" disabled={Boolean(generatingGlb) || uploading || history.length === 0 || Boolean(selectedPlayer.web_storage_path)} onClick={() => { const current = history.find((row) => row.is_current); if (current) void generateWebGlb(current); }} className="mt-3 min-h-10 w-full rounded-xl border border-cyan-400/25 px-3 text-xs font-black text-cyan-200 disabled:opacity-30">
+                    {selectedPlayer.web_storage_path ? "Web model ready" : "Generate web GLB"}
                   </button>
                 </>
-              ) : <p className="mt-3 text-xs leading-5 text-slate-500">Upload the first STL to give {selectedPlayer.display_name} a current miniature.</p>}
+              ) : <p className="mt-3 text-xs leading-5 text-slate-500">Upload the first miniature to give {selectedPlayer.display_name} a current miniature.</p>}
             </div>
           </section>
 
@@ -436,11 +426,11 @@ export function MiniatureManager({ campaignId }: Props) {
                   <div key={miniature.id} className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/35 p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-black text-slate-200">{miniature.original_name}</p>{miniature.is_current ? <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300">Current</span> : null}{miniature.web_storage_path ? <span className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-300">GLB {formatBytes(miniature.web_file_size_bytes)}</span> : null}</div>
-                      <p className="mt-1 text-[11px] text-slate-600">{formatDate(miniature.created_at)} · STL {formatBytes(miniature.file_size_bytes)} · {miniature.triangle_count?.toLocaleString() ?? "?"} triangles</p>
+                      <p className="mt-1 text-[11px] text-slate-600">{formatDate(miniature.created_at)} · Source {formatBytes(miniature.file_size_bytes)} · {miniature.triangle_count?.toLocaleString() ?? "?"} triangles</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" disabled={busyId === miniature.id || loadingModel} onClick={() => void previewHistory(miniature)} className="min-h-9 rounded-xl border border-slate-700 px-3 text-[11px] font-bold text-slate-300 disabled:opacity-30">Preview STL</button>
-                      <button type="button" disabled={Boolean(generatingGlb) || uploading} onClick={() => void generateWebGlb(miniature)} className="min-h-9 rounded-xl border border-cyan-500/25 px-3 text-[11px] font-bold text-cyan-200 disabled:opacity-30">{miniature.web_storage_path ? "Regenerate GLB" : "Generate GLB"}</button>
+                      <button type="button" disabled={busyId === miniature.id || loadingModel} onClick={() => void previewHistory(miniature)} className="min-h-9 rounded-xl border border-slate-700 px-3 text-[11px] font-bold text-slate-300 disabled:opacity-30">Preview model</button>
+                      <button type="button" disabled={Boolean(generatingGlb) || uploading || Boolean(miniature.web_storage_path)} onClick={() => void generateWebGlb(miniature)} className="min-h-9 rounded-xl border border-cyan-500/25 px-3 text-[11px] font-bold text-cyan-200 disabled:opacity-30">{miniature.web_storage_path ? "Web model ready" : "Generate GLB"}</button>
                       {!miniature.is_current ? <button type="button" disabled={busyId === miniature.id} onClick={() => void makeCurrent(miniature)} className="min-h-9 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3 text-[11px] font-black text-cyan-200 disabled:opacity-30">Set current</button> : null}
                     </div>
                   </div>

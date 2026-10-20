@@ -5,20 +5,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import {
-  applyMiniaturePaintDocumentToGeometry,
-  clearMiniaturePaintGeometry,
-  type MiniaturePaintDocument,
-} from "./miniaturePaintData";
-import { loadMiniatureGeometry } from "./miniatureModelFiles";
+import { type MiniaturePaintDocument } from "./miniaturePaintData";
+import { disposeMiniatureScene, loadMiniatureAsset, type MiniatureAsset } from "./miniatureAsset";
+import { MiniatureObject } from "./MiniatureObject";
 
-type Model = {
-  geometry: THREE.BufferGeometry;
-  height: number;
-  triangles: number;
-  name: string;
-  format: "stl" | "glb";
-};
+type Model = { asset: MiniatureAsset; height: number; previewScale: number; name: string; format: "stl" | "glb" };
 
 type Props = {
   sourceFile: File | null;
@@ -74,8 +65,7 @@ function CameraRig({
       Math.max(24, height * 0.72),
       distance * 0.92
     );
-    camera.near = 0.1;
-    camera.far = 2000;
+    Object.assign(camera, { near: 0.1, far: 2000 });
     camera.updateProjectionMatrix();
     next.target.set(0, Math.max(8, height * 0.42), 0);
     next.minDistance = Math.max(10, height * 0.22);
@@ -98,7 +88,6 @@ export function MiniatureSkinViewer({
   const [error, setError] = useState<string | null>(null);
   const [autoRotate, setAutoRotate] = useState(false);
   const [resetKey, setResetKey] = useState(0);
-  const [paintApplied, setPaintApplied] = useState(false);
   const [compact, setCompact] = useState(false);
 
   const theme = isBarovia
@@ -159,23 +148,25 @@ export function MiniatureSkinViewer({
     let cancelled = false;
     const load = async () => {
       if (modelRef.current) {
-        modelRef.current.geometry.dispose();
+        disposeMiniatureScene(modelRef.current.asset.scene);
         modelRef.current = null;
       }
       setModel(null);
       setError(null);
       if (!sourceFile) return;
       try {
-        const loaded = await loadMiniatureGeometry(sourceFile);
+        const loaded = await loadMiniatureAsset(sourceFile, paintDocument);
         if (cancelled) {
-          loaded.geometry.dispose();
+          disposeMiniatureScene(loaded.scene);
           return;
         }
-        const next = { ...loaded };
+        const previewScale = 40 / Math.max(loaded.height, loaded.width, loaded.depth);
+        const next = { asset: loaded, previewScale, height: loaded.height * previewScale, name: sourceFile.name, format: loaded.format };
         modelRef.current = next;
         setModel(next);
         setResetKey((value) => value + 1);
       } catch (cause) {
+        if (cancelled) return;
         setError(
           cause instanceof Error
             ? cause.message
@@ -187,28 +178,9 @@ export function MiniatureSkinViewer({
     return () => {
       cancelled = true;
     };
-  }, [sourceFile]);
+  }, [sourceFile, paintDocument]);
 
-  useEffect(() => () => modelRef.current?.geometry.dispose(), []);
-
-  useEffect(() => {
-    if (!model) return;
-    clearMiniaturePaintGeometry(model.geometry);
-    if (!paintDocument) {
-      setPaintApplied(false);
-      return;
-    }
-    const applied = applyMiniaturePaintDocumentToGeometry(
-      model.geometry,
-      paintDocument
-    );
-    setPaintApplied(applied);
-    if (!applied) {
-      setError("This skin belongs to a different miniature version.");
-    } else {
-      setError(null);
-    }
-  }, [model, paintDocument]);
+  useEffect(() => () => { if (modelRef.current) disposeMiniatureScene(modelRef.current.asset.scene); }, []);
 
   return (
     <div className={theme.frame}>
@@ -280,19 +252,7 @@ export function MiniatureSkinViewer({
             {!compact ? (
               <directionalLight position={[-35, 30, -25]} intensity={1.35} />
             ) : null}
-            <mesh
-              castShadow={!compact}
-              receiveShadow={!compact}
-              geometry={model.geometry}
-              rotation={[-Math.PI / 2, 0, 0]}
-            >
-              <meshStandardMaterial
-                vertexColors={paintApplied}
-                color={paintApplied ? "#ffffff" : "#8f949b"}
-                roughness={0.68}
-                metalness={0.08}
-              />
-            </mesh>
+            <MiniatureObject asset={model.asset} scale={model.previewScale} />
             <mesh
               receiveShadow={!compact}
               rotation={[-Math.PI / 2, 0, 0]}

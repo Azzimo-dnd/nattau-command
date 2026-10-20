@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { validVisualScale } from "@/components/miniatures/miniatureGlb";
 import type { VttToken } from "./vttTypes";
 
 const SIZE_PRESETS = [
@@ -23,6 +24,7 @@ type Props = {
   onRenameEnemy: (name: string) => void;
   onInitiative: (value: number | null) => void;
   onResize: (size: number) => void;
+  onScale: (scale: number) => void;
   onReveal: () => void;
   onHide: () => void;
   onDuplicate: () => void;
@@ -33,13 +35,15 @@ export function VttSelectionPanel(props: Props) {
   const selected = props.selectedTokens.length === 1 ? props.selectedTokens[0] : null;
   const count = props.selectedTokens.length;
   const [nameDraft, setNameDraft] = useState(selected?.name ?? "");
+  const [scaleDraft, setScaleDraft] = useState("100");
   const [initiativeDraft, setInitiativeDraft] = useState("");
 
-  const selectionKey = `${selected?.id}:${selected?.name}:${selected?.initiative}`;
+  const selectionKey = `${props.selectedTokens.map((token) => `${token.id}:${token.scale}`).join(",")}:${selected?.name}:${selected?.initiative}`;
   const [draftKey, setDraftKey] = useState<string | null>(null);
   if (draftKey !== selectionKey) {
     setDraftKey(selectionKey);
     setNameDraft(selected?.name ?? "");
+    setScaleDraft(String(Math.round((selected?.scale ?? 1) * 100)));
     setInitiativeDraft(selected?.initiative == null ? "" : String(selected.initiative));
   }
 
@@ -93,6 +97,14 @@ export function VttSelectionPanel(props: Props) {
                 <button key={preset.label} type="button" disabled={props.busy} onClick={() => props.onResize(preset.value)} className="min-h-9 rounded-lg border border-amber-400/20 bg-amber-400/5 px-2 text-[9px] font-bold text-amber-100 disabled:opacity-40">{preset.label}</button>
               ))}
             </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3">
+            <label className="text-xs font-bold text-cyan-100">Visual scale
+              <input aria-label="Token visual scale slider" type="range" min={10} max={1000} step={1} value={Number(scaleDraft) || 100} disabled={props.busy} onChange={(event) => setScaleDraft(event.target.value)} className="mt-3 w-full accent-cyan-300" />
+            </label>
+            <div className="mt-2 flex items-center gap-2"><input aria-label="Token visual scale percent" type="number" min={10} max={1000} value={scaleDraft} disabled={props.busy} onChange={(event) => setScaleDraft(event.target.value)} className="min-h-10 w-20 rounded-lg border border-slate-700 bg-slate-950 px-2 text-sm" /><span className="text-xs text-slate-400">%</span><button type="button" disabled={props.busy || !validVisualScale(Number(scaleDraft) / 100)} onClick={() => props.onScale(Number(scaleDraft) / 100)} className="min-h-10 rounded-lg border border-cyan-400/30 px-3 text-xs font-bold text-cyan-100 disabled:opacity-35">Apply</button><button type="button" disabled={props.busy} onClick={() => { setScaleDraft("100"); props.onScale(1); }} className="min-h-10 px-2 text-xs text-slate-300">Reset</button></div>
+            <p className="mt-2 text-[11px] leading-5 text-slate-400">Changes the model, keeping its grid footprint. 100% uses the scale saved at import. Applies to {count === 1 ? "this token" : "all selected tokens"}.</p>
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
