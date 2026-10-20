@@ -29,7 +29,7 @@ begin
   where s.id = new.scene_id and s.campaign_id = new.campaign_id;
   if not found then raise exception 'Terrain scene does not belong to this campaign'; end if;
   if not exists(select 1 from public.vtt_terrain_assets a
-                where a.id = new.terrain_asset_id and a.campaign_id = new.campaign_id and a.status <> 'archived') then
+                where a.id = new.terrain_asset_id and a.campaign_id = new.campaign_id and (tg_op = 'UPDATE' or a.status <> 'archived')) then
     raise exception 'Terrain asset is unavailable for this campaign';
   end if;
   if new.position_x < -scene_width / 2.0 or new.position_x > scene_width / 2.0
