@@ -278,7 +278,8 @@ export function useVttDice({
   }, []);
 
   const roll = useCallback(async () => {
-    if(!sceneId||pendingLocalRef.current||configuration.loading||historySaving)return;
+    if(!sceneId||pendingLocalRef.current||configuration.loading||historySaving||
+       [...activeRollsRef.current.values()].some(r=>r.envelope.rollerId===currentUserId))return;
     if(activeRollsRef.current.size>=MAX_SIMULTANEOUS_VTT_ROLLS){setLocalError("VTT dice table is full. Try again when dice settle.");return;}
     if (groups.length === 0) {
       setLocalError("Add at least one die before rolling.");
@@ -438,6 +439,7 @@ export function useVttDice({
     && groups.length > 0
     && physicalCount <= MAX_VTT_PHYSICAL_DICE
     && !pendingLocalRef.current
+    && !activeRoll
     && activeRolls.length<MAX_SIMULTANEOUS_VTT_ROLLS
     && !configuration.loading
     && !historySaving;
