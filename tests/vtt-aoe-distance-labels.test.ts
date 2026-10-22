@@ -34,7 +34,7 @@ test("Fog handling can suppress saved distance labels on player-hidden positions
 test("Saved circles, saved cones and temporary shared measurements all receive map labels",()=>{
  const layer=readFileSync(new URL("../components/vtt/VttSpellAreaLayer.tsx",import.meta.url),"utf8");
  const canvas=readFileSync(new URL("../components/vtt/VttCanvas.tsx",import.meta.url),"utf8");
- assert.match(layer,/labelRevealed\(a\).*<VttAoEDistanceMarker/s);
+ assert.match(layer,/labelRevealed\(a\)[\s\S]*?<VttAoEDistanceMarker/);
  assert.match(layer,/a\.shape_type==="cone"\?a\.direction_rad:0/);
  assert.match(canvas,/mode==="cone"[\s\S]*?<VttAoEDistanceMarker/);
  assert.match(canvas,/distance=\{radius\}[\s\S]*?feetPerSquare=\{feetPerSquare\}/);
