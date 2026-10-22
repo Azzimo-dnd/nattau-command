@@ -18,11 +18,13 @@ before(async()=>{
   "create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;",
   "create table public.vtt_scenes(id uuid primary key,campaign_id uuid,grid_width integer,grid_height integer);",
   "create table public.test_members(campaign_id uuid,user_id uuid,role text);",
-  "create function public.is_campaign_dm(p_id uuid) returns boolean language sql stable as $$ select exists(select 1 from public.test_members where campaign_id=p_id and user_id=auth.uid() and role='dm') $$;",
+  "create function public.is_campaign_dm(p_id uuid) returns boolean language sql stable security definer set search_path='' as $$ select exists(select 1 from public.test_members where campaign_id=p_id and user_id=auth.uid() and role='dm') $$;",
   "create table public.vtt_tokens(id uuid primary key,scene_id uuid,x double precision,z double precision,size_squares double precision,revision bigint default 0,updated_at timestamptz default now());",
   "alter table public.vtt_tokens enable row level security;",
   "grant select,update on public.vtt_tokens to authenticated;",
   "grant select on public.vtt_scenes to authenticated;",
+  "grant usage on schema auth to authenticated;",
+  "grant execute on function auth.uid() to authenticated;",
   "create policy gm_read on public.vtt_tokens for select to authenticated using (exists(select 1 from public.vtt_scenes s where s.id=scene_id and public.is_campaign_dm(s.campaign_id)));",
   "create policy gm_write on public.vtt_tokens for update to authenticated using (exists(select 1 from public.vtt_scenes s where s.id=scene_id and public.is_campaign_dm(s.campaign_id))) with check (exists(select 1 from public.vtt_scenes s where s.id=scene_id and public.is_campaign_dm(s.campaign_id)));"
  ].join("\n"));
