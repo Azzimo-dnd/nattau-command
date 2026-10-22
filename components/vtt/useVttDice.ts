@@ -17,6 +17,7 @@ import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-ph
 import type { DiceGroup, RolledGroup, SupportedDie } from "@/components/dice/diceUtils";
 import { resolveDuality, type DualityResult } from "./vttDuality";
 import { useVttDiceHistory } from "./useVttDiceHistory";
+import {shouldPublishVttDiceRoll} from "./vttDiceVisibility";
 
 export type VttRollKind = "custom" | "duality";
 
@@ -50,6 +51,7 @@ export type VttDiceResultToast = {
 
 type PendingLocalRoll = {
   envelope: VttDiceEnvelope;
+  visibleToPlayers: boolean;
 };
 
 type Counts = Record<SupportedDie, number>;
@@ -121,6 +123,7 @@ export function useVttDice({
   sceneId,
   daggerheart = false,
   sharedScene = false,
+  isDm = false,
 }: {
   campaignId: string;
   currentUserId: string;
@@ -128,6 +131,7 @@ export function useVttDice({
   sceneId: string | null;
   daggerheart?: boolean;
   sharedScene?: boolean;
+  isDm?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const configuration = useCampaignDiceConfiguration({ campaignId, currentUserId });
@@ -155,6 +159,8 @@ export function useVttDice({
   const [activeRoll, setActiveRoll] = useState<VttDiceEnvelope | null>(null);
   const [latestResult, setLatestResult] = useState<VttDiceResultToast | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [gmShareRoll,setGmShareRoll]=useState(true);
+  const rollWillBeShared=shouldPublishVttDiceRoll(isDm,sharedScene,gmShareRoll);
 
   const groups = useMemo(() => groupsFromCounts(counts), [counts]);
   const duality = rollKind === "duality";
@@ -303,19 +309,20 @@ export function useVttDice({
 
       setLocalError(null);
       setLatestResult(null);
-      pendingLocalRef.current = { envelope };
+      const visibleToPlayers=shouldPublishVttDiceRoll(isDm,sharedScene,gmShareRoll);
+      pendingLocalRef.current = { envelope,visibleToPlayers };
       activeRef.current = envelope;
       setActiveRoll(envelope);
 
       if (configuration.appearance.sound) await soundEngine.unlock();
-      void channelRef.current?.send({ type: "broadcast", event: "roll-start", payload: envelope });
+      if(visibleToPlayers)void channelRef.current?.send({ type: "broadcast", event: "roll-start", payload: envelope });
     } catch (cause) {
       pendingLocalRef.current = null;
       activeRef.current = null;
       setActiveRoll(null);
       setLocalError(cause instanceof Error ? cause.message : "Could not prepare the VTT dice roll.");
     }
-  }, [configuration.appearance, configuration.loading, configuration.physics, currentUserId, currentUserName, duality, effectiveMode, expression, groups, historySaving, modifier, physicalCount, physicalGroups, rollKind, sceneId, soundEngine]);
+  }, [configuration.appearance, configuration.loading, configuration.physics, currentUserId, currentUserName, duality, effectiveMode, expression, groups, historySaving, modifier, physicalCount, physicalGroups, rollKind, sceneId, soundEngine, isDm, sharedScene, gmShareRoll]);
 
   const handlePhysicsComplete = useCallback(async (physicsResult: PhysicsRollResult) => {
     const envelope = activeRef.current;
@@ -386,6 +393,7 @@ export function useVttDice({
     await saveHistoryRoll({
       rollKey: envelope.rollId,
       sceneId: envelope.sceneId,
+      visibleToPlayers:pending.visibleToPlayers,
       expression: envelope.expression,
       mode: envelope.mode,
       modifier: envelope.modifier,
@@ -416,7 +424,7 @@ export function useVttDice({
 
     if (sceneIdRef.current !== envelope.sceneId) return;
     setLatestResult(toast);
-    void channelRef.current?.send({ type: "broadcast", event: "roll-result", payload: toast });
+    if(pending.visibleToPlayers)void channelRef.current?.send({ type: "broadcast", event: "roll-result", payload: toast });
     clearActiveAfter(envelope.rollId);
   }, [clearActiveAfter, currentUserId, saveHistoryRoll]);
 
@@ -455,6 +463,9 @@ export function useVttDice({
     canRoll,
     activeRoll,
     latestResult,
+    rollWillBeShared,
+    gmShareRoll,
+    setGmShareRoll:(next:boolean)=>{if(isDm&&!activeRef.current)setGmShareRoll(next);},
     error,
     appearanceName: cosmetic.name,
     appearanceSwatch: cosmetic.swatch,

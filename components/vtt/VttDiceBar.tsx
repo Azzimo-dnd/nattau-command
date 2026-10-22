@@ -40,6 +40,10 @@ export function VttDiceBar({
   onClear,
   onHistory,
   onRoll,
+  isDm,
+  rollWillBeShared,
+  gmShareRoll,
+  onGmShareRoll,
 }: {
   isFullscreen: boolean;
   daggerheart?: boolean;
@@ -68,6 +72,10 @@ export function VttDiceBar({
   onClear: () => void;
   onHistory: () => void;
   onRoll: () => void;
+  isDm:boolean;
+  rollWillBeShared:boolean;
+  gmShareRoll:boolean;
+  onGmShareRoll:(value:boolean)=>void;
 }) {
   const busy = Boolean(activeRoll);
   const limitExceeded = physicalCount > maxPhysicalDice;
@@ -174,6 +182,13 @@ export function VttDiceBar({
             >
               History{historyCount > 0 ? ` · ${historyCount}` : ""}
             </button>
+
+            {isDm?<label className="flex min-h-9 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/85 px-2.5 text-[10px] font-bold text-slate-200">
+              <input type="checkbox" aria-label="Share GM dice with players"
+                checked={gmShareRoll} disabled={busy} onChange={e=>onGmShareRoll(e.target.checked)}
+                className="accent-emerald-400"/>
+              {rollWillBeShared?"Public roll":"GM secret"}
+            </label>:<span className="self-center text-[10px] font-bold text-emerald-300">Public roll</span>}
 
             <button
               type="button"

@@ -37,7 +37,9 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
     isDm&&!board.playerPreview,board.refreshNonce,board.broadcastRefresh);
   const terrain = useSceneTerrain(campaignId, board.scene?.id ?? null,
     board.scene?.grid_width ?? 24, board.scene?.grid_height ?? 18, isDm);
-  const dice = useVttDice({ daggerheart, campaignId, currentUserId, currentUserName, sceneId: board.scene?.id ?? null, sharedScene: Boolean(board.scene?.is_active && board.scene?.visible_to_players) });
+  const dice = useVttDice({ daggerheart, campaignId, currentUserId, currentUserName,
+    sceneId: board.scene?.id ?? null, isDm,
+    sharedScene: Boolean(board.scene?.is_active && board.scene?.visible_to_players) });
   const presence = useVttPresence({ campaignId, currentUserId, currentUserName, isDm });
   const fog = useVttFog({
     campaignId,
@@ -263,7 +265,9 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
 
           <VttDiceHistoryPanel open={historyOpen && !previewHidden} isFullscreen={isFullscreen} sceneName={scene.name} isDm={isDm} rolls={dice.historyRolls} loading={dice.historyLoading} clearing={dice.historyClearing} error={dice.historyError} onClose={() => setHistoryOpen(false)} onClear={() => { void dice.clearHistory(); }} />
           {!previewHidden && <VttDiceBar daggerheart={daggerheart} duality={dice.rollKind === "duality"} onDuality={dice.selectDuality}
-              onAdversary={isDm && !board.playerPreview ? dice.selectAdversary : undefined} isFullscreen={isFullscreen} counts={dice.counts} modifier={dice.modifier} mode={dice.mode} expression={dice.expression} physicalCount={dice.physicalCount} maxPhysicalDice={dice.maxPhysicalDice} canUseD20Mode={dice.canUseD20Mode} canRoll={dice.canRoll && !previewHidden} activeRoll={dice.activeRoll} latestResult={dice.latestResult} error={dice.error} appearanceName={dice.appearanceName} appearanceSwatch={dice.appearanceSwatch} historyCount={dice.historyRolls.length} historyOpen={historyOpen} onAddDie={dice.addDie} onRemoveDie={dice.removeDie} onModifier={dice.setModifier} onMode={dice.setMode} onClear={dice.clearDice} onHistory={() => setHistoryOpen((current) => !current)} onRoll={() => { void dice.roll(); }} />}
+              onAdversary={isDm && !board.playerPreview ? dice.selectAdversary : undefined} isFullscreen={isFullscreen} counts={dice.counts} modifier={dice.modifier} mode={dice.mode} expression={dice.expression} physicalCount={dice.physicalCount} maxPhysicalDice={dice.maxPhysicalDice} canUseD20Mode={dice.canUseD20Mode} canRoll={dice.canRoll && !previewHidden} activeRoll={dice.activeRoll} latestResult={dice.latestResult} error={dice.error} appearanceName={dice.appearanceName} appearanceSwatch={dice.appearanceSwatch} historyCount={dice.historyRolls.length} historyOpen={historyOpen} onAddDie={dice.addDie} onRemoveDie={dice.removeDie} onModifier={dice.setModifier} onMode={dice.setMode} onClear={dice.clearDice} onHistory={() => setHistoryOpen((current) => !current)} onRoll={() => { void dice.roll(); }}
+              isDm={isDm&&!board.playerPreview} rollWillBeShared={dice.rollWillBeShared}
+              gmShareRoll={dice.gmShareRoll} onGmShareRoll={dice.setGmShareRoll} />}
 
           {!isFullscreen ? <div className="border-t border-slate-800 px-4 py-3 text-[11px] text-slate-500">{board.playerPreview ? "Player Preview mirrors manual fog, GM-only tokens and the player initiative strip." : isDm ? fogOpen ? "Fog edit mode: drag rectangles or click polygon points. Close Fog to move the camera again." : "Click to select · Shift/Ctrl-click to add · Shift-drag empty ground to box-select · Move selection to drag troops. GM shortcuts: Q/E rotate · H hide/reveal · Ctrl/Cmd+D duplicate enemies · Delete removes selection." : "Spectator: orbit, pan, zoom, measure, ping and use the shared VTT dice bar."}</div> : null}
         </div>

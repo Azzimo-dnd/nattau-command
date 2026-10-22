@@ -73,6 +73,7 @@ export function VttDiceHistoryPanel({
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <p className="truncate text-xs font-black text-slate-100">{roll.roller_name}</p>
+                          {isDm&&!roll.visible_to_players?<span className="rounded-md border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black text-amber-200">GM SECRET</span>:null}
                           {label ? <span className={`rounded-md border px-1.5 py-0.5 text-[8px] font-black ${roll.mode === "advantage" ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200" : "border-rose-400/25 bg-rose-400/10 text-rose-200"}`}>{label}</span> : null}
                         </div>
                         <p className="mt-1 truncate text-[11px] font-bold text-slate-400">{roll.expression}</p>
