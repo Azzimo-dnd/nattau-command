@@ -5,6 +5,7 @@ import { subscribeVttChannel } from "./vttRealtime";
 import { createClient } from "@/lib/supabase/client";
 import type { VttMeasurePoint, VttPing, VttToolMode } from "./VttCanvas";
 import type { VttEnemyModel, VttScene, VttToken } from "./vttTypes";
+import {validSharedMeasure,type SharedMeasure} from "./vttSpellAreas";
 
 const MAX_MAP_BYTES = 20 * 1024 * 1024;
 const SCENE_FIELDS = "id,campaign_id,name,grid_width,grid_height,feet_per_square,is_active,visible_to_players,map_storage_path,map_original_name,map_opacity,grid_opacity,show_grid,show_nameplates,initiative_active,initiative_round,initiative_current_token_id,map_scale,map_offset_x,map_offset_z";
@@ -90,6 +91,10 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
   const [toolMode, setToolMode] = useState<VttToolMode>("navigate");
   const [measureStart, setMeasureStart] = useState<VttMeasurePoint | null>(null);
   const [measureEnd, setMeasureEnd] = useState<VttMeasurePoint | null>(null);
+  const [measureSharingEnabled,setMeasureSharingEnabled]=useState(false);
+  const [remoteMeasures,setRemoteMeasures]=useState<Record<string,SharedMeasure>>({});
+  const [refreshNonce,setRefreshNonce]=useState(0);
+  const lastMeasureSentAt=useRef(0);
   const [ping, setPing] = useState<VttPing | null>(null);
   const [mapFile, setMapFile] = useState<File | null>(null);
   const [draftName, setDraftName] = useState("");
@@ -188,6 +193,7 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
   }, []);
 
   const refreshFromBroadcast = useCallback(async () => {
+    setRefreshNonce(n=>n+1);
     if (isDm) {
       await refreshScenes();
       const workspaceId = workspaceSceneIdRef.current;
@@ -228,6 +234,19 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
     const channel = supabase
       .channel(`vtt:campaign:${campaignId}`, { config: { private: true } })
       .on("broadcast", { event: "refresh" }, () => { void refreshFromBroadcast().catch(() => setError("Could not refresh the table. Check your connection and try again.")); })
+      .on("broadcast", { event: "measure" }, ({ payload }) => {
+        const raw=payload as Record<string,unknown>;
+        if(raw.sceneId!==workspaceSceneIdRef.current || typeof raw.senderId!=="string"||
+          !/^[0-9a-f-]{36}$/i.test(raw.senderId)||raw.senderId===currentUserId)return;
+        const senderId=raw.senderId;
+        if(raw.clear===true){
+          setRemoteMeasures(old=>{const next={...old};delete next[senderId];return next;});
+          return;
+        }
+        if(!validSharedMeasure(raw))return;
+        const measure:SharedMeasure={senderId,mode:raw.mode,start:raw.start,end:raw.end};
+        setRemoteMeasures(old=>({...old,[senderId]:measure}));
+      })
       .on("broadcast", { event: "ping" }, ({ payload }) => {
         const next = payload as { sceneId?: string; id?: string; x?: number; z?: number };
         if (next.sceneId !== workspaceSceneIdRef.current || typeof next.x !== "number" || typeof next.z !== "number" || !Number.isFinite(next.x) || !Number.isFinite(next.z)) return;
@@ -249,7 +268,7 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
       channelRef.current = null;
       unsubscribe();
     };
-  }, [campaignId, refreshFromBroadcast, supabase]);
+  }, [campaignId, currentUserId, refreshFromBroadcast, supabase]);
 
   useEffect(() => {
     if (!ping) return;
@@ -746,9 +765,54 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
     } finally { setBusy(false); }
   }, [broadcastRefresh, busy, isDm, refreshScenes, scene, supabase, tokens]);
 
+  const sendMeasurement = useCallback((mode:"ruler"|"radius",start:VttMeasurePoint,end:VttMeasurePoint,force=false)=>{
+    if(!measureSharingEnabled||!scene?.is_active||!scene.visible_to_players)return;
+    const now=Date.now();
+    if(!force&&now-lastMeasureSentAt.current<95)return;
+    lastMeasureSentAt.current=now;
+    void channelRef.current?.send({type:"broadcast",event:"measure",payload:{
+      senderId:currentUserId,sceneId:scene.id,mode,start,end,
+    }});
+  },[currentUserId,measureSharingEnabled,scene]);
+  const clearSharedMeasurement = useCallback(()=>{
+    if(!scene)return;
+    void channelRef.current?.send({type:"broadcast",event:"measure",
+      payload:{senderId:currentUserId,sceneId:scene.id,clear:true}});
+  },[currentUserId,scene]);
+  const clearMeasurement = useCallback(()=>{
+    setMeasureStart(null);setMeasureEnd(null);
+    if(measureSharingEnabled)clearSharedMeasurement();
+  },[clearSharedMeasurement,measureSharingEnabled]);
+  const setMeasurementSharing = useCallback((enabled:boolean)=>{
+    if(!enabled&&measureSharingEnabled)clearSharedMeasurement();
+    setMeasureSharingEnabled(enabled);
+    if(enabled&&scene?.is_active&&scene.visible_to_players&&measureStart&&measureEnd
+      &&(toolMode==="ruler"||toolMode==="radius")){
+      void channelRef.current?.send({type:"broadcast",event:"measure",payload:{
+        senderId:currentUserId,sceneId:scene.id,mode:toolMode,
+        start:measureStart,end:measureEnd,
+      }});
+    }
+  },[clearSharedMeasurement,currentUserId,measureEnd,measureSharingEnabled,measureStart,scene,toolMode]);
+  const startMeasurement = useCallback((point:VttMeasurePoint)=>{
+    setMeasureStart(point);setMeasureEnd(point);
+    if(toolMode==="ruler"||toolMode==="radius")sendMeasurement(toolMode,point,point,true);
+  },[sendMeasurement,toolMode]);
+  const moveMeasurement = useCallback((point:VttMeasurePoint)=>{
+    setMeasureEnd(point);
+    if(measureStart&&(toolMode==="ruler"||toolMode==="radius"))sendMeasurement(toolMode,measureStart,point);
+  },[measureStart,sendMeasurement,toolMode]);
+  const endMeasurement = useCallback((point:VttMeasurePoint)=>{
+    setMeasureEnd(point);
+    if(measureStart&&(toolMode==="ruler"||toolMode==="radius"))sendMeasurement(toolMode,measureStart,point,true);
+  },[measureStart,sendMeasurement,toolMode]);
+
   const selectToolMode = useCallback((mode: VttToolMode) => {
+    if(mode!==toolMode&&measureSharingEnabled)clearSharedMeasurement();
+    setRemoteMeasures({});
+
     setToolMode(mode); setMeasureStart(null); setMeasureEnd(null);
-  }, []);
+  }, [toolMode,measureSharingEnabled,clearSharedMeasurement]);
 
   const sendPing = useCallback((point: VttMeasurePoint) => {
     if (!scene) return;
@@ -769,11 +833,13 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
     supabase, mapInputRef, connection, refreshTokens, refreshFromBroadcast, setSpotlight,
     scenes, scene, canvasScene, tokens: visibleTokens, allTokens: tokens, enemyModels, selectedIds, selectedTokens, initiativeTokens,
     loading, busy, playerPreview, toolMode, measureStart, measureEnd, measurement, ping,
+    measureSharingEnabled,remoteMeasures,refreshNonce,
     mapFile, draftName, draftWidth, draftHeight, draftMapOpacity, draftGridOpacity, draftShowGrid,
     draftMapScale, draftMapOffsetX, draftMapOffsetZ, error, message, rotationDegrees,
     setPlayerPreview, setMapFile, setDraftName, setDraftWidth, setDraftHeight, setDraftMapOpacity,
     setDraftGridOpacity, setDraftShowGrid, setDraftMapScale, setDraftMapOffsetX, setDraftMapOffsetZ,
     selectToken, selectManyTokens, commitFormationMove, selectToolMode, setMeasureStart, setMeasureEnd, sendPing,
+    startMeasurement,moveMeasurement,endMeasurement,clearMeasurement,setMeasurementSharing,broadcastRefresh,
     saveScenePresentation, uploadSceneMap, removeSceneMap, createScene, duplicateScene, openScene, activateScene, deleteScene, setScenePlayerVisibility,
     placeParty, spawnEnemy, localMove, commitMove, rotateSelected, renameSelectedEnemy, setTokenInitiative, toggleNameplates,
     bulkUpdate, removeSelected, duplicateSelected, startInitiative, stopInitiative, stepInitiative,
