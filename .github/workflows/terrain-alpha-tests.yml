@@ -1,0 +1,17 @@
+name: Terrain Alpha tests
+on:
+  push:
+    branches: [feature/vtt-terrain-asset-studio-alpha]
+  pull_request:
+    paths: ['lib/terrain/**', 'components/terrain/**', 'tests/terrain-*.test.ts', 'supabase/migrations/*terrain*']
+jobs:
+  terrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test

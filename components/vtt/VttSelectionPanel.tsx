@@ -16,6 +16,9 @@ const SIZE_PRESETS = [
 type Props = {
   showInitiative?: boolean;
   selectedTokens: VttToken[];
+  tokenMoveEnabled?:boolean;
+  onTokenMoveMode?:()=>void;
+  onClearSelection?:()=>void;
   busy: boolean;
   rotationDegrees: number;
   onRotateLeft: () => void;
@@ -55,7 +58,7 @@ export function VttSelectionPanel(props: Props) {
       </div>
 
       {count === 0 ? (
-        <p className="mt-3 text-xs leading-5 text-slate-500">Click a miniature to inspect it. Shift/Ctrl-click creates a multi-selection.</p>
+        <p className="mt-3 text-xs leading-5 text-slate-500">Click to inspect without moving. Shift/Ctrl-click adds miniatures, or Shift-drag empty floor to select a whole squad.</p>
       ) : (
         <>
           {selected ? (
@@ -90,6 +93,16 @@ export function VttSelectionPanel(props: Props) {
             </>
           ) : <p className="mt-3 text-xs text-slate-400">{count} tokens selected. Bulk actions apply to all selected miniatures.</p>}
 
+          <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3">
+            <p className="text-xs font-bold text-amber-100">{count} miniature{count===1?"":"s"} selected</p>
+            <p className="mt-1 text-[11px] text-slate-400">Move selection: hold the left button on one of these figures and drag. The whole formation will move only if its destination is empty.</p>
+            <div className="mt-2 flex gap-2">
+              <button type="button" onClick={props.onTokenMoveMode} disabled={props.busy||!props.onTokenMoveMode}
+                className={`min-h-9 flex-1 rounded-lg border px-2 text-xs font-bold disabled:opacity-40 ${props.tokenMoveEnabled?"border-amber-300 bg-amber-400/20 text-amber-100":"border-slate-700 text-slate-200"}`}>
+                {props.tokenMoveEnabled?"Move selection: ON":"Enable move selection"}</button>
+              <button type="button" onClick={props.onClearSelection} className="rounded-lg border border-slate-700 px-3 text-xs text-slate-300">Clear</button>
+            </div>
+          </div>
           <div className="mt-4">
             <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-200">Creature size</p>
             <div className="mt-2 grid grid-cols-3 gap-1.5">
@@ -114,7 +127,7 @@ export function VttSelectionPanel(props: Props) {
             <button type="button" disabled={props.busy} onClick={props.onRemove} className="min-h-10 rounded-xl border border-rose-400/30 px-3 text-[10px] font-black text-rose-200 disabled:opacity-40">Remove</button>
           </div>
 
-          <p className="mt-3 text-[9px] leading-4 text-slate-600">Shift/Ctrl-click adds or removes tokens. Party character miniatures remain unique per scene.</p>
+          <p className="mt-3 text-[9px] leading-4 text-slate-600">Shift/Ctrl-click toggles tokens. Shift-drag empty floor selects an entire squad. Reveal and Hide never move miniatures.</p>
         </>
       )}
     </section>
