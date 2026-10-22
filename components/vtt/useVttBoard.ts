@@ -93,6 +93,7 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
   const [measureEnd, setMeasureEnd] = useState<VttMeasurePoint | null>(null);
   const [measureSharingEnabled,setMeasureSharingEnabled]=useState(false);
   const [remoteMeasures,setRemoteMeasures]=useState<Record<string,SharedMeasure>>({});
+  const remoteMeasureLastSeen=useRef<Record<string,number>>({});
   const [refreshNonce,setRefreshNonce]=useState(0);
   const lastMeasureSentAt=useRef(0);
   const [ping, setPing] = useState<VttPing | null>(null);
@@ -117,6 +118,7 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
       setMeasureStart(null);
       setMeasureEnd(null);
       setRemoteMeasures({});
+      remoteMeasureLastSeen.current={};
       setMeasureSharingEnabled(false);
       setPlayerPreview(false);
       setPing(null);
@@ -242,11 +244,13 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
           !/^[0-9a-f-]{36}$/i.test(raw.senderId)||raw.senderId===currentUserId)return;
         const senderId=raw.senderId;
         if(raw.clear===true){
+          delete remoteMeasureLastSeen.current[senderId];
           setRemoteMeasures(old=>{const next={...old};delete next[senderId];return next;});
           return;
         }
         if(!validSharedMeasure(raw))return;
         const measure:SharedMeasure={senderId,mode:raw.mode,start:raw.start,end:raw.end};
+        remoteMeasureLastSeen.current[senderId]=Date.now();
         setRemoteMeasures(old=>({...old,[senderId]:measure}));
       })
       .on("broadcast", { event: "ping" }, ({ payload }) => {
@@ -271,6 +275,28 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
       unsubscribe();
     };
   }, [campaignId, currentUserId, refreshFromBroadcast, supabase]);
+
+  // A disconnected client cannot clear its last broadcast, so live measurements
+  // expire unless their owner keeps them alive. Pinned spell areas are persisted
+  // separately and deliberately never expire here.
+  useEffect(()=>{
+    const interval=window.setInterval(()=>{
+      const cutoff=Date.now()-20000;
+      setRemoteMeasures(current=>{
+        let removed=false;
+        const next={...current};
+        for(const senderId of Object.keys(next)){
+          if((remoteMeasureLastSeen.current[senderId]??0)<cutoff){
+            delete next[senderId];
+            delete remoteMeasureLastSeen.current[senderId];
+            removed=true;
+          }
+        }
+        return removed?next:current;
+      });
+    },3000);
+    return ()=>window.clearInterval(interval);
+  },[]);
 
   useEffect(() => {
     if (!ping) return;
@@ -776,6 +802,17 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
       senderId:currentUserId,sceneId:scene.id,mode,start,end,
     }});
   },[currentUserId,measureSharingEnabled,scene]);
+  // Keep a stationary shared ruler/radius visible until its owner clears it,
+  // switches tool or disconnects. Abandoned previews auto-expire on receivers.
+  useEffect(()=>{
+    if(!measureSharingEnabled||!scene?.is_active||!scene.visible_to_players||
+       !measureStart||!measureEnd||(toolMode!=="ruler"&&toolMode!=="radius"))return;
+    const interval=window.setInterval(()=>{
+      sendMeasurement(toolMode,measureStart,measureEnd,true);
+    },7000);
+    return ()=>window.clearInterval(interval);
+  },[measureSharingEnabled,scene,measureStart,measureEnd,toolMode,sendMeasurement]);
+
   const clearSharedMeasurement = useCallback(()=>{
     if(!scene)return;
     void channelRef.current?.send({type:"broadcast",event:"measure",
