@@ -51,6 +51,8 @@ export type VttDiceResultToast = {
   duality?: DualityResult;
 };
 
+export type VttActiveDiceRoll={envelope:VttDiceEnvelope;slot:number};
+
 type PendingLocalRoll = {
   envelope: VttDiceEnvelope;
   visibleToPlayers: boolean;
@@ -60,6 +62,8 @@ type Counts = Record<SupportedDie, number>;
 
 const DIE_ORDER: SupportedDie[] = [4, 6, 8, 10, 12, 20, 100];
 const MAX_VTT_PHYSICAL_DICE = 12;
+export const MAX_SIMULTANEOUS_VTT_ROLLS=12;
+const VTT_RESULT_TOAST_MS=10000;
 
 function emptyCounts(): Counts {
   return { 4: 0, 6: 0, 8: 0, 10: 0, 12: 0, 20: 0, 100: 0 };
@@ -151,17 +155,20 @@ export function useVttDice({
   const soundEngine = useMemo(() => getSharedDiceSoundEngine(), []);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const sceneIdRef = useRef<string | null>(sceneId);
-  const activeRef = useRef<VttDiceEnvelope | null>(null);
-  const pendingLocalRef = useRef<PendingLocalRoll | null>(null);
-  const clearTimerRef = useRef<number | null>(null);
-  const remoteWatchdogRef = useRef<number | null>(null);
+  const activeRollsRef=useRef(new Map<string,VttActiveDiceRoll>());
+  const [activeRolls,setActiveRolls]=useState<VttActiveDiceRoll[]>([]);
+  const clearTimersRef=useRef(new Map<string,number>());
+  const resultTimersRef=useRef(new Map<string,number>());
+  const seenResultsRef=useRef(new Set<string>());
+  const pendingLocalRef=useRef<PendingLocalRoll|null>(null);
 
   const [rollKind, setRollKind] = useState<VttRollKind>(daggerheart ? "duality" : "custom");
   const [counts, setCounts] = useState<Counts>(() => daggerheart ? { ...emptyCounts(), 12: 2 } : defaultCounts());
   const [modifier, setModifier] = useState(0);
   const [mode, setMode] = useState<VttDiceMode>("normal");
-  const [activeRoll, setActiveRoll] = useState<VttDiceEnvelope | null>(null);
-  const [latestResult, setLatestResult] = useState<VttDiceResultToast | null>(null);
+  const [resultToasts,setResultToasts]=useState<VttDiceResultToast[]>([]);
+  const activeRoll=activeRolls.find(r=>r.envelope.rollerId===currentUserId)?.envelope??null;
+  const latestResult=resultToasts[0]??null;
   const [localError, setLocalError] = useState<string | null>(null);
   const [gmShareRoll,setGmShareRoll]=useState(true);
   const rollWillBeShared=shouldPublishVttDiceRoll(isDm,sharedScene,gmShareRoll);
@@ -183,91 +190,87 @@ export function useVttDice({
     [configuration.appearance.cosmeticId],
   );
 
-  const [rollSceneId, setRollSceneId] = useState(sceneId);
-  if (rollSceneId !== sceneId) {
-    setRollSceneId(sceneId);
-    setLatestResult(null);
-    setActiveRoll(null);
-  }
+  const [rollSceneId,setRollSceneId]=useState(sceneId);
+  if(rollSceneId!==sceneId){setRollSceneId(sceneId);setActiveRolls([]);setResultToasts([]);}
 
-  useEffect(() => {
-    sceneIdRef.current = sceneId;
-    activeRef.current = null;
-    pendingLocalRef.current = null;
-    if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
-    if (remoteWatchdogRef.current) window.clearTimeout(remoteWatchdogRef.current);
-  }, [sceneId]);
+  const removeActive=useCallback((rollId:string)=>{
+    const timer=clearTimersRef.current.get(rollId);
+    if(timer!==undefined){window.clearTimeout(timer);clearTimersRef.current.delete(rollId);}
+    if(activeRollsRef.current.delete(rollId))setActiveRolls([...activeRollsRef.current.values()]);
+  },[]);
+  const clearActiveAfter=useCallback((rollId:string,milliseconds=3200)=>{
+    const old=clearTimersRef.current.get(rollId);
+    if(old!==undefined)window.clearTimeout(old);
+    clearTimersRef.current.set(rollId,window.setTimeout(()=>removeActive(rollId),milliseconds));
+  },[removeActive]);
+  const beginEnvelope=useCallback((envelope:VttDiceEnvelope):boolean=>{
+    if(envelope.sceneId!==sceneIdRef.current)return false;
+    if(activeRollsRef.current.has(envelope.rollId))return true;
+    if(activeRollsRef.current.size>=MAX_SIMULTANEOUS_VTT_ROLLS)return false;
+    const taken=new Set([...activeRollsRef.current.values()].map(r=>r.slot));
+    let slot=0;while(taken.has(slot))slot+=1;
+    activeRollsRef.current.set(envelope.rollId,{envelope,slot});
+    setActiveRolls([...activeRollsRef.current.values()]);
+    clearActiveAfter(envelope.rollId,30000);
+    return true;
+  },[clearActiveAfter]);
+  const showResult=useCallback((result:VttDiceResultToast)=>{
+    if(seenResultsRef.current.has(result.rollId))return;
+    seenResultsRef.current.add(result.rollId);
+    setResultToasts(prev=>[result,...prev].slice(0,6));
+    resultTimersRef.current.set(result.rollId,window.setTimeout(()=>{
+      setResultToasts(prev=>prev.filter(r=>r.rollId!==result.rollId));
+      resultTimersRef.current.delete(result.rollId);
+      seenResultsRef.current.delete(result.rollId);
+    },VTT_RESULT_TOAST_MS));
+  },[]);
 
-  const clearActiveAfter = useCallback((rollId: string, milliseconds = 3200) => {
-    if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
-    clearTimerRef.current = window.setTimeout(() => {
-      if (activeRef.current?.rollId !== rollId) return;
-      activeRef.current = null;
-      setActiveRoll(null);
-    }, milliseconds);
-  }, []);
-
-  const beginEnvelope = useCallback((envelope: VttDiceEnvelope) => {
-    if (envelope.sceneId !== sceneIdRef.current) return;
-    if (activeRef.current?.rollId === envelope.rollId) return;
-    // The first beta deliberately serializes shared throws. A second simultaneous
-    // broadcast is ignored rather than letting two physics worlds overlap.
-    if (activeRef.current) return;
-    if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
-    if (remoteWatchdogRef.current) window.clearTimeout(remoteWatchdogRef.current);
-    setLatestResult(null);
-    activeRef.current = envelope;
-    setActiveRoll(envelope);
-  }, []);
-
-  useEffect(() => {
-    if (!sceneId || !sharedScene) return;
-    const channel = supabase
-      .channel(`vtt:dice:${sceneId}`, { config: { private: true } })
-      .on("broadcast", { event: "roll-start" }, ({ payload }) => {
-        if (!isEnvelope(payload)) return;
-        if (payload.sceneId !== sceneIdRef.current) return;
-        if (payload.rollerId === currentUserId && pendingLocalRef.current?.envelope.rollId === payload.rollId) return;
-        beginEnvelope({
-          ...payload,
-          request: { ...payload.request, startedAt: performance.now() },
-        });
+  useEffect(()=>{
+    sceneIdRef.current=sceneId;
+    activeRollsRef.current.clear();
+    pendingLocalRef.current=null;
+    seenResultsRef.current.clear();
+    for(const t of clearTimersRef.current.values())window.clearTimeout(t);
+    clearTimersRef.current.clear();
+    for(const t of resultTimersRef.current.values())window.clearTimeout(t);
+    resultTimersRef.current.clear();
+    setActiveRolls([]);setResultToasts([]);
+  },[sceneId]);
+  useEffect(()=>{
+    if(!sceneId||!sharedScene)return;
+    const channel=supabase.channel(`vtt:dice:${sceneId}`,{config:{private:true}})
+      .on("broadcast",{event:"roll-start"},({payload})=>{
+        if(!isEnvelope(payload)||payload.sceneId!==sceneIdRef.current)return;
+        if(payload.rollerId===currentUserId&&pendingLocalRef.current?.envelope.rollId===payload.rollId)return;
+        beginEnvelope({...payload,request:{...payload.request,startedAt:performance.now()}});
       })
-      .on("broadcast", { event: "roll-result" }, ({ payload }) => {
-        if (!isResultToast(payload) || payload.sceneId !== sceneIdRef.current) return;
-        setLatestResult(payload);
-        if (activeRef.current?.rollId === payload.rollId) clearActiveAfter(payload.rollId);
+      .on("broadcast",{event:"roll-result"},({payload})=>{
+        if(!isResultToast(payload)||payload.sceneId!==sceneIdRef.current)return;
+        showResult(payload);
+        if(activeRollsRef.current.has(payload.rollId))clearActiveAfter(payload.rollId,3200);
       });
-
-    const unsubscribe = subscribeVttChannel(supabase, channel);
-    channelRef.current = channel;
-    return () => {
-      channelRef.current = null;
-      unsubscribe();
-    };
-  }, [beginEnvelope, clearActiveAfter, currentUserId, sceneId, sharedScene, supabase]);
-
-  useEffect(() => () => {
-    if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
-    if (remoteWatchdogRef.current) window.clearTimeout(remoteWatchdogRef.current);
-  }, []);
+    const unsubscribe=subscribeVttChannel(supabase,channel);
+    channelRef.current=channel;
+    return ()=>{channelRef.current=null;unsubscribe();};
+  },[beginEnvelope,clearActiveAfter,currentUserId,sceneId,sharedScene,showResult,supabase]);
+  useEffect(()=>()=>{for(const t of clearTimersRef.current.values())window.clearTimeout(t);for(const t of resultTimersRef.current.values())window.clearTimeout(t);},[]);
 
   const addDie = useCallback((sides: SupportedDie) => {
-    if (activeRef.current) return;
+    if (pendingLocalRef.current) return;
     setRollKind("custom");
     setMode("normal");
     setCounts((current) => ({ ...current, [sides]: Math.min(12, current[sides] + 1) }));
   }, []);
 
   const removeDie = useCallback((sides: SupportedDie) => {
-    if (activeRef.current) return;
+    if (pendingLocalRef.current) return;
     setRollKind("custom");
     setMode("normal");
     setCounts((current) => ({ ...current, [sides]: Math.max(0, current[sides] - 1) }));
   }, []);
 
   const clearDice = useCallback(() => {
-    if (activeRef.current) return;
+    if (pendingLocalRef.current) return;
     setRollKind("custom");
     setCounts(emptyCounts());
     setModifier(0);
@@ -275,7 +278,8 @@ export function useVttDice({
   }, []);
 
   const roll = useCallback(async () => {
-    if (!sceneId || activeRef.current || configuration.loading || historySaving) return;
+    if(!sceneId||pendingLocalRef.current||configuration.loading||historySaving)return;
+    if(activeRollsRef.current.size>=MAX_SIMULTANEOUS_VTT_ROLLS){setLocalError("VTT dice table is full. Try again when dice settle.");return;}
     if (groups.length === 0) {
       setLocalError("Add at least one die before rolling.");
       return;
@@ -312,34 +316,25 @@ export function useVttDice({
       };
 
       setLocalError(null);
-      setLatestResult(null);
       const visibleToPlayers=shouldPublishVttDiceRoll(isDm,sharedScene,gmShareRoll);
-      pendingLocalRef.current = { envelope,visibleToPlayers };
-      activeRef.current = envelope;
-      setActiveRoll(envelope);
+      pendingLocalRef.current={envelope,visibleToPlayers};
+      if(!beginEnvelope(envelope)){pendingLocalRef.current=null;setLocalError("VTT dice table is full.");return;}
 
       if (configuration.appearance.sound) await soundEngine.unlock();
       if(visibleToPlayers)void channelRef.current?.send({ type: "broadcast", event: "roll-start", payload: envelope });
     } catch (cause) {
-      pendingLocalRef.current = null;
-      activeRef.current = null;
-      setActiveRoll(null);
+      pendingLocalRef.current=null;
+      removeActive(rollId);
       setLocalError(cause instanceof Error ? cause.message : "Could not prepare the VTT dice roll.");
     }
-  }, [configuration.appearance, configuration.loading, configuration.physics, currentUserId, currentUserName, duality, effectiveMode, expression, groups, historySaving, modifier, physicalCount, physicalGroups, rollKind, sceneId, soundEngine, isDm, sharedScene, gmShareRoll]);
+  }, [configuration.appearance, configuration.loading, configuration.physics, currentUserId, currentUserName, duality, effectiveMode, expression, groups, historySaving, modifier, physicalCount, physicalGroups, rollKind, sceneId, soundEngine, isDm, sharedScene, gmShareRoll,beginEnvelope,removeActive]);
 
   const handlePhysicsComplete = useCallback(async (physicsResult: PhysicsRollResult) => {
-    const envelope = activeRef.current;
-    if (!envelope || envelope.rollId !== physicsResult.rollId) return;
-
-    if (envelope.rollerId !== currentUserId) {
-      if (remoteWatchdogRef.current) window.clearTimeout(remoteWatchdogRef.current);
-      remoteWatchdogRef.current = window.setTimeout(() => {
-        if (activeRef.current?.rollId === envelope.rollId) {
-          activeRef.current = null;
-          setActiveRoll(null);
-        }
-      }, 5200);
+    const entry=activeRollsRef.current.get(physicsResult.rollId);
+    if(!entry)return;
+    const envelope=entry.envelope;
+    if(envelope.rollerId!==currentUserId){
+      if(!seenResultsRef.current.has(envelope.rollId))clearActiveAfter(envelope.rollId,5200);
       return;
     }
 
@@ -428,33 +423,33 @@ export function useVttDice({
     });
 
     if (sceneIdRef.current !== envelope.sceneId) return;
-    setLatestResult(toast);
+    showResult(toast);
     if(pending.visibleToPlayers)void channelRef.current?.send({ type: "broadcast", event: "roll-result", payload: toast });
     clearActiveAfter(envelope.rollId);
-  }, [clearActiveAfter, currentUserId, saveHistoryRoll]);
+  }, [clearActiveAfter, currentUserId, saveHistoryRoll,showResult]);
 
-  const handleImpact = useCallback((force: number) => {
-    const envelope = activeRef.current;
-    if (!envelope?.request.settings.sound) return;
+  const handleImpact=useCallback((force:number,rollId:string)=>{
+    if(!activeRollsRef.current.get(rollId)?.envelope.request.settings.sound)return;
     soundEngine.impact(force);
-  }, [soundEngine]);
+  },[soundEngine]);
 
   const error = localError ?? configuration.error ?? historyError;
   const canRoll = Boolean(sceneId)
     && groups.length > 0
     && physicalCount <= MAX_VTT_PHYSICAL_DICE
-    && !activeRoll
+    && !pendingLocalRef.current
+    && activeRolls.length<MAX_SIMULTANEOUS_VTT_ROLLS
     && !configuration.loading
     && !historySaving;
 
   return {
     rollKind,
     selectDuality: () => {
-      if (!daggerheart || activeRef.current) return;
+      if (!daggerheart || pendingLocalRef.current) return;
       setRollKind("duality"); setCounts({ ...emptyCounts(), 12: 2 }); setMode("normal");
     },
     selectAdversary: () => {
-      if (activeRef.current) return;
+      if (pendingLocalRef.current) return;
       setRollKind("custom"); setCounts(defaultCounts()); setMode("normal");
     },
     counts,
@@ -467,10 +462,12 @@ export function useVttDice({
     canUseD20Mode,
     canRoll,
     activeRoll,
+    activeRolls,
+    resultToasts,
     latestResult,
     rollWillBeShared,
     gmShareRoll,
-    setGmShareRoll:(next:boolean)=>{if(isDm&&!activeRef.current)setGmShareRoll(next);},
+    setGmShareRoll:(next:boolean)=>{if(isDm&&!pendingLocalRef.current)setGmShareRoll(next);},
     error,
     appearanceName: cosmetic.name,
     appearanceSwatch: cosmetic.swatch,
@@ -484,10 +481,10 @@ export function useVttDice({
     removeDie,
     clearDice,
     setModifier: (value: number) => {
-      if (!activeRef.current) setModifier(Math.max(-99, Math.min(99, Math.round(value))));
+      if (!pendingLocalRef.current) setModifier(Math.max(-99, Math.min(99, Math.round(value))));
     },
     setMode: (value: VttDiceMode) => {
-      if (!activeRef.current && (value === "normal" || canUseD20Mode)) setMode(value);
+      if (!pendingLocalRef.current && (value === "normal" || canUseD20Mode)) setMode(value);
     },
     roll,
     handlePhysicsComplete,
