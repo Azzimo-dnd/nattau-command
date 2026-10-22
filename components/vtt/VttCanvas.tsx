@@ -14,6 +14,7 @@ import { VttFogDraftOverlay, VttFogLayer } from "./VttFogLayer";
 import { VttTerrainLayer } from "./VttTerrainLayer";
 import { VttSpellAreaLayer,VttConeShape } from "./VttSpellAreaLayer";
 import { VttAoEDistanceMarker } from "./VttAoEDistanceMarker";
+import { snapAoEEdge } from "./vttAoEMath";
 import {coneDirection} from "./vttConeMath";
 import type {SharedMeasure,VttSpellArea} from "./vttSpellAreas";
 import { planTokenGroupMove, tokensInSelectionBox } from "./vttGroupMovement";
@@ -257,7 +258,7 @@ function MeasurementOverlay({ mode, start, end, feetPerSquare }: { mode: VttTool
   if (radius < 0.02) return null;
   if(mode==="cone")return <group position={[start[0],0.04,start[1]]}>
     <VttConeShape length={radius} direction={coneDirection(start,end)} opacity={0.16}/>
-    <VttAoEDistanceMarker distance={radius} feetPerSquare={feetPerSquare} direction={coneDirection(start,end)} color="#d8b4fe"/>
+    <VttAoEDistanceMarker distance={radius} feetPerSquare={feetPerSquare} direction={coneDirection(start,end)} kind="cone" color="#d8b4fe"/>
   </group>;
   return <group position={[start[0], 0.035, start[1]]}><mesh rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[radius, 96]} /><meshBasicMaterial color="#c084fc" transparent opacity={0.11} depthWrite={false} side={THREE.DoubleSide} /></mesh><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}><ringGeometry args={[Math.max(0.01, radius - 0.025), radius + 0.025, 96]} /><meshBasicMaterial color="#d8b4fe" transparent opacity={0.95} depthWrite={false} side={THREE.DoubleSide} /></mesh><VttAoEDistanceMarker distance={radius} feetPerSquare={feetPerSquare} direction={0} color="#d8b4fe"/></group>;
 }
@@ -519,7 +520,11 @@ export function VttCanvas({
       return;
     }
     if (draggingId && isDm && !diceRequest) { event.stopPropagation(); onLocalMove(draggingId, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
-    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) { event.stopPropagation(); onMeasureMove([event.point.x, event.point.z]); }
+    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) {
+      event.stopPropagation();
+      const point:[number,number]=[event.point.x,event.point.z];
+      onMeasureMove(measureStart&&(toolMode==="radius"||toolMode==="cone")?snapAoEEdge(measureStart,point):point);
+    }
   };
 
   const planeUp = (event: ThreeEvent<PointerEvent>) => {
@@ -538,7 +543,11 @@ export function VttCanvas({
       return;
     }
     if (draggingId && isDm && !diceRequest) { event.stopPropagation(); const id = draggingId; setDraggingId(null); onCommitMove(id, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
-    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) { event.stopPropagation(); setMeasuring(false); onMeasureEnd([event.point.x, event.point.z]); }
+    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) {
+      event.stopPropagation();setMeasuring(false);
+      const point:[number,number]=[event.point.x,event.point.z];
+      onMeasureEnd(measureStart&&(toolMode==="radius"||toolMode==="cone")?snapAoEEdge(measureStart,point):point);
+    }
   };
 
   return <>{moveWarning&&<div role="alert" className="pointer-events-none absolute left-1/2 top-16 z-30 -translate-x-1/2 rounded-xl border border-amber-400/40 bg-slate-950/95 px-4 py-2 text-xs text-amber-200">{moveWarning}</div>}

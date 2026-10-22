@@ -2,7 +2,8 @@
 import {useEffect,useMemo} from "react";
 import * as THREE from "three";
 import {coneCorners} from "./vttConeMath";
-import {VttAoEDistanceMarker,aoeLabelOffset} from "./VttAoEDistanceMarker";
+import {VttAoEDistanceMarker} from "./VttAoEDistanceMarker";
+import {aoeLabelOffset} from "./vttAoEMath";
 import {isFogPointRevealed} from "./vttFogMath";
 import type {VttFogBaseState,VttFogRegion} from "./vttTypes";
 import type {VttSpellArea} from "./vttSpellAreas";
@@ -74,7 +75,7 @@ export function VttSpellAreaLayer({areas,feetPerSquare,isDm,fogEnabled,fogBaseSt
      </>}
    {labelRevealed(a)&&<VttAoEDistanceMarker distance={a.radius}
      feetPerSquare={feetPerSquare} direction={a.shape_type==="cone"?a.direction_rad:0}
-     color={a.color}/>}
+     kind={a.shape_type==="cone"?"cone":"radius"} color={a.color}/>}
   </group>)}
  </group>;
 }

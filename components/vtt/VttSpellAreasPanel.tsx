@@ -78,7 +78,7 @@ export function VttSpellAreasPanel({areas,currentRadius,currentShape,busy,loadin
      <span className="h-3 w-3 shrink-0 rounded-full" style={{backgroundColor:a.color}}/>
      <div className="min-w-0 flex-1">
       <p className="truncate text-xs font-medium text-slate-200">{a.shape_type==="cone"?"△":"◯"} {a.label}</p>
-      <p className="text-[10px] text-slate-500">{a.shape_type==="cone"?"Length":"Radius"} {a.radius.toFixed(1)} sq · {(a.radius*feetPerSquare).toFixed(0)} ft · {a.visible_to_players?"Shared":"GM only"}</p>
+      <p className="text-[10px] text-slate-500">{a.shape_type==="cone"?"Length":"Radius"} {Number((a.radius*feetPerSquare).toFixed(1)).toLocaleString("en-US",{maximumFractionDigits:1})} ft · {a.visible_to_players?"Shared":"GM only"}</p>
      </div>
      {isDm&&<>
       {a.shape_type==="cone"&&<button type="button" disabled={busy} onClick={()=>setEditing(old=>old===a.id?null:a.id)}
