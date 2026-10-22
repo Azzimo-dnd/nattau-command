@@ -12,6 +12,7 @@ import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-ph
 import { VttDiceLayer } from "./VttDiceLayer";
 import { VttFogDraftOverlay, VttFogLayer } from "./VttFogLayer";
 import { VttTerrainLayer } from "./VttTerrainLayer";
+import { planTokenGroupMove, tokensInSelectionBox } from "./vttGroupMovement";
 import type { TerrainAssetRow } from "@/lib/terrain/terrainTypes";
 import type { VttSceneTerrainInstance } from "./terrainSceneTypes";
 import type {
@@ -60,6 +61,9 @@ type Props = {
   onSelect: (id: string | null, additive: boolean) => void;
   onLocalMove: (id: string, x: number, z: number) => void;
   onCommitMove: (id: string, x: number, z: number) => void;
+  tokenMoveEnabled?: boolean;
+  onSelectMany?: (ids: string[], additive: boolean) => void;
+  onCommitTokenFormation?: (ids: string[], dx: number, dz: number) => Promise<boolean>;
   onMeasureStart: (point: VttMeasurePoint) => void;
   onMeasureMove: (point: VttMeasurePoint) => void;
   onMeasureEnd: (point: VttMeasurePoint) => void;
@@ -265,23 +269,51 @@ function TokenNameplate({ name, size }: { name: string; size: number }) {
   return <sprite position={[0, 1.05 * Math.max(1, size), 0]} scale={[labelHeight * aspect, labelHeight, 1]}><spriteMaterial map={texture} transparent depthTest={false} depthWrite={false} /></sprite>;
 }
 
-function TokenMesh({ token, selected, currentTurn, showNameplate, isDm, canDrag, supabase, onSelect, onDragStart, onAssetSettled, assetCache }: { assetCache: TokenAssetCache; token: VttToken; selected: boolean; currentTurn: boolean; showNameplate: boolean; isDm: boolean; canDrag: boolean; supabase: ReturnType<typeof createClient>; onSelect: (id: string, additive: boolean) => void; onDragStart: (id: string) => void; onAssetSettled: (id: string, ok: boolean) => void }) {
-  const [asset, setAsset] = useState<LoadedTokenAsset | null>(null);
-  const [failed, setFailed] = useState(false);
-  const descriptor = useMemo(() => ({ source_kind: token.source_kind, model_storage_path: token.model_storage_path, paint_storage_path: token.paint_storage_path, model_file_name: token.model_file_name, model_format: token.model_format }), [token.source_kind, token.model_storage_path, token.paint_storage_path, token.model_file_name, token.model_format]);
-  useEffect(() => {
-    let alive = true;
-    loadTokenAsset(supabase, descriptor, assetCache).then((next) => { if (alive) { setAsset(next); onAssetSettled(tokenAssetKey(descriptor), true); } }).catch(() => { if (alive) { setFailed(true); onAssetSettled(tokenAssetKey(descriptor), false); } });
-    return () => { alive = false; };
-  }, [assetCache, descriptor, onAssetSettled, supabase]);
-  const down = (event: ThreeEvent<PointerEvent>) => { event.stopPropagation(); const additive = event.shiftKey || event.ctrlKey || event.metaKey; onSelect(token.id, additive); if (isDm && canDrag && event.button === 0 && !additive) onDragStart(token.id); };
-  const worldScale = (asset?.baseScale ?? 1) * (asset?.visualScale ?? 1) * token.scale * token.size_squares;
-  const ringColor = token.source_kind === "enemy" ? (token.visible_to_players ? "#fb7185" : "#a855f7") : "#22d3ee";
-  return <group position={[token.x, 0.02, token.z]} rotation={[0, token.rotation, 0]}>
-    {currentTurn ? <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}><ringGeometry args={[0.5 * token.size_squares, 0.62 * token.size_squares, 64]} /><meshBasicMaterial color="#fbbf24" transparent opacity={0.95} depthTest={false} side={THREE.DoubleSide} /></mesh> : null}
-    {selected ? <><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}><ringGeometry args={[0.42 * token.size_squares, 0.52 * token.size_squares, 48]} /><meshBasicMaterial color={ringColor} transparent opacity={0.9} side={THREE.DoubleSide} /></mesh><mesh position={[0, 0.045, -0.62 * token.size_squares]} rotation={[-Math.PI / 2, 0, 0]}><coneGeometry args={[0.11 * token.size_squares, 0.28 * token.size_squares, 3]} /><meshBasicMaterial color={ringColor} depthTest={false} /></mesh></> : null}
-    {showNameplate ? <TokenNameplate name={token.name} size={token.size_squares} /> : null}
-    {asset ? <MiniatureObject asset={asset} scale={worldScale} opacity={isDm && !token.visible_to_players ? 0.42 : 1} onPointerDown={down} /> : <mesh onPointerDown={down} position={[0, 0.34, 0]}><cylinderGeometry args={[0.34, 0.42, 0.68, 20]} /><meshStandardMaterial color={failed ? "#7f1d1d" : token.source_kind === "enemy" ? "#7f4650" : "#53657b"} /></mesh>}
+type Point2 = [number,number];
+type TokenDragSession = {
+  pointerId:number; ids:string[]; anchorId:string; leader:VttToken;
+  startHit:Point2; origins:VttToken[]; moved:boolean; dx:number; dz:number;
+};
+type MarqueeSession={pointerId:number;start:Point2;end:Point2};
+const floorPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+function hitFloor(event:ThreeEvent<PointerEvent>): Point2|null {
+  const point=event.ray.intersectPlane(floorPlane,new THREE.Vector3());
+  return point && Number.isFinite(point.x) && Number.isFinite(point.z)?[point.x,point.z]:null;
+}
+function capturePointer(event:ThreeEvent<PointerEvent>){
+  (event.target as unknown as {setPointerCapture?:(id:number)=>void}).setPointerCapture?.(event.pointerId);
+}
+function releasePointer(event:ThreeEvent<PointerEvent>){
+  (event.target as unknown as {releasePointerCapture?:(id:number)=>void}).releasePointerCapture?.(event.pointerId);
+}
+
+function TokenMesh({ token, selected, currentTurn, showNameplate, isDm, supabase, onPointerDown, onPointerMove, onPointerUp, onAssetSettled, assetCache }: {
+  assetCache: TokenAssetCache; token: VttToken; selected: boolean; currentTurn: boolean;
+  showNameplate: boolean; isDm: boolean; supabase: ReturnType<typeof createClient>;
+  onPointerDown:(event:ThreeEvent<PointerEvent>,token:VttToken)=>void;
+  onPointerMove:(event:ThreeEvent<PointerEvent>)=>void;
+  onPointerUp:(event:ThreeEvent<PointerEvent>)=>void;
+  onAssetSettled:(id:string,ok:boolean)=>void;
+}) {
+  const [asset,setAsset]=useState<LoadedTokenAsset|null>(null);
+  const [failed,setFailed]=useState(false);
+  const descriptor=useMemo(()=>({source_kind:token.source_kind,model_storage_path:token.model_storage_path,paint_storage_path:token.paint_storage_path,model_file_name:token.model_file_name,model_format:token.model_format}),[token.source_kind,token.model_storage_path,token.paint_storage_path,token.model_file_name,token.model_format]);
+  useEffect(()=>{
+    let alive=true;
+    loadTokenAsset(supabase,descriptor,assetCache).then(next=>{
+      if(alive){setAsset(next);onAssetSettled(tokenAssetKey(descriptor),true);}
+    }).catch(()=>{if(alive){setFailed(true);onAssetSettled(tokenAssetKey(descriptor),false);}});
+    return()=>{alive=false};
+  },[assetCache,descriptor,onAssetSettled,supabase]);
+  const worldScale=(asset?.baseScale??1)*(asset?.visualScale??1)*token.scale*token.size_squares;
+  const ringColor=token.source_kind==="enemy"?(token.visible_to_players?"#fb7185":"#a855f7"):"#22d3ee";
+  return <group position={[token.x,0.02,token.z]} rotation={[0,token.rotation,0]}
+    onPointerDown={e=>onPointerDown(e,token)}
+    onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+    {currentTurn?<mesh rotation={[-Math.PI/2,0,0]} position={[0,0.01,0]} raycast={()=>undefined}><ringGeometry args={[0.5*token.size_squares,0.62*token.size_squares,64]}/><meshBasicMaterial color="#fbbf24" transparent opacity={0.95} depthTest={false} side={THREE.DoubleSide}/></mesh>:null}
+    {selected?<><mesh rotation={[-Math.PI/2,0,0]} position={[0,0.015,0]} raycast={()=>undefined}><ringGeometry args={[0.42*token.size_squares,0.52*token.size_squares,48]}/><meshBasicMaterial color={ringColor} transparent opacity={0.9} side={THREE.DoubleSide}/></mesh><mesh position={[0,0.045,-0.62*token.size_squares]} rotation={[-Math.PI/2,0,0]} raycast={()=>undefined}><coneGeometry args={[0.11*token.size_squares,0.28*token.size_squares,3]}/><meshBasicMaterial color={ringColor} depthTest={false}/></mesh></>:null}
+    {showNameplate?<TokenNameplate name={token.name} size={token.size_squares}/>:null}
+    {asset?<MiniatureObject asset={asset} scale={worldScale} opacity={isDm&&!token.visible_to_players?0.42:1}/>:<mesh position={[0,0.34,0]}><cylinderGeometry args={[0.34,0.42,0.68,20]}/><meshStandardMaterial color={failed?"#7f1d1d":token.source_kind==="enemy"?"#7f4650":"#53657b"}/></mesh>}
   </group>;
 }
 
@@ -313,6 +345,9 @@ export function VttCanvas({
   onSelect,
   onLocalMove,
   onCommitMove,
+  tokenMoveEnabled = false,
+  onSelectMany,
+  onCommitTokenFormation,
   onMeasureStart,
   onMeasureMove,
   onMeasureEnd,
@@ -328,6 +363,13 @@ export function VttCanvas({
   onDiceImpact,
 }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [formationDragging,setFormationDragging]=useState(false);
+  const tokenDrag=useRef<TokenDragSession|null>(null);
+  const marqueeRef=useRef<MarqueeSession|null>(null);
+  const [marquee,setMarquee]=useState<MarqueeSession|null>(null);
+  const [formationDraft,setFormationDraft]=useState<Map<string,{x:number;z:number}>>(new Map());
+  const [moveWarning,setMoveWarning]=useState<string|null>(null);
+  const formationSaving=useRef(false);
   const [terrainDragging, setTerrainDragging] = useState(false);
   const [measuring, setMeasuring] = useState(false);
   const [assetAttempt, setAssetAttempt] = useState(0);
@@ -348,6 +390,74 @@ export function VttCanvas({
   }, [failedCount, loadedCount, onAssetProgress, tokens.length]);
   const assetSettled = useCallback((id: string, ok: boolean) => setAssetState((current) => current[id] === ok ? current : { ...current, [id]: ok }), []);
 
+  const cancelSelectionGesture=useCallback(()=>{
+    tokenDrag.current=null;marqueeRef.current=null;
+    setMarquee(null);setFormationDraft(new Map());setFormationDragging(false);setMoveWarning(null);
+  },[]);
+  useEffect(()=>{
+    window.addEventListener("blur",cancelSelectionGesture);
+    window.addEventListener("pointercancel",cancelSelectionGesture);
+    return()=>{window.removeEventListener("blur",cancelSelectionGesture);
+      window.removeEventListener("pointercancel",cancelSelectionGesture);};
+  },[cancelSelectionGesture]);
+  useEffect(()=>{if(toolMode!=="navigate"||fogEditing||diceRequest||!isDm)cancelSelectionGesture();},
+    [toolMode,fogEditing,diceRequest,isDm,cancelSelectionGesture]);
+  const tokenDown=(event:ThreeEvent<PointerEvent>,token:VttToken)=>{
+    if(event.button!==0||fogEditing||diceRequest||toolMode!=="navigate")return;
+    event.stopPropagation();
+    const additive=event.shiftKey||event.ctrlKey||event.metaKey;
+    const groupAlreadySelected=selectedIds.includes(token.id);
+    if(!isDm||!tokenMoveEnabled||additive||formationSaving.current){
+      onSelect(token.id,additive);return;
+    }
+    if(!groupAlreadySelected)onSelect(token.id,false);
+    const hit=hitFloor(event);
+    if(!hit)return;
+    const ids=groupAlreadySelected?[...selectedIds]:[token.id];
+    tokenDrag.current={pointerId:event.pointerId,ids,anchorId:token.id,leader:token,
+      startHit:hit,origins:tokens.slice(),moved:false,dx:0,dz:0};
+    capturePointer(event);
+    setFormationDragging(true);
+  };
+  const tokenMove=(event:ThreeEvent<PointerEvent>)=>{
+    const drag=tokenDrag.current;
+    if(!drag||drag.pointerId!==event.pointerId)return;
+    event.stopPropagation();
+    const hit=hitFloor(event);
+    if(!hit)return;
+    const diffX=hit[0]-drag.startHit[0],diffZ=hit[1]-drag.startHit[1];
+    if(!drag.moved&&Math.hypot(diffX,diffZ)<0.12)return;
+    drag.moved=true;
+    const plan=planTokenGroupMove(drag.origins,drag.ids,drag.anchorId,
+      drag.leader.x+diffX,drag.leader.z+diffZ,scene.grid_width,scene.grid_height);
+    if(!plan.valid){
+      drag.dx=0;drag.dz=0;
+      setFormationDraft(new Map());
+      setMoveWarning(plan.reason??"This formation cannot move to these squares.");
+      return;
+    }
+    drag.dx=plan.dx;drag.dz=plan.dz;
+    setFormationDraft(plan.positions);setMoveWarning(null);
+  };
+  const tokenUp=(event:ThreeEvent<PointerEvent>)=>{
+    const drag=tokenDrag.current;
+    if(!drag||drag.pointerId!==event.pointerId)return;
+    event.stopPropagation();
+    releasePointer(event);
+    tokenDrag.current=null;setFormationDragging(false);
+    if(!drag.moved||(!drag.dx&&!drag.dz)){
+      setFormationDraft(new Map());return;
+    }
+    if(!onCommitTokenFormation){setFormationDraft(new Map());return;}
+    formationSaving.current=true;
+    void onCommitTokenFormation(drag.ids,drag.dx,drag.dz).catch(cause=>{
+      setMoveWarning(cause instanceof Error?cause.message:"Could not save formation movement.");
+      return false;
+    }).finally(()=>{
+      formationSaving.current=false;setFormationDraft(new Map());
+    });
+  };
+
   const planeDown = (event: ThreeEvent<PointerEvent>) => {
     if (event.button !== 0 || diceRequest) return;
     if (fogEditing) {
@@ -362,11 +472,25 @@ export function VttCanvas({
       return;
     }
     if (toolMode === "ping") { event.stopPropagation(); onPing([event.point.x, event.point.z]); return; }
-    if (toolMode === "navigate") return;
+    if(toolMode==="navigate"){
+      if(isDm&&event.shiftKey){
+        event.stopPropagation();
+        const start:[number,number]=[event.point.x,event.point.z];
+        const box={pointerId:event.pointerId,start,end:start};
+        marqueeRef.current=box;setMarquee(box);
+        capturePointer(event);setFormationDragging(true);
+      }
+      return;
+    }
     event.stopPropagation(); setMeasuring(true); onMeasureStart([event.point.x, event.point.z]);
   };
 
   const planeMove = (event: ThreeEvent<PointerEvent>) => {
+    if(marqueeRef.current&&marqueeRef.current.pointerId===event.pointerId){
+      event.stopPropagation();
+      const next={...marqueeRef.current,end:[event.point.x,event.point.z] as Point2};
+      marqueeRef.current=next;setMarquee(next);return;
+    }
     if (fogEditing && !diceRequest) {
       event.stopPropagation();
       onFogPointerMove([event.point.x, event.point.z]);
@@ -377,6 +501,15 @@ export function VttCanvas({
   };
 
   const planeUp = (event: ThreeEvent<PointerEvent>) => {
+    const box=marqueeRef.current;
+    if(box&&box.pointerId===event.pointerId){
+      event.stopPropagation();releasePointer(event);marqueeRef.current=null;
+      setMarquee(null);setFormationDragging(false);
+      if(Math.hypot(box.end[0]-box.start[0],box.end[1]-box.start[1])>=0.1){
+        onSelectMany?.(tokensInSelectionBox(tokens,box.start,box.end),true);
+      }
+      return;
+    }
     if (fogEditing && !diceRequest) {
       event.stopPropagation();
       onFogPointerUp([event.point.x, event.point.z]);
@@ -386,7 +519,8 @@ export function VttCanvas({
     if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) { event.stopPropagation(); setMeasuring(false); onMeasureEnd([event.point.x, event.point.z]); }
   };
 
-  return <>{(failedCount > 0 || (mapError && mapError === scene.map_storage_path) || terrainError) && <div role="alert" className="absolute right-3 top-14 z-30 max-w-xs rounded-xl border border-rose-400/30 bg-slate-950 p-3 text-xs text-rose-100"><p>{terrainError ?? (mapError === scene.map_storage_path ? "The map image could not be loaded." : "Some miniature files could not be loaded.")}</p><button type="button" onClick={() => { setMapError(null); setTerrainError(null); setAssetState({}); setAssetAttempt((attempt) => attempt + 1); }} className="mt-2 min-h-9 rounded-lg border border-rose-300/30 px-3 font-bold">Retry assets</button></div>}<Canvas fallback={<div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-300">The 3D table needs WebGL. Enable hardware acceleration or open it in another browser.</div>} shadows dpr={[1, 1.5]} camera={{ position: defaultCameraPosition(scene.grid_width, scene.grid_height).toArray() as [number, number, number], fov: 44, near: 0.1, far: 300 }} onPointerMissed={() => { if (toolMode === "navigate" && !diceRequest && !fogEditing) onSelect(null, false); }}>
+  return <>{moveWarning&&<div role="alert" className="pointer-events-none absolute left-1/2 top-16 z-30 -translate-x-1/2 rounded-xl border border-amber-400/40 bg-slate-950/95 px-4 py-2 text-xs text-amber-200">{moveWarning}</div>}
+  {(failedCount > 0 || (mapError && mapError === scene.map_storage_path) || terrainError) && <div role="alert" className="absolute right-3 top-14 z-30 max-w-xs rounded-xl border border-rose-400/30 bg-slate-950 p-3 text-xs text-rose-100"><p>{terrainError ?? (mapError === scene.map_storage_path ? "The map image could not be loaded." : "Some miniature files could not be loaded.")}</p><button type="button" onClick={() => { setMapError(null); setTerrainError(null); setAssetState({}); setAssetAttempt((attempt) => attempt + 1); }} className="mt-2 min-h-9 rounded-lg border border-rose-300/30 px-3 font-bold">Retry assets</button></div>}<Canvas fallback={<div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-300">The 3D table needs WebGL. Enable hardware acceleration or open it in another browser.</div>} shadows dpr={[1, 1.5]} camera={{ position: defaultCameraPosition(scene.grid_width, scene.grid_height).toArray() as [number, number, number], fov: 44, near: 0.1, far: 300 }} onPointerMissed={() => { if (toolMode === "navigate" && !diceRequest && !fogEditing) onSelect(null, false); }}>
     <color attach="background" args={["#070b11"]} /><ambientLight intensity={1.25} /><directionalLight position={[12, 22, 10]} intensity={2.5} castShadow /><directionalLight position={[-12, 10, -8]} intensity={0.8} />
     <BoardBase width={scene.grid_width} height={scene.grid_height} />
     <BattleMap key={`${scene.map_storage_path}:${assetAttempt}`} scene={scene} supabase={supabase} onError={setMapError} />
@@ -401,8 +535,21 @@ export function VttCanvas({
       gridWidth={scene.grid_width} gridHeight={scene.grid_height} snapToGrid={terrainSnapToGrid}
       onDraggingChange={setTerrainDragging} onCommitMove={(id,point)=>onTerrainCommitMove?.(id,point) ?? Promise.resolve(false)}
       onSelect={(id) => onTerrainSelect?.(id)} onError={setTerrainError} /> : null}
-    {tokens.map((token) => <TokenMesh key={`${token.id}:${tokenAssetKey(token)}:${assetAttempt}`} assetCache={assetCache} token={token} selected={selectedIds.includes(token.id)} currentTurn={scene.initiative_active && token.id === scene.initiative_current_token_id} showNameplate={scene.show_nameplates} isDm={isDm} canDrag={toolMode === "navigate" && !diceRequest && !fogEditing} supabase={supabase} onSelect={onSelect} onDragStart={(id) => setDraggingId(id)} onAssetSettled={assetSettled} />)}
+    {tokens.map((token) => {
+      const point=formationDraft.get(token.id);
+      return <TokenMesh key={`${token.id}:${tokenAssetKey(token)}:${assetAttempt}`} assetCache={assetCache}
+        token={point?{...token,x:point.x,z:point.z}:token} selected={selectedIds.includes(token.id)}
+        currentTurn={scene.initiative_active&&token.id===scene.initiative_current_token_id}
+        showNameplate={scene.show_nameplates} isDm={isDm} supabase={supabase}
+        onPointerDown={tokenDown} onPointerMove={tokenMove} onPointerUp={tokenUp}
+        onAssetSettled={assetSettled}/>;
+    })}
+    {marquee&&<mesh rotation={[-Math.PI/2,0,0]}
+      position={[(marquee.start[0]+marquee.end[0])/2,0.10,(marquee.start[1]+marquee.end[1])/2]} raycast={()=>undefined}>
+      <planeGeometry args={[Math.max(0.01,Math.abs(marquee.end[0]-marquee.start[0])),Math.max(0.01,Math.abs(marquee.end[1]-marquee.start[1]))]}/>
+      <meshBasicMaterial color="#22d3ee" transparent opacity={0.23} depthTest={false} side={THREE.DoubleSide}/>
+    </mesh>}
     {diceRequest ? <VttDiceLayer key={diceRequest.rollId} request={diceRequest} sceneWidth={scene.grid_width} sceneHeight={scene.grid_height} onComplete={onDiceComplete} onImpact={onDiceImpact} /> : null}
-    <VttOrbitControls disabled={Boolean(draggingId) || terrainDragging || measuring || fogEditing} width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
+    <VttOrbitControls disabled={Boolean(draggingId) || formationDragging || terrainDragging || measuring || fogEditing} width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
   </Canvas></>;
 }
