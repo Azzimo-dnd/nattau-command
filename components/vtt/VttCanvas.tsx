@@ -11,6 +11,7 @@ import { MiniatureObject } from "@/components/miniatures/MiniatureObject";
 import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-physics/dicePhysicsTypes";
 import { VttDiceLayer } from "./VttDiceLayer";
 import {vttDiceLaneOffset} from "./vttDiceLayout";
+import {VttDiceRollNameplate} from "./VttDiceRollNameplate";
 import type {VttActiveDiceRoll} from "./useVttDice";
 import { VttFogDraftOverlay, VttFogLayer } from "./VttFogLayer";
 import { VttTerrainLayer } from "./VttTerrainLayer";
@@ -589,10 +590,14 @@ export function VttCanvas({
     </mesh>}
     {diceRolls.map(({envelope,slot})=>{
        const [spawnOffsetX,spawnOffsetZ]=vttDiceLaneOffset(slot,scene.grid_width,scene.grid_height);
-       return <VttDiceLayer key={envelope.rollId} request={envelope.request}
-         sceneWidth={scene.grid_width} sceneHeight={scene.grid_height}
-         spawnOffsetX={spawnOffsetX} spawnOffsetZ={spawnOffsetZ}
-         onComplete={onDiceComplete} onImpact={force=>onDiceImpact(force,envelope.rollId)}/>;
+       return <group key={envelope.rollId}>
+         <VttDiceLayer request={envelope.request}
+           sceneWidth={scene.grid_width} sceneHeight={scene.grid_height}
+           spawnOffsetX={spawnOffsetX} spawnOffsetZ={spawnOffsetZ}
+           onComplete={onDiceComplete} onImpact={force=>onDiceImpact(force,envelope.rollId)}/>
+         <VttDiceRollNameplate name={envelope.rollerName} expression={envelope.expression}
+           slot={slot} x={spawnOffsetX} z={spawnOffsetZ}/>
+       </group>;
     })}
     <VttOrbitControls disabled={Boolean(draggingId) || formationDragging || terrainDragging || measuring || fogEditing}
       lockLeftMouse={isDm && tokenMoveEnabled && toolMode === "navigate" && !fogEditing && !hasDice}
