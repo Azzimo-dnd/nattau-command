@@ -219,7 +219,7 @@ export function useVttDice({
   const showResult=useCallback((result:VttDiceResultToast)=>{
     if(seenResultsRef.current.has(result.rollId))return;
     seenResultsRef.current.add(result.rollId);
-    setResultToasts(prev=>[result,...prev].slice(0,6));
+    setResultToasts(prev=>[result,...prev].slice(0,MAX_SIMULTANEOUS_VTT_ROLLS));
     resultTimersRef.current.set(result.rollId,window.setTimeout(()=>{
       setResultToasts(prev=>prev.filter(r=>r.rollId!==result.rollId));
       resultTimersRef.current.delete(result.rollId);

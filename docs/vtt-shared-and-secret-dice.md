@@ -63,7 +63,7 @@ Now multiple `rollId` entries run independently:
 - **Up to 12 simultaneous active throws**, each with its own isolated Rapier
   physics world, stable 4×3 floor lane and readable participant nameplate.
 - A result or timeout removes only that particular throw. Result notifications
-  are individually deduplicated and up to six cards are displayed side-by-side
+  are individually deduplicated and up to twelve cards are shown in a compact, scrollable set
   for 10 seconds each; older entries remain in the persistent scene history.
 - The **authoritative face values** still come from the person who rolled, not
   from other clients' non-identical local physics simulations.
