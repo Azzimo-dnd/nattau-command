@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { shouldPublishVttDiceRoll } from "../components/vtt/vttDiceVisibility";
+import {formatVttDiceBreakdown} from "../components/vtt/vttDiceBreakdown";
 
 const migration=readFileSync(new URL("../supabase/migrations/20261022183500_vtt_dice_roll_privacy.sql",import.meta.url),"utf8");
 const uuid=(i:number)=>"00000000-0000-4000-8000-"+String(i).padStart(12,"0");
@@ -125,4 +126,14 @@ test("Secret rolls do not send roll-start/roll-result Realtime events",()=>{
  const src=readFileSync(new URL("../components/vtt/useVttDice.ts",import.meta.url),"utf8");
  assert.match(src,/if\(visibleToPlayers\)void channelRef\.current\?\.send\(\{ type: "broadcast", event: "roll-start"/);
  assert.match(src,/if\(pending\.visibleToPlayers\)void channelRef\.current\?\.send\(\{ type: "broadcast", event: "roll-result"/);
+});
+
+
+test("GM and players receive an identical roller-authoritative per-die breakdown",()=>{
+ assert.equal(formatVttDiceBreakdown([{diceCount:1,sides:20,results:[17]}]),"d20: 17");
+ assert.equal(formatVttDiceBreakdown([
+   {diceCount:2,sides:20,results:[8,15]},
+   {diceCount:1,sides:6,results:[3]},
+ ]),"d20: 8, 15 · d6: 3");
+ assert.equal(formatVttDiceBreakdown([]),"");
 });
