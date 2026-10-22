@@ -131,7 +131,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
   const settledAssets = assetProgress.loaded + assetProgress.failed;
   const assetsLoading = assetProgress.total > 0 && settledAssets < assetProgress.total;
   const selectedForFocus = board.selectedTokens.length === 1 ? board.selectedTokens[0] : null;
-  const radiusDraft=board.toolMode==="radius" && board.measureStart && board.measureEnd
+  const radiusDraft=(board.toolMode==="radius"||board.toolMode==="cone") && board.measureStart && board.measureEnd
     ? Math.hypot(board.measureEnd[0]-board.measureStart[0],
       board.measureEnd[1]-board.measureStart[1]):null;
   const fogEditing = isDm && fogOpen && fog.enabled && !board.playerPreview && !dice.activeRoll;
@@ -171,7 +171,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
               onClick={()=>{board.selectToolMode("navigate");setFogOpen(false);fog.cancelDraft();setTokenMoveEnabled(v=>!v);}}
               className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-40 ${board.toolMode==="navigate"&&tokenMoveEnabled?"border-amber-300 bg-amber-400/15 text-amber-100":"border-slate-800 bg-slate-900/70 text-slate-400"}`}>
               {tokenMoveEnabled?"Move selection ON":"Move selection"}</button>:null}
-            {(["navigate", "ruler", "radius", "ping"] as VttToolMode[]).map((mode) => <button key={mode} type="button" onClick={() => { setFogOpen(false); fog.cancelDraft(); board.selectToolMode(mode); }} disabled={Boolean(dice.activeRoll)} className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${board.toolMode === mode && !fogOpen ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>{mode === "navigate" ? "Navigate" : mode === "ruler" ? "Ruler" : mode === "radius" ? daggerheart ? "Area" : "Spell radius" : "Ping"}</button>)}
+            {(["navigate", "ruler", "radius", "cone", "ping"] as VttToolMode[]).map((mode) => <button key={mode} type="button" onClick={() => { setFogOpen(false); fog.cancelDraft(); board.selectToolMode(mode); }} disabled={Boolean(dice.activeRoll)} className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${board.toolMode === mode && !fogOpen ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>{mode === "navigate" ? "Navigate" : mode === "ruler" ? "Ruler" : mode === "radius" ? daggerheart ? "Area" : "Spell radius" : mode === "cone" ? "Cone" : "Ping"}</button>)}
             {isDm ? <button type="button" disabled={Boolean(dice.activeRoll) || board.playerPreview || terrain.loading} onClick={() => { setFogOpen(false); fog.cancelDraft(); board.selectToken(null,false); board.selectToolMode(board.toolMode === "terrain" ? "navigate" : "terrain"); setTerrainPlacementEnabled(false); }}
               className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${board.toolMode === "terrain" && !fogOpen ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>Terrain</button> : null}
             {isDm ? <button type="button" disabled={Boolean(dice.activeRoll) || board.playerPreview} onClick={() => { board.selectToolMode("navigate"); setFogOpen((current) => !current); fog.cancelDraft(); }} className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${fogOpen ? "border-sky-300 bg-sky-300/15 text-sky-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>Fog</button> : null}
@@ -179,28 +179,30 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
             <button type="button" onClick={() => commandCamera("fit")} className="min-h-9 rounded-xl border border-slate-800 px-2.5 text-[9px] font-black text-slate-400 hover:text-slate-100">Fit</button>
             {isDm ? <button type="button" disabled={!selectedForFocus} onClick={() => selectedForFocus && commandCamera("focus", selectedForFocus.x, selectedForFocus.z)} className="min-h-9 rounded-xl border border-slate-800 px-2.5 text-[9px] font-black text-slate-400 hover:text-slate-100 disabled:opacity-30">Focus</button> : null}
             <button type="button" onClick={() => commandCamera("reset")} className="min-h-9 rounded-xl border border-slate-800 px-2.5 text-[9px] font-black text-slate-400 hover:text-slate-100">Reset</button>
-            {board.measurement ? <span className={`rounded-xl border px-3 py-2 text-[11px] font-black ${board.toolMode === "radius" ? "border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-100" : "border-cyan-400/30 bg-cyan-400/10 text-cyan-100"}`}>{board.toolMode === "radius" ? "Radius " : "Distance "}{!daggerheart && `${board.measurement.feet.toFixed(board.measurement.feet >= 100 ? 0 : 1)} ft · `}{board.measurement.squares.toFixed(1)} sq</span> : null}
-            {(board.toolMode === "ruler" || board.toolMode === "radius") && !fogOpen ?
+            {board.measurement ? <span className={`rounded-xl border px-3 py-2 text-[11px] font-black ${board.toolMode === "radius" || board.toolMode === "cone" ? "border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-100" : "border-cyan-400/30 bg-cyan-400/10 text-cyan-100"}`}>{board.toolMode === "radius" ? "Radius " : board.toolMode === "cone" ? "Cone length " : "Distance "}{!daggerheart && `${board.measurement.feet.toFixed(board.measurement.feet >= 100 ? 0 : 1)} ft · `}{board.measurement.squares.toFixed(1)} sq</span> : null}
+            {(board.toolMode === "ruler" || board.toolMode === "radius" || board.toolMode === "cone") && !fogOpen ?
               <label className="flex items-center gap-2 rounded-lg border border-cyan-400/20 px-3 py-2 text-[10px] font-bold text-cyan-100">
                 <input type="checkbox" checked={board.measureSharingEnabled}
                   onChange={event=>board.setMeasurementSharing(event.target.checked)}
                   className="accent-cyan-400" disabled={!scene.is_active||!scene.visible_to_players}/>
                 Share live
               </label>:null}
-            {(board.toolMode === "ruler" || board.toolMode === "radius") && board.measureStart && !fogOpen ? <button type="button" onClick={board.clearMeasurement} className="min-h-9 rounded-xl border border-slate-800 px-3 text-[10px] font-bold text-slate-400">Clear</button> : null}
+            {(board.toolMode === "ruler" || board.toolMode === "radius" || board.toolMode === "cone") && board.measureStart && !fogOpen ? <button type="button" onClick={board.clearMeasurement} className="min-h-9 rounded-xl border border-slate-800 px-3 text-[10px] font-bold text-slate-400">Clear</button> : null}
           </div>
 
           {isDm && fogOpen ? <VttFogControls enabled={fog.enabled} busy={fog.busy} loading={fog.loading} operation={fog.operation} shape={fog.shape} draftCount={fog.draftPoints.length} canUndo={fog.canUndo} error={fog.error} onToggle={() => { void fog.toggleEnabled(); }} onOperation={fog.setOperation} onShape={fog.setShape} onCoverAll={() => { void fog.coverAll(); }} onRevealAll={() => { void fog.revealAll(); }} onUndo={() => { void fog.undo(); }} onFinishPolygon={fog.finishPolygon} onCancelDraft={fog.cancelDraft} onClose={() => { fog.cancelDraft(); setFogOpen(false); }} /> : null}
 
-          {isDm && !board.playerPreview && (board.toolMode==="radius" || spellAreas.areas.length>0) ?
+          {isDm && !board.playerPreview && (board.toolMode==="radius" || board.toolMode==="cone" || spellAreas.areas.length>0) ?
             <VttSpellAreasPanel areas={spellAreas.areas}
-              currentRadius={radiusDraft} feetPerSquare={scene.feet_per_square}
+              currentRadius={radiusDraft} currentShape={board.toolMode==="cone"?"cone":"circle"} feetPerSquare={scene.feet_per_square}
               busy={spellAreas.busy} loading={spellAreas.loading} error={spellAreas.error} notice={spellAreas.notice}
               isDm={true}
               onAdd={(label,color,visible)=>{
-                if(board.measureStart&&board.measureEnd&&board.toolMode==="radius")
-                  void spellAreas.add(label,color,board.measureStart,board.measureEnd,visible);
+                if(board.measureStart&&board.measureEnd&&(board.toolMode==="radius"||board.toolMode==="cone"))
+                  void spellAreas.add(label,color,board.measureStart,board.measureEnd,visible,
+                    board.toolMode==="cone"?"cone":"circle");
               }}
+              onUpdateCone={(id,length,direction)=>{void spellAreas.updateCone(id,length,direction);}}
               onRemove={(id)=>{void spellAreas.remove(id);}}
               onVisibility={(id,visible)=>{void spellAreas.setVisible(id,visible);}}/>:null}
           <VttInitiativeStrip daggerheart={daggerheart} scene={scene} tokens={previewHidden ? [] : fog.displayTokens} />

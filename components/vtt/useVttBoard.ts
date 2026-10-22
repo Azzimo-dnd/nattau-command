@@ -793,7 +793,7 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
     } finally { setBusy(false); }
   }, [broadcastRefresh, busy, isDm, refreshScenes, scene, supabase, tokens]);
 
-  const sendMeasurement = useCallback((mode:"ruler"|"radius",start:VttMeasurePoint,end:VttMeasurePoint,force=false)=>{
+  const sendMeasurement = useCallback((mode:"ruler"|"radius"|"cone",start:VttMeasurePoint,end:VttMeasurePoint,force=false)=>{
     if(!measureSharingEnabled||!scene?.is_active||!scene.visible_to_players)return;
     const now=Date.now();
     if(!force&&now-lastMeasureSentAt.current<95)return;
@@ -806,7 +806,7 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
   // switches tool or disconnects. Abandoned previews auto-expire on receivers.
   useEffect(()=>{
     if(!measureSharingEnabled||!scene?.is_active||!scene.visible_to_players||
-       !measureStart||!measureEnd||(toolMode!=="ruler"&&toolMode!=="radius"))return;
+       !measureStart||!measureEnd||(toolMode!=="ruler"&&toolMode!=="radius"&&toolMode!=="cone"))return;
     const interval=window.setInterval(()=>{
       sendMeasurement(toolMode,measureStart,measureEnd,true);
     },7000);
@@ -826,7 +826,7 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
     if(!enabled&&measureSharingEnabled)clearSharedMeasurement();
     setMeasureSharingEnabled(enabled);
     if(enabled&&scene?.is_active&&scene.visible_to_players&&measureStart&&measureEnd
-      &&(toolMode==="ruler"||toolMode==="radius")){
+      &&(toolMode==="ruler"||toolMode==="radius"||toolMode==="cone")){
       void channelRef.current?.send({type:"broadcast",event:"measure",payload:{
         senderId:currentUserId,sceneId:scene.id,mode:toolMode,
         start:measureStart,end:measureEnd,
@@ -835,15 +835,15 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
   },[clearSharedMeasurement,currentUserId,measureEnd,measureSharingEnabled,measureStart,scene,toolMode]);
   const startMeasurement = useCallback((point:VttMeasurePoint)=>{
     setMeasureStart(point);setMeasureEnd(point);
-    if(toolMode==="ruler"||toolMode==="radius")sendMeasurement(toolMode,point,point,true);
+    if(toolMode==="ruler"||toolMode==="radius"||toolMode==="cone")sendMeasurement(toolMode,point,point,true);
   },[sendMeasurement,toolMode]);
   const moveMeasurement = useCallback((point:VttMeasurePoint)=>{
     setMeasureEnd(point);
-    if(measureStart&&(toolMode==="ruler"||toolMode==="radius"))sendMeasurement(toolMode,measureStart,point);
+    if(measureStart&&(toolMode==="ruler"||toolMode==="radius"||toolMode==="cone"))sendMeasurement(toolMode,measureStart,point);
   },[measureStart,sendMeasurement,toolMode]);
   const endMeasurement = useCallback((point:VttMeasurePoint)=>{
     setMeasureEnd(point);
-    if(measureStart&&(toolMode==="ruler"||toolMode==="radius"))sendMeasurement(toolMode,measureStart,point,true);
+    if(measureStart&&(toolMode==="ruler"||toolMode==="radius"||toolMode==="cone"))sendMeasurement(toolMode,measureStart,point,true);
   },[measureStart,sendMeasurement,toolMode]);
 
   const selectToolMode = useCallback((mode: VttToolMode) => {
@@ -859,7 +859,7 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
   }, [scene]);
 
   const measurement = useMemo(() => {
-    if (!scene || !measureStart || !measureEnd || (toolMode !== "ruler" && toolMode !== "radius")) return null;
+    if (!scene || !measureStart || !measureEnd || (toolMode !== "ruler" && toolMode !== "radius" && toolMode !== "cone")) return null;
     const dx = measureEnd[0] - measureStart[0];
     const dz = measureEnd[1] - measureStart[1];
     const squares = Math.sqrt(dx * dx + dz * dz);
