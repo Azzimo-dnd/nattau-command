@@ -8,7 +8,7 @@ const troops=[
 ];
 test("simple click selection cannot alter token position (planner pure)",()=>{
  const before=JSON.stringify(troops);
- const plan=planTokenGroupMove(troops,["a"],"a",-2.5,-1.5,24,18);
+ const plan=planTokenGroupMove(troops,["a"],"a",-4.5,-1.5,24,18);
  assert.equal(plan.valid,true);
  assert.equal(JSON.stringify(troops),before);
 });
@@ -25,7 +25,7 @@ test("reject occupied destination by stationary miniature",()=>{
  assert.match(plan.reason!,/occupied/);
 });
 test("reject partial overlap for large grid footprints",()=>{
- const group=[{id:"a",x:-2.5,z:-0.5,size_squares:1},{id:"b",x:1,z:0,size_squares:2}];
+ const group=[{id:"a",x:-2.5,z:-0.5,size_squares:1},{id:"b",x:0.5,z:-0.5,size_squares:2}];
  const plan=planTokenGroupMove(group,["a"],"a",-0.5,-0.5,24,18);
  assert.equal(plan.valid,false);
 });
