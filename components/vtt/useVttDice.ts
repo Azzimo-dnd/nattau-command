@@ -18,6 +18,7 @@ import type { DiceGroup, RolledGroup, SupportedDie } from "@/components/dice/dic
 import { resolveDuality, type DualityResult } from "./vttDuality";
 import { useVttDiceHistory } from "./useVttDiceHistory";
 import {shouldPublishVttDiceRoll} from "./vttDiceVisibility";
+import {formatVttDiceBreakdown} from "./vttDiceBreakdown";
 
 export type VttRollKind = "custom" | "duality";
 
@@ -46,6 +47,7 @@ export type VttDiceResultToast = {
   mode: VttDiceMode;
   total: number;
   keptDie: number | null;
+  breakdown?:string;
   duality?: DualityResult;
 };
 
@@ -386,6 +388,7 @@ export function useVttDice({
       mode: envelope.mode,
       total,
       keptDie,
+      breakdown:formatVttDiceBreakdown(rolledGroups),
       duality: dualityResult,
     };
 

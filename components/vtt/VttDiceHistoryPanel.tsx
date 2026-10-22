@@ -2,6 +2,8 @@
 
 import { dualityLabel, type DualityResult } from "./vttDuality";
 import type { VttDiceHistoryRow } from "./useVttDiceHistory";
+import {formatVttDiceBreakdown} from "./vttDiceBreakdown";
+import type {RolledGroup} from "@/components/dice/diceUtils";
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -77,6 +79,7 @@ export function VttDiceHistoryPanel({
                           {label ? <span className={`rounded-md border px-1.5 py-0.5 text-[8px] font-black ${roll.mode === "advantage" ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200" : "border-rose-400/25 bg-rose-400/10 text-rose-200"}`}>{label}</span> : null}
                         </div>
                         <p className="mt-1 truncate text-[11px] font-bold text-slate-400">{roll.expression}</p>
+                        {Array.isArray(roll.details.groups)&&<p className="mt-1 text-[10px] text-cyan-200">{formatVttDiceBreakdown(roll.details.groups as RolledGroup[])}</p>}
                         <p className="mt-1 text-[9px] text-slate-600">{formatTime(roll.created_at)}</p>
                         {duality && <p className="mt-1 text-[10px] text-rose-200">Hope {duality.hope} · Fear {duality.fear} · {dualityLabel(duality.outcome)}</p>}
                       </div>

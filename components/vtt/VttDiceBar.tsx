@@ -90,6 +90,7 @@ export function VttDiceBar({
               <p className="mt-1 text-sm font-bold text-slate-200">
                 {latestResult.expression}{latestResult.mode === "normal" ? "" : ` · ${latestResult.mode}`}
               </p>
+              {latestResult.breakdown&&<p className="mt-1 text-xs font-semibold text-cyan-200">{latestResult.breakdown}</p>}
               <p className="mt-1 text-2xl font-black text-white">{latestResult.total}</p>
               {latestResult.duality && <p className="mt-1 text-xs font-bold text-rose-200">Hope {latestResult.duality.hope} · Fear {latestResult.duality.fear} · {dualityLabel(latestResult.duality.outcome)}</p>}
             </div>
