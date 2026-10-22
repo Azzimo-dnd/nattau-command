@@ -2,7 +2,11 @@
 -- Legacy entries are deliberately private: no reliable historic public/private flag exists.
 begin;
 alter table public.vtt_dice_rolls
-  add column if not exists visible_to_players boolean not null default false;
+  add column if not exists visible_to_players boolean not null default true;
+-- The existing two rolls have no historical visibility metadata and are treated
+-- conservatively as private. New inserts from older app versions default to
+-- public when the scene is actually shared, preserving rolling compatibility.
+update public.vtt_dice_rolls set visible_to_players=false;
 
 -- The creator controls sharing for GM rolls; players can only record public rolls.
 -- This trigger executes with the existing definer privileges and never trusts
