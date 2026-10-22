@@ -234,7 +234,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
               spellAreas={board.playerPreview?spellAreas.areas.filter(a=>a.visible_to_players):spellAreas.areas}
               remoteMeasurements={Object.values(board.remoteMeasures)}
               ping={board.ping}
-              diceRequest={dice.activeRoll?.request ?? null}
+              diceRolls={dice.activeRolls}
               cameraCommand={cameraCommand}
               onAssetProgress={setAssetProgress}
               fogEnabled={fog.enabled}
@@ -265,7 +265,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
 
           <VttDiceHistoryPanel open={historyOpen && !previewHidden} isFullscreen={isFullscreen} sceneName={scene.name} isDm={isDm} rolls={dice.historyRolls} loading={dice.historyLoading} clearing={dice.historyClearing} error={dice.historyError} onClose={() => setHistoryOpen(false)} onClear={() => { void dice.clearHistory(); }} />
           {!previewHidden && <VttDiceBar daggerheart={daggerheart} duality={dice.rollKind === "duality"} onDuality={dice.selectDuality}
-              onAdversary={isDm && !board.playerPreview ? dice.selectAdversary : undefined} isFullscreen={isFullscreen} counts={dice.counts} modifier={dice.modifier} mode={dice.mode} expression={dice.expression} physicalCount={dice.physicalCount} maxPhysicalDice={dice.maxPhysicalDice} canUseD20Mode={dice.canUseD20Mode} canRoll={dice.canRoll && !previewHidden} activeRoll={dice.activeRoll} latestResult={dice.latestResult} error={dice.error} appearanceName={dice.appearanceName} appearanceSwatch={dice.appearanceSwatch} historyCount={dice.historyRolls.length} historyOpen={historyOpen} onAddDie={dice.addDie} onRemoveDie={dice.removeDie} onModifier={dice.setModifier} onMode={dice.setMode} onClear={dice.clearDice} onHistory={() => setHistoryOpen((current) => !current)} onRoll={() => { void dice.roll(); }}
+              onAdversary={isDm && !board.playerPreview ? dice.selectAdversary : undefined} isFullscreen={isFullscreen} counts={dice.counts} modifier={dice.modifier} mode={dice.mode} expression={dice.expression} physicalCount={dice.physicalCount} maxPhysicalDice={dice.maxPhysicalDice} canUseD20Mode={dice.canUseD20Mode} canRoll={dice.canRoll && !previewHidden} activeRoll={dice.activeRoll} latestResult={dice.latestResult} error={dice.error} appearanceName={dice.appearanceName} appearanceSwatch={dice.appearanceSwatch} activeRolls={dice.activeRolls} resultToasts={dice.resultToasts} historyCount={dice.historyRolls.length} historyOpen={historyOpen} onAddDie={dice.addDie} onRemoveDie={dice.removeDie} onModifier={dice.setModifier} onMode={dice.setMode} onClear={dice.clearDice} onHistory={() => setHistoryOpen((current) => !current)} onRoll={() => { void dice.roll(); }}
               isDm={isDm&&!board.playerPreview} rollWillBeShared={dice.rollWillBeShared}
               gmShareRoll={dice.gmShareRoll} onGmShareRoll={dice.setGmShareRoll} />}
 
