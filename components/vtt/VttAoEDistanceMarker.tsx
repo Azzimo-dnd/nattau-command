@@ -1,64 +1,75 @@
 "use client";
-
-import {useEffect,useMemo} from "react";
+import {useEffect,useMemo,useRef} from "react";
+import {useFrame,useThree} from "@react-three/fiber";
 import * as THREE from "three";
+import {aoeLabelOffset,formatAoEDistance} from "./vttAoEMath";
 
-/** Reusable distance label for the preview and all persisted templates.
- * Distances are stored in map squares; the scene supplies feet per square.
+/** Stable, high-contrast screen-pixel label anchored to the measured position.
+ * Unlike a perspective-sized 3D sprite, text stays readable when zooming out.
+ * Its DOM element is pointer-transparent so it never blocks table controls.
  */
-export function formatAoEDistance(squares:number,feetPerSquare:number):string {
- if(!Number.isFinite(squares)||squares<0||!Number.isFinite(feetPerSquare)||feetPerSquare<=0)return "—";
- const show=(value:number)=>Number(value.toFixed(1)).toLocaleString("en-US",{maximumFractionDigits:1});
- return `${show(squares*feetPerSquare)} ft · ${show(squares)} sq`;
-}
-
-/** Where the distance annotation sits. Center the label halfway along the
- * radius/axis so it remains inside the area rather than spilling off the tip.
- */
-export function aoeLabelOffset(distance:number,direction:number):[number,number] {
- if(!Number.isFinite(distance)||!Number.isFinite(direction)||distance<=0)return [0,0];
- return [Math.cos(direction)*distance*0.5,Math.sin(direction)*distance*0.5];
-}
-
-export function VttAoEDistanceMarker({distance,feetPerSquare,direction,color="#d8b4fe",lineHeight=0.045}:{
- distance:number;feetPerSquare:number;direction:number;color?:string;lineHeight?:number;
+export function VttAoEDistanceMarker({distance,feetPerSquare,direction,color="#d8b4fe",lineHeight=0.045,kind="radius"}:{
+ distance:number;feetPerSquare:number;direction:number;color?:string;lineHeight?:number;kind?:"radius"|"cone";
 }){
+ const {gl,camera,size}=useThree();
+ const anchor=useRef<THREE.Group>(null);
+ const element=useRef<HTMLDivElement|null>(null);
+ const projection=useRef(new THREE.Vector3());
+ const offset=useMemo(()=>aoeLabelOffset(distance,direction),[distance,direction]);
  const label=formatAoEDistance(distance,feetPerSquare);
- const offset=aoeLabelOffset(distance,direction);
- const texture=useMemo(()=>{
-  if(typeof document==="undefined"||label==="—")return null;
-  const canvas=document.createElement("canvas");canvas.width=384;canvas.height=92;
-  const ctx=canvas.getContext("2d");if(!ctx)return null;
-  ctx.fillStyle="rgba(2,6,23,0.92)";
-  ctx.beginPath();ctx.roundRect(3,3,378,86,18);ctx.fill();
-  ctx.strokeStyle=color;ctx.lineWidth=4;ctx.stroke();
-  ctx.textAlign="center";ctx.textBaseline="middle";
-  ctx.font="bold 32px sans-serif";ctx.fillStyle="#f8fafc";
-  ctx.fillText(label,192,47,354);
-  const t=new THREE.CanvasTexture(canvas);
-  t.colorSpace=THREE.SRGBColorSpace;t.needsUpdate=true;
-  return t;
- },[label,color]);
- useEffect(()=>()=>texture?.dispose(),[texture]);
+ const visible=distance>=0.02&&Number.isFinite(distance)&&label!=="—"&&Number.isFinite(direction);
+ const text=`${kind==="cone"?"CONE":"RADIUS"} · ${label}`;
+ useEffect(()=>{
+  if(!visible)return;
+  const host=gl.domElement.parentElement;
+  if(!host)return;
+  const node=document.createElement("div");
+  node.className="vtt-distance-label";
+  node.setAttribute("role","note");
+  node.setAttribute("aria-label",text);
+  node.textContent=text;
+  Object.assign(node.style,{
+   position:"absolute",left:"0px",top:"0px",zIndex:"5",
+   whiteSpace:"nowrap",pointerEvents:"none",userSelect:"none",
+   font:"800 15px/1.2 system-ui, -apple-system, sans-serif",
+   letterSpacing:"0.035em",color:"#ffffff",textShadow:"0 1px 2px #020617",
+   background:"rgba(2,6,23,0.97)",border:`2px solid ${color}`,borderRadius:"10px",
+   padding:"7px 11px",boxShadow:"0 4px 16px rgba(0,0,0,0.85)",
+   transform:"translate(-10000px,-10000px)",willChange:"transform",
+  });
+  host.appendChild(node);
+  element.current=node;
+  return ()=>{if(element.current===node)element.current=null;node.remove();};
+ },[gl,visible,color,text]);
+ useFrame(()=>{
+  const labelNode=element.current,marker=anchor.current;
+  if(!labelNode||!marker)return;
+  marker.getWorldPosition(projection.current);
+  projection.current.project(camera);
+  const p=projection.current;
+  if(p.z<-1||p.z>1||Math.abs(p.x)>1.15||Math.abs(p.y)>1.15){
+   if(labelNode.style.visibility!=="hidden")labelNode.style.visibility="hidden";
+   return;
+  }
+  if(labelNode.style.visibility!=="visible")labelNode.style.visibility="visible";
+  const x=(p.x*0.5+0.5)*size.width;
+  const y=(-p.y*0.5+0.5)*size.height;
+  labelNode.style.transform=`translate(-50%, -115%) translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+ });
  const line=useMemo(()=>{
-  if(!Number.isFinite(distance)||distance<0.02||!Number.isFinite(direction))return null;
-  const g=new THREE.BufferGeometry();
-  g.setAttribute("position",new THREE.Float32BufferAttribute([
+  if(!visible)return null;
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute("position",new THREE.Float32BufferAttribute([
    0,lineHeight,0,Math.cos(direction)*distance,lineHeight,Math.sin(direction)*distance,
   ],3));
-  return g;
- },[distance,direction,lineHeight]);
+  return geometry;
+ },[visible,lineHeight,direction,distance]);
  useEffect(()=>()=>line?.dispose(),[line]);
- if(distance<0.02||!Number.isFinite(distance)||!Number.isFinite(feetPerSquare)||
-   feetPerSquare<=0||!Number.isFinite(direction)||!texture)return null;
+ if(!visible)return null;
  return <group name="area-distance-marker">
   {line&&<lineSegments geometry={line} raycast={()=>undefined} renderOrder={1}>
-   <lineBasicMaterial color={color} transparent opacity={0.8} depthWrite={false} depthTest={false}/>
+   <lineBasicMaterial color={color} transparent opacity={0.86} depthWrite={false} depthTest={false}/>
   </lineSegments>}
-  <sprite position={[offset[0],0.34,offset[1]]} scale={[1.4,0.335,1]}
-   raycast={()=>undefined} renderOrder={3}>
-   <spriteMaterial map={texture} transparent depthWrite={false} depthTest={false}
-     sizeAttenuation={true} toneMapped={false}/>
-  </sprite>
+  <group ref={anchor} position={[offset[0],0.34,offset[1]]}/>
  </group>;
 }
