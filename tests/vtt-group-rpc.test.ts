@@ -17,8 +17,8 @@ before(async()=>{
   "create schema auth;create table auth.users(id uuid primary key);",
   "create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;",
   "create table public.vtt_scenes(id uuid primary key,campaign_id uuid,grid_width integer,grid_height integer);",
-  "create function public.is_campaign_dm(p_id uuid) returns boolean language sql stable as $$ select exists(select 1 from public.test_members where campaign_id=p_id and user_id=auth.uid() and role='dm') $$;",
   "create table public.test_members(campaign_id uuid,user_id uuid,role text);",
+  "create function public.is_campaign_dm(p_id uuid) returns boolean language sql stable as $$ select exists(select 1 from public.test_members where campaign_id=p_id and user_id=auth.uid() and role='dm') $$;",
   "create table public.vtt_tokens(id uuid primary key,scene_id uuid,x double precision,z double precision,size_squares double precision,revision bigint default 0,updated_at timestamptz default now());",
   "alter table public.vtt_tokens enable row level security;",
   "grant select,update on public.vtt_tokens to authenticated;",
@@ -44,7 +44,7 @@ test("GM atomically moves a multi-miniature formation and increases revisions",a
 test("occupied or outside destinations do not partially update the group",async()=>{
  await asUser(gm,async()=>{
   const before=await db.query("select id,x,z,revision from vtt_tokens where scene_id=$1 order by id",[scene]);
-  await assert.rejects(db.query("select public.move_vtt_token_formation($1,array[$2,$3]::uuid[],2,3)",[scene,a,b]),/occupied/);
+  await assert.rejects(db.query("select public.move_vtt_token_formation($1,array[$2,$3]::uuid[],3,3)",[scene,a,b]),/occupied/);
   await assert.rejects(db.query("select public.move_vtt_token_formation($1,array[$2,$3]::uuid[],20,0)",[scene,a,b]),/outside/);
   const after=await db.query("select id,x,z,revision from vtt_tokens where scene_id=$1 order by id",[scene]);
   assert.deepEqual(after.rows,before.rows);
