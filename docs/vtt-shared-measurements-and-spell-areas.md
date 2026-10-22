@@ -52,3 +52,14 @@ policies, hidden areas, invalid geometry, shared measurement validation and
 existing VTT behavior. A live GM/player, two-browser smoke test is additionally
 needed after the migration is applied to verify Realtime delivery and fog
 visibility against actual data.
+
+
+## Database migration verification (2026-10-22)
+
+The initial `vtt_spell_areas` migration is applied. A small follow-up policy
+correction (`supabase/migrations/20261022115807_vtt_spell_areas_policy_scene_scope.sql`) was also applied to explicitly bind a visible
+scene to the stored area's campaign. The table, 5 RLS policies and the
+necessary campaign/fog helpers were verified using the connected database.
+The migration left the 3 existing scenes, 36 miniature rows and 3 saved
+terrain source models unchanged. No spell areas have been created on behalf
+of the GM; use the preview to place real ones.
