@@ -52,3 +52,33 @@ shared GM/player rolls, secret GM rolls, legacy privacy, and the trigger/RLS.
 applied to the environment. The migration has not been applied to the
 production Supabase project yet; the branch preview builds, but its history
 query cannot fully function against the old schema until then.
+
+## Concurrent physical rolls (PR #38 extension)
+
+The earlier VTT dice hook kept one global `activeRoll` and deliberately
+ignored any overlapping remote `roll-start` event. This could hide player
+throws from other participants even though completed rolls were in history.
+
+Now multiple `rollId` entries run independently:
+- **Up to 12 simultaneous active throws**, each with its own isolated Rapier
+  physics world, stable 4×3 floor lane and readable participant nameplate.
+- A result or timeout removes only that particular throw. Result notifications
+  are individually deduplicated and up to six cards are displayed side-by-side
+  for 10 seconds each; older entries remain in the persistent scene history.
+- The **authoritative face values** still come from the person who rolled, not
+  from other clients' non-identical local physics simulations.
+- A participant cannot accidentally start another local roll before theirs
+  completes; another participant is free to roll at the same time.
+- GM-secret rolls are *never* broadcast to other participants.
+- If 12 active rolls are already visible, the local roller receives an
+  explicit capacity message. For the planned 7 players plus GM there are
+  available lanes.
+
+The new feature does **not** automatically enable a hidden scene for
+players. `Alpha Grid` must be manually made active and player-visible for
+multi-client rolls to appear across connected participants.
+
+All preview build and source tests are helpful, but physical animation
+synchronization still needs a **two-browser, two-account manual test** against
+a shared scene before promotion to production. This PR remains a draft and
+production Supabase has not yet received the privacy migration.
