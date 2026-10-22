@@ -3,7 +3,7 @@
 ## Status
 
 Implemented on branch `feature/vtt-terrain-asset-studio-alpha`. The Vercel preview is independent of the
-production app. The schema migration `supabase/migrations/20261022142000_vtt_spell_areas.sql`
+production app. The schema migration `supabase/migrations/20261022115551_vtt_spell_areas.sql`
 must be applied to the **existing** Supabase project before persistent areas
 can be saved or listed. Never reapply after it is already in migration history.
 
