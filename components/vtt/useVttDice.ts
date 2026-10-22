@@ -17,6 +17,7 @@ import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-ph
 import type { DiceGroup, RolledGroup, SupportedDie } from "@/components/dice/diceUtils";
 import { resolveDuality, type DualityResult } from "./vttDuality";
 import { useVttDiceHistory } from "./useVttDiceHistory";
+import {allocateVttDiceSlot,VTT_DICE_MAX_CONCURRENT} from "./vttDiceLayout";
 import {shouldPublishVttDiceRoll} from "./vttDiceVisibility";
 import {formatVttDiceBreakdown} from "./vttDiceBreakdown";
 
@@ -62,7 +63,7 @@ type Counts = Record<SupportedDie, number>;
 
 const DIE_ORDER: SupportedDie[] = [4, 6, 8, 10, 12, 20, 100];
 const MAX_VTT_PHYSICAL_DICE = 12;
-export const MAX_SIMULTANEOUS_VTT_ROLLS=12;
+export const MAX_SIMULTANEOUS_VTT_ROLLS=VTT_DICE_MAX_CONCURRENT;
 const VTT_RESULT_TOAST_MS=10000;
 
 function emptyCounts(): Counts {
@@ -208,7 +209,8 @@ export function useVttDice({
     if(activeRollsRef.current.has(envelope.rollId))return true;
     if(activeRollsRef.current.size>=MAX_SIMULTANEOUS_VTT_ROLLS)return false;
     const taken=new Set([...activeRollsRef.current.values()].map(r=>r.slot));
-    let slot=0;while(taken.has(slot))slot+=1;
+    const slot=allocateVttDiceSlot(taken);
+    if(slot<0)return false;
     activeRollsRef.current.set(envelope.rollId,{envelope,slot});
     setActiveRolls([...activeRollsRef.current.values()]);
     clearActiveAfter(envelope.rollId,30000);

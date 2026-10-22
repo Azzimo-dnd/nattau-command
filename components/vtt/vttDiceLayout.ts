@@ -19,3 +19,12 @@ export const VTT_DICE_LANE_COLORS=[
  "#f472b6","#facc15","#2dd4bf","#f87171",
  "#93c5fd","#fdba74","#bef264","#d8b4fe",
 ];
+
+/** Deterministic choice from the slots free on this client's table.
+ * A roll never migrates to another slot when other rolls finish.
+ */
+export function allocateVttDiceSlot(taken:ReadonlySet<number>):number{
+ for(let slot=0;slot<VTT_DICE_MAX_CONCURRENT;slot++)
+  if(!taken.has(slot))return slot;
+ return -1;
+}
