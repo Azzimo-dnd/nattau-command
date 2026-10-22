@@ -3,11 +3,13 @@ import {readFileSync} from "node:fs";
 import {before,after,test} from "node:test";
 import {PGlite} from "@electric-sql/pglite";
 import {safeSpellRadius,validSharedMeasure} from "../components/vtt/vttSpellAreas";
+import {coneCorners,coneDirection,isInsideCone,safeConeTemplate} from "../components/vtt/vttConeMath";
 
 const db=new PGlite();
 const uuid=(n:number)=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const [campaign,scene,gm,player,hidden,otherScene]=Array.from({length:6},(_,i)=>uuid(i+1));
 const sql=readFileSync(new URL("../supabase/migrations/20261022115551_vtt_spell_areas.sql",import.meta.url),"utf8");
+const coneMigration=readFileSync(new URL("../supabase/migrations/20261022160000_vtt_cone_spell_areas.sql",import.meta.url),"utf8");
 async function asUser<T>(id:string,run:()=>Promise<T>){
  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);
  await db.exec("set role authenticated");
@@ -33,6 +35,7 @@ before(async()=>{
  await db.query("insert into test_members values ($1,$2,'dm'),($1,$3,'player')",[campaign,gm,player]);
  await db.query("insert into vtt_scenes values ($1,$3,24,18,true,true),($2,$3,24,18,false,false)",[scene,otherScene,campaign]);
  await db.exec(sql);
+ await db.exec(coneMigration);
 });
 after(async()=>await db.close());
 test("GM can pin multiple colored areas; player sees only active, shared, revealed circles",async()=>{
@@ -82,4 +85,48 @@ test("shared measurements validate mode and finite coordinate bounds",()=>{
  assert.equal(validSharedMeasure({mode:"sword",start:[0,0],end:[1,1]}),false);
  assert.equal(safeSpellRadius([0,0],[3,4],24,18),5);
  assert.throws(()=>safeSpellRadius([0,0],[100,4],24,18),/valid radius/);
+});
+
+test("legacy saved circles stay circles after additive cone migration",async()=>{
+ const rows=await asUser(gm,()=>db.query<{shape_type:string;direction_rad:number;radius:number}>(
+  "select shape_type,direction_rad,radius from vtt_spell_areas where id=$1",[uuid(13)]));
+ assert.deepEqual(rows.rows,[{shape_type:"circle",direction_rad:0,radius:3}]);
+});
+test("GM pins an angled 5e cone and player sees only visible shared geometry",async()=>{
+ const template=safeConeTemplate([2,0],[2,3],24,18);
+ assert.equal(template.length,3);
+ assert.ok(Math.abs(template.direction-Math.PI/2)<1e-10);
+ await asUser(gm,async()=>{
+  await db.query("insert into vtt_spell_areas(id,campaign_id,scene_id,label,color,center_x,center_z,radius,shape_type,direction_rad,visible_to_players) values($1,$2,$3,'Dragon breath','#f97316',2,0,$4,'cone',$5,true)",[uuid(28),campaign,scene,template.length,template.direction]);
+ });
+ await asUser(player,async()=>{
+  const r=await db.query<{shape_type:string;radius:number;direction_rad:number}>("select shape_type,radius,direction_rad from vtt_spell_areas where id=$1",[uuid(28)]);
+  assert.equal(r.rows[0].shape_type,"cone");
+  assert.equal(r.rows[0].radius,3);
+ });
+ await asUser(gm,async()=>{
+  await db.query("update vtt_spell_areas set radius=6,direction_rad=0 where id=$1",[uuid(28)]);
+  const r=await db.query<{radius:number;direction_rad:number}>("select radius,direction_rad from vtt_spell_areas where id=$1",[uuid(28)]);
+  assert.deepEqual(r.rows,[{radius:6,direction_rad:0}]);
+ });
+});
+test("invalid persisted cone geometry rejected by database constraints",async()=>{
+ await asUser(gm,async()=>{
+  await assert.rejects(db.query("insert into vtt_spell_areas(campaign_id,scene_id,label,color,center_x,center_z,radius,shape_type) values($1,$2,'invalid','#112233',0,0,3,'triangle')",[campaign,scene]),/check constraint/i);
+  await assert.rejects(db.query("insert into vtt_spell_areas(campaign_id,scene_id,label,color,center_x,center_z,radius,shape_type,direction_rad) values($1,$2,'invalid','#112233',0,0,3,'cone',4)",[campaign,scene]),/check constraint/i);
+ });
+});
+test("5e cone footprint and direction match a flat ended triangle",()=>{
+ const [origin,left,right]=coneCorners(6,0);
+ assert.deepEqual(origin,[0,0]);
+ assert.deepEqual(left,[6,3]);
+ assert.deepEqual(right,[6,-3]);
+ assert.equal(coneDirection([0,0],[0,2]),Math.PI/2);
+ assert.equal(isInsideCone([3,1],[0,0],6,0),true);
+ assert.equal(isInsideCone([3,2],[0,0],6,0),false);
+ assert.equal(isInsideCone([7,0],[0,0],6,0),false);
+ assert.equal(isInsideCone([-1,0],[0,0],6,0),false);
+ assert.equal(validSharedMeasure({mode:"cone",start:[1,1],end:[6,1]}),true);
+ assert.equal(validSharedMeasure({mode:"cone",start:[1,1],end:[Infinity,1]}),false);
+ assert.throws(()=>safeConeTemplate([0,0],[200,0],24,18));
 });
