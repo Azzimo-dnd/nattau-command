@@ -111,7 +111,9 @@ function isResultToast(value: unknown): value is VttDiceResultToast {
     && typeof record.rollerId === "string"
     && typeof record.rollerName === "string"
     && typeof record.expression === "string"
-    && typeof record.total === "number";
+    && typeof record.total === "number" && Number.isFinite(record.total)
+    && (record.breakdown === undefined ||
+      (typeof record.breakdown === "string" && record.breakdown.length <= 400));
 }
 
 function d20ModeAllowed(groups: DiceGroup[]) {
