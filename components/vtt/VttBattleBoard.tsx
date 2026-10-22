@@ -18,6 +18,8 @@ import { useVttFog } from "./useVttFog";
 import { useVttPresence } from "./useVttPresence";
 import { useSceneTerrain } from "./useSceneTerrain";
 import { VttTerrainPanel } from "./VttTerrainPanel";
+import { VttSpellAreasPanel } from "./VttSpellAreasPanel";
+import { useVttSpellAreas } from "./useVttSpellAreas";
 
 type Props = { campaignSlug?: string; campaignId: string; isDm: boolean; currentUserId: string; currentUserName: string };
 
@@ -30,6 +32,9 @@ function isEditableTarget(target: EventTarget | null) {
 export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, currentUserId, currentUserName }: Props) {
   const daggerheart = campaignSlug === "barovia";
   const board = useVttBoard(campaignId, isDm, currentUserId);
+  const spellAreas=useVttSpellAreas(campaignId,board.scene?.id??null,
+    board.scene?.grid_width??24,board.scene?.grid_height??18,
+    isDm&&!board.playerPreview,board.refreshNonce,board.broadcastRefresh);
   const terrain = useSceneTerrain(campaignId, board.scene?.id ?? null,
     board.scene?.grid_width ?? 24, board.scene?.grid_height ?? 18, isDm);
   const dice = useVttDice({ daggerheart, campaignId, currentUserId, currentUserName, sceneId: board.scene?.id ?? null, sharedScene: Boolean(board.scene?.is_active && board.scene?.visible_to_players) });
@@ -126,6 +131,9 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
   const settledAssets = assetProgress.loaded + assetProgress.failed;
   const assetsLoading = assetProgress.total > 0 && settledAssets < assetProgress.total;
   const selectedForFocus = board.selectedTokens.length === 1 ? board.selectedTokens[0] : null;
+  const radiusDraft=board.toolMode==="radius" && board.measureStart && board.measureEnd
+    ? Math.hypot(board.measureEnd[0]-board.measureStart[0],
+      board.measureEnd[1]-board.measureStart[1]):null;
   const fogEditing = isDm && fogOpen && fog.enabled && !board.playerPreview && !dice.activeRoll;
 
   return (
@@ -172,11 +180,29 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
             {isDm ? <button type="button" disabled={!selectedForFocus} onClick={() => selectedForFocus && commandCamera("focus", selectedForFocus.x, selectedForFocus.z)} className="min-h-9 rounded-xl border border-slate-800 px-2.5 text-[9px] font-black text-slate-400 hover:text-slate-100 disabled:opacity-30">Focus</button> : null}
             <button type="button" onClick={() => commandCamera("reset")} className="min-h-9 rounded-xl border border-slate-800 px-2.5 text-[9px] font-black text-slate-400 hover:text-slate-100">Reset</button>
             {board.measurement ? <span className={`rounded-xl border px-3 py-2 text-[11px] font-black ${board.toolMode === "radius" ? "border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-100" : "border-cyan-400/30 bg-cyan-400/10 text-cyan-100"}`}>{board.toolMode === "radius" ? "Radius " : "Distance "}{!daggerheart && `${board.measurement.feet.toFixed(board.measurement.feet >= 100 ? 0 : 1)} ft · `}{board.measurement.squares.toFixed(1)} sq</span> : null}
-            {(board.toolMode === "ruler" || board.toolMode === "radius") && board.measureStart && !fogOpen ? <button type="button" onClick={() => { board.setMeasureStart(null); board.setMeasureEnd(null); }} className="min-h-9 rounded-xl border border-slate-800 px-3 text-[10px] font-bold text-slate-400">Clear</button> : null}
+            {(board.toolMode === "ruler" || board.toolMode === "radius") && !fogOpen ?
+              <label className="flex items-center gap-2 rounded-lg border border-cyan-400/20 px-3 py-2 text-[10px] font-bold text-cyan-100">
+                <input type="checkbox" checked={board.measureSharingEnabled}
+                  onChange={event=>board.setMeasurementSharing(event.target.checked)}
+                  className="accent-cyan-400" disabled={!scene.is_active||!scene.visible_to_players}/>
+                Share live
+              </label>:null}
+            {(board.toolMode === "ruler" || board.toolMode === "radius") && board.measureStart && !fogOpen ? <button type="button" onClick={board.clearMeasurement} className="min-h-9 rounded-xl border border-slate-800 px-3 text-[10px] font-bold text-slate-400">Clear</button> : null}
           </div>
 
           {isDm && fogOpen ? <VttFogControls enabled={fog.enabled} busy={fog.busy} loading={fog.loading} operation={fog.operation} shape={fog.shape} draftCount={fog.draftPoints.length} canUndo={fog.canUndo} error={fog.error} onToggle={() => { void fog.toggleEnabled(); }} onOperation={fog.setOperation} onShape={fog.setShape} onCoverAll={() => { void fog.coverAll(); }} onRevealAll={() => { void fog.revealAll(); }} onUndo={() => { void fog.undo(); }} onFinishPolygon={fog.finishPolygon} onCancelDraft={fog.cancelDraft} onClose={() => { fog.cancelDraft(); setFogOpen(false); }} /> : null}
 
+          {isDm && !board.playerPreview && (board.toolMode==="radius" || spellAreas.areas.length>0) ?
+            <VttSpellAreasPanel areas={spellAreas.areas}
+              currentRadius={radiusDraft} feetPerSquare={scene.feet_per_square}
+              busy={spellAreas.busy} loading={spellAreas.loading} error={spellAreas.error} notice={spellAreas.notice}
+              isDm={true}
+              onAdd={(label,color,visible)=>{
+                if(board.measureStart&&board.measureEnd&&board.toolMode==="radius")
+                  void spellAreas.add(label,color,board.measureStart,board.measureEnd,visible);
+              }}
+              onRemove={(id)=>{void spellAreas.remove(id);}}
+              onVisibility={(id,visible)=>{void spellAreas.setVisible(id,visible);}}/>:null}
           <VttInitiativeStrip daggerheart={daggerheart} scene={scene} tokens={previewHidden ? [] : fog.displayTokens} />
           {fog.error && <div role="alert" className="absolute right-3 top-24 z-30 max-w-xs rounded-xl border border-rose-400/30 bg-slate-950 p-3 text-xs text-rose-200">{fog.error}</div>}
           {assetsLoading ? <div className="pointer-events-none absolute right-3 top-3 z-20 rounded-xl border border-cyan-400/20 bg-slate-950/90 px-3 py-2 text-[9px] font-black uppercase tracking-[0.1em] text-cyan-100 shadow-xl">Loading miniatures {settledAssets}/{assetProgress.total}</div> : null}
@@ -201,6 +227,8 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
               toolMode={board.toolMode}
               measureStart={board.measureStart}
               measureEnd={board.measureEnd}
+              spellAreas={board.playerPreview?spellAreas.areas.filter(a=>a.visible_to_players):spellAreas.areas}
+              remoteMeasurements={Object.values(board.remoteMeasures)}
               ping={board.ping}
               diceRequest={dice.activeRoll?.request ?? null}
               cameraCommand={cameraCommand}
@@ -215,9 +243,9 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
               onSelect={board.selectToken}
               onLocalMove={board.localMove}
               onCommitMove={(id, x, z) => { void board.commitMove(id, x, z); }}
-              onMeasureStart={(point) => { board.setMeasureStart(point); board.setMeasureEnd(point); }}
-              onMeasureMove={board.setMeasureEnd}
-              onMeasureEnd={board.setMeasureEnd}
+              onMeasureStart={board.startMeasurement}
+              onMeasureMove={board.moveMeasurement}
+              onMeasureEnd={board.endMeasurement}
               onPing={board.sendPing}
               onTerrainPlace={(point) => { if(isDm && !board.playerPreview && !dice.activeRoll) void terrain.place(point); }}
               onTerrainSelect={(id) => { if(isDm && !board.playerPreview) terrain.setSelectedId(id); }}
