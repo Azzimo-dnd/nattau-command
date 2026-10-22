@@ -26,5 +26,7 @@ heartbeat/expiry mechanism as shared circles. Persistent cones follow the
 existing GM-only modification policy and scene/fog-aware player reads. Geometry
 is a visual guide, not automatic target selection, damage or cover calculation.
 
-**Deployment:** additive migration `supabase/migrations/20261022160000_vtt_cone_spell_areas.sql`
+**Deployment:** additive migration `supabase/migrations/20261022155708_vtt_cone_spell_areas.sql`
 must be applied before the production app begins requesting the new columns.
+
+Migration applied to the connected Supabase production project; verified default shape circle, direction 0, two constraints, and unchanged scene/token totals.

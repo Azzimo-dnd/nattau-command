@@ -9,7 +9,7 @@ const db=new PGlite();
 const uuid=(n:number)=>"00000000-0000-4000-8000-"+String(n).padStart(12,"0");
 const [campaign,scene,gm,player,hidden,otherScene]=Array.from({length:6},(_,i)=>uuid(i+1));
 const sql=readFileSync(new URL("../supabase/migrations/20261022115551_vtt_spell_areas.sql",import.meta.url),"utf8");
-const coneMigration=readFileSync(new URL("../supabase/migrations/20261022160000_vtt_cone_spell_areas.sql",import.meta.url),"utf8");
+const coneMigration=readFileSync(new URL("../supabase/migrations/20261022155708_vtt_cone_spell_areas.sql",import.meta.url),"utf8");
 async function asUser<T>(id:string,run:()=>Promise<T>){
  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);
  await db.exec("set role authenticated");
