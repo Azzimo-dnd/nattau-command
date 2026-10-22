@@ -13,6 +13,8 @@ import { VttDiceLayer } from "./VttDiceLayer";
 import { VttFogDraftOverlay, VttFogLayer } from "./VttFogLayer";
 import { VttTerrainLayer } from "./VttTerrainLayer";
 import { VttSpellAreaLayer,VttConeShape } from "./VttSpellAreaLayer";
+import { VttAoEDistanceMarker } from "./VttAoEDistanceMarker";
+import { snapAoEEdge } from "./vttAoEMath";
 import {coneDirection} from "./vttConeMath";
 import type {SharedMeasure,VttSpellArea} from "./vttSpellAreas";
 import { planTokenGroupMove, tokensInSelectionBox } from "./vttGroupMovement";
@@ -244,7 +246,7 @@ function InteractionSurface({ width, height, onPointerDown, onPointerMove, onPoi
   return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}><planeGeometry args={[width, height]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} /></mesh>;
 }
 
-function MeasurementOverlay({ mode, start, end }: { mode: VttToolMode; start: VttMeasurePoint | null; end: VttMeasurePoint | null }) {
+function MeasurementOverlay({ mode, start, end, feetPerSquare }: { mode: VttToolMode; start: VttMeasurePoint | null; end: VttMeasurePoint | null; feetPerSquare: number }) {
   const lineGeometry = useMemo(() => {
     if (!start || !end || mode !== "ruler") return null;
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute([start[0], 0.055, start[1], end[0], 0.055, end[1]], 3)); return geometry;
@@ -256,8 +258,9 @@ function MeasurementOverlay({ mode, start, end }: { mode: VttToolMode; start: Vt
   if (radius < 0.02) return null;
   if(mode==="cone")return <group position={[start[0],0.04,start[1]]}>
     <VttConeShape length={radius} direction={coneDirection(start,end)} opacity={0.16}/>
+    <VttAoEDistanceMarker distance={radius} feetPerSquare={feetPerSquare} direction={coneDirection(start,end)} kind="cone" color="#d8b4fe"/>
   </group>;
-  return <group position={[start[0], 0.035, start[1]]}><mesh rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[radius, 96]} /><meshBasicMaterial color="#c084fc" transparent opacity={0.11} depthWrite={false} side={THREE.DoubleSide} /></mesh><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}><ringGeometry args={[Math.max(0.01, radius - 0.025), radius + 0.025, 96]} /><meshBasicMaterial color="#d8b4fe" transparent opacity={0.95} depthWrite={false} side={THREE.DoubleSide} /></mesh></group>;
+  return <group position={[start[0], 0.035, start[1]]}><mesh rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[radius, 96]} /><meshBasicMaterial color="#c084fc" transparent opacity={0.11} depthWrite={false} side={THREE.DoubleSide} /></mesh><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}><ringGeometry args={[Math.max(0.01, radius - 0.025), radius + 0.025, 96]} /><meshBasicMaterial color="#d8b4fe" transparent opacity={0.95} depthWrite={false} side={THREE.DoubleSide} /></mesh><VttAoEDistanceMarker distance={radius} feetPerSquare={feetPerSquare} direction={0} color="#d8b4fe"/></group>;
 }
 
 function PingOverlay({ ping }: { ping: VttPing | null }) {
@@ -517,7 +520,11 @@ export function VttCanvas({
       return;
     }
     if (draggingId && isDm && !diceRequest) { event.stopPropagation(); onLocalMove(draggingId, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
-    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) { event.stopPropagation(); onMeasureMove([event.point.x, event.point.z]); }
+    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) {
+      event.stopPropagation();
+      const point:[number,number]=[event.point.x,event.point.z];
+      onMeasureMove(measureStart&&(toolMode==="radius"||toolMode==="cone")?snapAoEEdge(measureStart,point):point);
+    }
   };
 
   const planeUp = (event: ThreeEvent<PointerEvent>) => {
@@ -536,7 +543,11 @@ export function VttCanvas({
       return;
     }
     if (draggingId && isDm && !diceRequest) { event.stopPropagation(); const id = draggingId; setDraggingId(null); onCommitMove(id, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
-    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) { event.stopPropagation(); setMeasuring(false); onMeasureEnd([event.point.x, event.point.z]); }
+    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) {
+      event.stopPropagation();setMeasuring(false);
+      const point:[number,number]=[event.point.x,event.point.z];
+      onMeasureEnd(measureStart&&(toolMode==="radius"||toolMode==="cone")?snapAoEEdge(measureStart,point):point);
+    }
   };
 
   return <>{moveWarning&&<div role="alert" className="pointer-events-none absolute left-1/2 top-16 z-30 -translate-x-1/2 rounded-xl border border-amber-400/40 bg-slate-950/95 px-4 py-2 text-xs text-amber-200">{moveWarning}</div>}
@@ -544,14 +555,15 @@ export function VttCanvas({
     <color attach="background" args={["#070b11"]} /><ambientLight intensity={1.25} /><directionalLight position={[12, 22, 10]} intensity={2.5} castShadow /><directionalLight position={[-12, 10, -8]} intensity={0.8} />
     <BoardBase width={scene.grid_width} height={scene.grid_height} />
     <BattleMap key={`${scene.map_storage_path}:${assetAttempt}`} scene={scene} supabase={supabase} onError={setMapError} />
-    <VttSpellAreaLayer areas={spellAreas} />
+    <VttSpellAreaLayer areas={spellAreas} feetPerSquare={scene.feet_per_square}
+      isDm={isDm} fogEnabled={fogEnabled} fogBaseState={fogBaseState} fogRegions={fogRegions}/>
     <VttFogLayer width={scene.grid_width} height={scene.grid_height} enabled={fogEnabled} baseState={fogBaseState} regions={fogRegions} isDm={isDm} />
     <InteractionSurface width={scene.grid_width} height={scene.grid_height} onPointerDown={planeDown} onPointerMove={planeMove} onPointerUp={planeUp} />
     {scene.show_grid ? <BattleGrid width={scene.grid_width} height={scene.grid_height} opacity={scene.grid_opacity} /> : null}
     {fogEditing ? <VttFogDraftOverlay points={fogDraftPoints} shape={fogShape} operation={fogOperation} /> : null}
-    <MeasurementOverlay mode={toolMode} start={measureStart} end={measureEnd} />
+    <MeasurementOverlay mode={toolMode} start={measureStart} end={measureEnd} feetPerSquare={scene.feet_per_square}/>
     {remoteMeasurements.map(remote=><MeasurementOverlay key={remote.senderId}
-      mode={remote.mode} start={remote.start} end={remote.end}/>)}
+      mode={remote.mode} start={remote.start} end={remote.end} feetPerSquare={scene.feet_per_square}/>)}
     <PingOverlay ping={ping} />
     {isDm && terrainInstances.length > 0 ? <VttTerrainLayer key={assetAttempt} instances={terrainInstances} assets={terrainAssets} supabase={supabase}
       selectedId={selectedTerrainId} canSelect={toolMode === "terrain" && !diceRequest && !fogEditing}

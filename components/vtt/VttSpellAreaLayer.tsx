@@ -2,6 +2,10 @@
 import {useEffect,useMemo} from "react";
 import * as THREE from "three";
 import {coneCorners} from "./vttConeMath";
+import {VttAoEDistanceMarker} from "./VttAoEDistanceMarker";
+import {aoeLabelOffset} from "./vttAoEMath";
+import {isFogPointRevealed} from "./vttFogMath";
+import type {VttFogBaseState,VttFogRegion} from "./vttTypes";
 import type {VttSpellArea} from "./vttSpellAreas";
 
 /** A true 5e flat-ended triangle, width L at distance L from the origin.
@@ -37,7 +41,24 @@ export function VttConeShape({length,direction,color="#d8b4fe",opacity=0.2}:{
  </group>;
 }
 
-export function VttSpellAreaLayer({areas}:{areas:VttSpellArea[]}){
+type SpellAreaLayerProps={
+ areas:VttSpellArea[];
+ feetPerSquare:number;
+ isDm:boolean;
+ fogEnabled:boolean;
+ fogBaseState:VttFogBaseState;
+ fogRegions:VttFogRegion[];
+};
+export function VttSpellAreaLayer({areas,feetPerSquare,isDm,fogEnabled,fogBaseState,fogRegions}:SpellAreaLayerProps){
+ const labelRevealed=(a:VttSpellArea)=>{
+  if(isDm||!fogEnabled)return true;
+  const [dx,dz]=aoeLabelOffset(a.radius,a.shape_type==="cone"?a.direction_rad:0);
+  const x=a.center_x+dx,z=a.center_z+dz;
+  // Sprites face the camera and aren't occluded by floor fog. Only draw a
+  // player-facing label if the entire neighborhood around its anchor is revealed.
+  return [-0.65,0,0.65].every(ox=>[-0.35,0,0.35].every(oz=>
+   isFogPointRevealed(fogEnabled,fogBaseState,fogRegions,x+ox,z+oz)));
+ };
  return <group name="persistent-spell-areas">
   {areas.map(a=><group key={a.id} position={[a.center_x,0.015,a.center_z]}>
    {a.shape_type==="cone"
@@ -52,6 +73,9 @@ export function VttSpellAreaLayer({areas}:{areas:VttSpellArea[]}){
        <meshBasicMaterial color={a.color} transparent opacity={0.95} depthWrite={false} depthTest={false} side={THREE.DoubleSide}/>
       </mesh>
      </>}
+   {labelRevealed(a)&&<VttAoEDistanceMarker distance={a.radius}
+     feetPerSquare={feetPerSquare} direction={a.shape_type==="cone"?a.direction_rad:0}
+     kind={a.shape_type==="cone"?"cone":"radius"} color={a.color}/>}
   </group>)}
  </group>;
 }
