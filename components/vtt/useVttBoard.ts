@@ -285,6 +285,13 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
     setSelectedIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   }, [playerPreview]);
 
+  const selectManyTokens = useCallback((ids:string[], additive:boolean) => {
+    if(playerPreview||!isDm)return;
+    const requested=new Set(ids);
+    const valid=tokens.filter(t=>requested.has(t.id)).map(t=>t.id);
+    setSelectedIds(current=>additive?[...new Set([...current,...valid])]:valid);
+  },[isDm,playerPreview,tokens]);
+
   const sceneDraft = useCallback(() => ({
     name: draftName.trim() || scene?.name || "Untitled Scene",
     grid_width: Math.max(4, Math.min(100, Math.round(draftWidth))),
@@ -543,6 +550,29 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
     } else if (scene?.is_active) broadcastRefresh();
   }, [broadcastRefresh, isDm, refreshTokens, scene, supabase, tokens]);
 
+  /** One database transaction moves the entire formation or none of its actors. */
+  const commitFormationMove = useCallback(async (ids:string[], dx:number, dz:number):Promise<boolean> => {
+    if(!scene||!isDm||playerPreview||busy||ids.length<1)return false;
+    if(!Number.isInteger(dx)||!Number.isInteger(dz)||Math.abs(dx)>100||Math.abs(dz)>100)return false;
+    if(dx===0&&dz===0)return true;
+    setBusy(true);setError(null);setMessage(null);
+    try{
+      const {data,error:rpcError}=await supabase.rpc("move_vtt_token_formation",{
+        p_scene_id:scene.id,p_token_ids:ids,p_dx:dx,p_dz:dz
+      });
+      if(rpcError)throw rpcError;
+      if(Number(data)!==ids.length)throw new Error("Formation update returned the wrong actor count.");
+      await refreshTokens(scene.id);
+      if(scene.is_active)broadcastRefresh();
+      setMessage(`${ids.length} miniature${ids.length===1?"":"s"} moved together.`);
+      return true;
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:"Could not move the formation.");
+      await refreshTokens(scene.id).catch(()=>undefined);
+      return false;
+    }finally{setBusy(false);}
+  },[broadcastRefresh,busy,isDm,playerPreview,refreshTokens,scene,supabase]);
+
   const rotateSelected = useCallback(async (delta: number, absolute = false) => {
     if (!selected || !isDm || busy) return;
     const nextRotation = normalizeRotation(absolute ? delta : selected.rotation + delta);
@@ -743,7 +773,7 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
     draftMapScale, draftMapOffsetX, draftMapOffsetZ, error, message, rotationDegrees,
     setPlayerPreview, setMapFile, setDraftName, setDraftWidth, setDraftHeight, setDraftMapOpacity,
     setDraftGridOpacity, setDraftShowGrid, setDraftMapScale, setDraftMapOffsetX, setDraftMapOffsetZ,
-    selectToken, selectToolMode, setMeasureStart, setMeasureEnd, sendPing,
+    selectToken, selectManyTokens, commitFormationMove, selectToolMode, setMeasureStart, setMeasureEnd, sendPing,
     saveScenePresentation, uploadSceneMap, removeSceneMap, createScene, duplicateScene, openScene, activateScene, deleteScene, setScenePlayerVisibility,
     placeParty, spawnEnemy, localMove, commitMove, rotateSelected, renameSelectedEnemy, setTokenInitiative, toggleNameplates,
     bulkUpdate, removeSelected, duplicateSelected, startInitiative, stopInitiative, stepInitiative,

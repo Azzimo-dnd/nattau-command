@@ -51,6 +51,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
   const [fogOpen, setFogOpen] = useState(false);
   const [terrainPlacementEnabled, setTerrainPlacementEnabled] = useState(false);
   const [terrainSnapToGrid, setTerrainSnapToGrid] = useState(false);
+  const [tokenMoveEnabled,setTokenMoveEnabled]=useState(false);
   const [cameraCommand, setCameraCommand] = useState<VttCameraCommand | null>(null);
   const [assetProgress, setAssetProgress] = useState<VttAssetProgress>({ loaded: 0, failed: 0, total: 0 });
 
@@ -72,6 +73,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
     setFogOpen(false);
     terrain.setSelectedId(null);
     setTerrainPlacementEnabled(false);
+    setTokenMoveEnabled(false);
     setAssetProgress({ loaded: 0, failed: 0, total: 0 });
   }
 
@@ -157,6 +159,10 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
       <div className={`${isFullscreen ? "grid min-h-0 flex-1 gap-2" : "grid gap-4"} ${isDm && !board.playerPreview ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>
         <div className={`relative overflow-hidden border border-slate-800 bg-[#070b11] ${isFullscreen ? "min-h-0 rounded-2xl" : "rounded-[30px]"}`}>
           <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5 rounded-2xl border border-slate-700/80 bg-slate-950/88 p-1.5 shadow-2xl backdrop-blur">
+            {isDm&&!board.playerPreview?<button type="button" disabled={Boolean(dice.activeRoll)||board.busy}
+              onClick={()=>{board.selectToolMode("navigate");setFogOpen(false);fog.cancelDraft();setTokenMoveEnabled(v=>!v);}}
+              className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-40 ${board.toolMode==="navigate"&&tokenMoveEnabled?"border-amber-300 bg-amber-400/15 text-amber-100":"border-slate-800 bg-slate-900/70 text-slate-400"}`}>
+              {tokenMoveEnabled?"Move selection ON":"Move selection"}</button>:null}
             {(["navigate", "ruler", "radius", "ping"] as VttToolMode[]).map((mode) => <button key={mode} type="button" onClick={() => { setFogOpen(false); fog.cancelDraft(); board.selectToolMode(mode); }} disabled={Boolean(dice.activeRoll)} className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${board.toolMode === mode && !fogOpen ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>{mode === "navigate" ? "Navigate" : mode === "ruler" ? "Ruler" : mode === "radius" ? daggerheart ? "Area" : "Spell radius" : "Ping"}</button>)}
             {isDm ? <button type="button" disabled={Boolean(dice.activeRoll) || board.playerPreview || terrain.loading} onClick={() => { setFogOpen(false); fog.cancelDraft(); board.selectToken(null,false); board.selectToolMode(board.toolMode === "terrain" ? "navigate" : "terrain"); setTerrainPlacementEnabled(false); }}
               className={`min-h-9 rounded-xl border px-3 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35 ${board.toolMode === "terrain" && !fogOpen ? "border-cyan-300 bg-cyan-300/15 text-cyan-100" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-slate-200"}`}>Terrain</button> : null}
@@ -188,6 +194,9 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
               terrainSnapToGrid={terrainSnapToGrid}
               isDm={isDm && !board.playerPreview}
               selectedIds={board.playerPreview ? [] : board.selectedIds}
+              tokenMoveEnabled={isDm&&!board.playerPreview&&tokenMoveEnabled}
+              onSelectMany={board.selectManyTokens}
+              onCommitTokenFormation={board.commitFormationMove}
               supabase={board.supabase}
               toolMode={board.toolMode}
               measureStart={board.measureStart}
@@ -226,7 +235,7 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
           {!previewHidden && <VttDiceBar daggerheart={daggerheart} duality={dice.rollKind === "duality"} onDuality={dice.selectDuality}
               onAdversary={isDm && !board.playerPreview ? dice.selectAdversary : undefined} isFullscreen={isFullscreen} counts={dice.counts} modifier={dice.modifier} mode={dice.mode} expression={dice.expression} physicalCount={dice.physicalCount} maxPhysicalDice={dice.maxPhysicalDice} canUseD20Mode={dice.canUseD20Mode} canRoll={dice.canRoll && !previewHidden} activeRoll={dice.activeRoll} latestResult={dice.latestResult} error={dice.error} appearanceName={dice.appearanceName} appearanceSwatch={dice.appearanceSwatch} historyCount={dice.historyRolls.length} historyOpen={historyOpen} onAddDie={dice.addDie} onRemoveDie={dice.removeDie} onModifier={dice.setModifier} onMode={dice.setMode} onClear={dice.clearDice} onHistory={() => setHistoryOpen((current) => !current)} onRoll={() => { void dice.roll(); }} />}
 
-          {!isFullscreen ? <div className="border-t border-slate-800 px-4 py-3 text-[11px] text-slate-500">{board.playerPreview ? "Player Preview mirrors manual fog, GM-only tokens and the player initiative strip." : isDm ? fogOpen ? "Fog edit mode: drag rectangles or click polygon points. Close Fog to move the camera again." : "GM shortcuts: Q/E rotate · H hide/reveal · Ctrl/Cmd+D duplicate enemies · Delete removes selection." : "Spectator: orbit, pan, zoom, measure, ping and use the shared VTT dice bar."}</div> : null}
+          {!isFullscreen ? <div className="border-t border-slate-800 px-4 py-3 text-[11px] text-slate-500">{board.playerPreview ? "Player Preview mirrors manual fog, GM-only tokens and the player initiative strip." : isDm ? fogOpen ? "Fog edit mode: drag rectangles or click polygon points. Close Fog to move the camera again." : "Click to select · Shift/Ctrl-click to add · Shift-drag empty ground to box-select · Move selection to drag troops. GM shortcuts: Q/E rotate · H hide/reveal · Ctrl/Cmd+D duplicate enemies · Delete removes selection." : "Spectator: orbit, pan, zoom, measure, ping and use the shared VTT dice bar."}</div> : null}
         </div>
 
         {isDm && !board.playerPreview ? (
@@ -259,7 +268,10 @@ export function VttBattleBoard({ campaignId, campaignSlug = "nattau", isDm, curr
 
             <section className="rounded-[26px] border border-slate-800 bg-slate-900/70 p-4"><div className="flex items-center justify-between gap-2"><p className="text-xs font-black uppercase tracking-[0.2em] text-rose-300">Enemy library</p><span className="text-[10px] font-bold text-slate-600">{board.enemyModels.length}</span></div>{board.enemyModels.length === 0 ? <p className="mt-3 text-xs leading-5 text-slate-500">No enemy STLs yet. Add them in the GM Enemy Studio.</p> : <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">{board.enemyModels.map((enemy) => <button key={enemy.id} type="button" disabled={board.busy} onClick={() => void board.spawnEnemy(enemy)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/50 px-3 text-left text-xs font-bold text-slate-200 hover:border-rose-400/30 disabled:opacity-40"><span className="truncate">{enemy.name}</span><span className="shrink-0 text-[9px] uppercase text-rose-300">Spawn hidden</span></button>)}</div>}</section>
 
-            <VttSelectionPanel showInitiative={!daggerheart} selectedTokens={board.selectedTokens} busy={gmBusy} rotationDegrees={board.rotationDegrees} onRotateLeft={() => void board.rotateSelected(-Math.PI / 4)} onRotateReset={() => void board.rotateSelected(0, true)} onRotateRight={() => void board.rotateSelected(Math.PI / 4)} onRenameEnemy={(name) => void board.renameSelectedEnemy(name)} onInitiative={(value) => selectedForFocus && void board.setTokenInitiative(selectedForFocus.id, value)} onResize={(size) => void board.bulkUpdate({ size_squares: size }, `${board.selectedIds.length} token${board.selectedIds.length === 1 ? "" : "s"} resized.`)} onScale={(scale) => { if (Number.isFinite(scale) && scale >= 0.1 && scale <= 10) void board.bulkUpdate({ scale }, "Visual scale saved. Grid footprint unchanged."); }} onReveal={() => void board.bulkUpdate({ visible_to_players: true }, "Selected tokens revealed.")} onHide={() => void board.bulkUpdate({ visible_to_players: false }, "Selected tokens hidden from players.")} onDuplicate={() => void board.duplicateSelected()} onRemove={() => void board.removeSelected()} />
+            <VttSelectionPanel tokenMoveEnabled={tokenMoveEnabled}
+              onTokenMoveMode={()=>{board.selectToolMode("navigate");setFogOpen(false);fog.cancelDraft();setTokenMoveEnabled(v=>!v);}}
+              onClearSelection={()=>board.selectToken(null,false)}
+              showInitiative={!daggerheart} selectedTokens={board.selectedTokens} busy={gmBusy} rotationDegrees={board.rotationDegrees} onRotateLeft={() => void board.rotateSelected(-Math.PI / 4)} onRotateReset={() => void board.rotateSelected(0, true)} onRotateRight={() => void board.rotateSelected(Math.PI / 4)} onRenameEnemy={(name) => void board.renameSelectedEnemy(name)} onInitiative={(value) => selectedForFocus && void board.setTokenInitiative(selectedForFocus.id, value)} onResize={(size) => void board.bulkUpdate({ size_squares: size }, `${board.selectedIds.length} token${board.selectedIds.length === 1 ? "" : "s"} resized.`)} onScale={(scale) => { if (Number.isFinite(scale) && scale >= 0.1 && scale <= 10) void board.bulkUpdate({ scale }, "Visual scale saved. Grid footprint unchanged."); }} onReveal={() => void board.bulkUpdate({ visible_to_players: true }, "Selected tokens revealed.")} onHide={() => void board.bulkUpdate({ visible_to_players: false }, "Selected tokens hidden from players.")} onDuplicate={() => void board.duplicateSelected()} onRemove={() => void board.removeSelected()} />
           </aside>
         ) : null}
       </div>
