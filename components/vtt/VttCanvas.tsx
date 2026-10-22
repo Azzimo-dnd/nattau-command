@@ -12,7 +12,8 @@ import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-ph
 import { VttDiceLayer } from "./VttDiceLayer";
 import { VttFogDraftOverlay, VttFogLayer } from "./VttFogLayer";
 import { VttTerrainLayer } from "./VttTerrainLayer";
-import { VttSpellAreaLayer } from "./VttSpellAreaLayer";
+import { VttSpellAreaLayer,VttConeShape } from "./VttSpellAreaLayer";
+import {coneDirection} from "./vttConeMath";
 import type {SharedMeasure,VttSpellArea} from "./vttSpellAreas";
 import { planTokenGroupMove, tokensInSelectionBox } from "./vttGroupMovement";
 import { orbitMouseButtons } from "./vttCameraInput";
@@ -28,7 +29,7 @@ import type {
   VttToken,
 } from "./vttTypes";
 
-export type VttToolMode = "navigate" | "ruler" | "radius" | "ping" | "terrain";
+export type VttToolMode = "navigate" | "ruler" | "radius" | "cone" | "ping" | "terrain";
 export type VttMeasurePoint = [number, number];
 export type VttPing = { id: string; x: number; z: number };
 export type VttCameraCommand = { id: number; type: "fit" | "reset" | "focus"; x?: number; z?: number };
@@ -249,10 +250,13 @@ function MeasurementOverlay({ mode, start, end }: { mode: VttToolMode; start: Vt
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute([start[0], 0.055, start[1], end[0], 0.055, end[1]], 3)); return geometry;
   }, [end, mode, start]);
   useEffect(() => () => lineGeometry?.dispose(), [lineGeometry]);
-  if (!start || !end || (mode !== "ruler" && mode !== "radius")) return null;
+  if (!start || !end || (mode !== "ruler" && mode !== "radius" && mode !== "cone")) return null;
   const dx = end[0] - start[0]; const dz = end[1] - start[1]; const radius = Math.sqrt(dx * dx + dz * dz);
   if (mode === "ruler") return <group>{lineGeometry ? <lineSegments geometry={lineGeometry}><lineBasicMaterial color="#22d3ee" depthTest={false} /></lineSegments> : null}<mesh position={[start[0], 0.06, start[1]]}><sphereGeometry args={[0.09, 16, 12]} /><meshBasicMaterial color="#67e8f9" depthTest={false} /></mesh><mesh position={[end[0], 0.06, end[1]]}><sphereGeometry args={[0.09, 16, 12]} /><meshBasicMaterial color="#67e8f9" depthTest={false} /></mesh></group>;
   if (radius < 0.02) return null;
+  if(mode==="cone")return <group position={[start[0],0.04,start[1]]}>
+    <VttConeShape length={radius} direction={coneDirection(start,end)} opacity={0.16}/>
+  </group>;
   return <group position={[start[0], 0.035, start[1]]}><mesh rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[radius, 96]} /><meshBasicMaterial color="#c084fc" transparent opacity={0.11} depthWrite={false} side={THREE.DoubleSide} /></mesh><mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}><ringGeometry args={[Math.max(0.01, radius - 0.025), radius + 0.025, 96]} /><meshBasicMaterial color="#d8b4fe" transparent opacity={0.95} depthWrite={false} side={THREE.DoubleSide} /></mesh></group>;
 }
 
@@ -513,7 +517,7 @@ export function VttCanvas({
       return;
     }
     if (draggingId && isDm && !diceRequest) { event.stopPropagation(); onLocalMove(draggingId, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
-    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) { event.stopPropagation(); onMeasureMove([event.point.x, event.point.z]); }
+    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) { event.stopPropagation(); onMeasureMove([event.point.x, event.point.z]); }
   };
 
   const planeUp = (event: ThreeEvent<PointerEvent>) => {
@@ -532,7 +536,7 @@ export function VttCanvas({
       return;
     }
     if (draggingId && isDm && !diceRequest) { event.stopPropagation(); const id = draggingId; setDraggingId(null); onCommitMove(id, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
-    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius")) { event.stopPropagation(); setMeasuring(false); onMeasureEnd([event.point.x, event.point.z]); }
+    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) { event.stopPropagation(); setMeasuring(false); onMeasureEnd([event.point.x, event.point.z]); }
   };
 
   return <>{moveWarning&&<div role="alert" className="pointer-events-none absolute left-1/2 top-16 z-30 -translate-x-1/2 rounded-xl border border-amber-400/40 bg-slate-950/95 px-4 py-2 text-xs text-amber-200">{moveWarning}</div>}
