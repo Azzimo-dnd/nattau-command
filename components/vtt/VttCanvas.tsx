@@ -12,6 +12,8 @@ import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-ph
 import { VttDiceLayer } from "./VttDiceLayer";
 import { VttFogDraftOverlay, VttFogLayer } from "./VttFogLayer";
 import { VttTerrainLayer } from "./VttTerrainLayer";
+import { VttSpellAreaLayer } from "./VttSpellAreaLayer";
+import type {SharedMeasure,VttSpellArea} from "./vttSpellAreas";
 import { planTokenGroupMove, tokensInSelectionBox } from "./vttGroupMovement";
 import { orbitMouseButtons } from "./vttCameraInput";
 import type { TerrainAssetRow } from "@/lib/terrain/terrainTypes";
@@ -48,6 +50,8 @@ type Props = {
   toolMode: VttToolMode;
   measureStart: VttMeasurePoint | null;
   measureEnd: VttMeasurePoint | null;
+  spellAreas?: VttSpellArea[];
+  remoteMeasurements?: SharedMeasure[];
   ping: VttPing | null;
   diceRequest: PhysicsRollRequest | null;
   cameraCommand?: VttCameraCommand | null;
@@ -341,6 +345,8 @@ export function VttCanvas({
   toolMode,
   measureStart,
   measureEnd,
+  spellAreas = [],
+  remoteMeasurements = [],
   ping,
   diceRequest,
   cameraCommand,
@@ -534,11 +540,14 @@ export function VttCanvas({
     <color attach="background" args={["#070b11"]} /><ambientLight intensity={1.25} /><directionalLight position={[12, 22, 10]} intensity={2.5} castShadow /><directionalLight position={[-12, 10, -8]} intensity={0.8} />
     <BoardBase width={scene.grid_width} height={scene.grid_height} />
     <BattleMap key={`${scene.map_storage_path}:${assetAttempt}`} scene={scene} supabase={supabase} onError={setMapError} />
+    <VttSpellAreaLayer areas={spellAreas} />
     <VttFogLayer width={scene.grid_width} height={scene.grid_height} enabled={fogEnabled} baseState={fogBaseState} regions={fogRegions} isDm={isDm} />
     <InteractionSurface width={scene.grid_width} height={scene.grid_height} onPointerDown={planeDown} onPointerMove={planeMove} onPointerUp={planeUp} />
     {scene.show_grid ? <BattleGrid width={scene.grid_width} height={scene.grid_height} opacity={scene.grid_opacity} /> : null}
     {fogEditing ? <VttFogDraftOverlay points={fogDraftPoints} shape={fogShape} operation={fogOperation} /> : null}
     <MeasurementOverlay mode={toolMode} start={measureStart} end={measureEnd} />
+    {remoteMeasurements.map(remote=><MeasurementOverlay key={remote.senderId}
+      mode={remote.mode} start={remote.start} end={remote.end}/>)}
     <PingOverlay ping={ping} />
     {isDm && terrainInstances.length > 0 ? <VttTerrainLayer key={assetAttempt} instances={terrainInstances} assets={terrainAssets} supabase={supabase}
       selectedId={selectedTerrainId} canSelect={toolMode === "terrain" && !diceRequest && !fogEditing}
