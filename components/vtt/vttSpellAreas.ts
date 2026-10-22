@@ -1,3 +1,4 @@
+import type {SpellShape} from "./vttConeMath";
 export const SPELL_AREA_COLORS = [
   {label:"Fire",hex:"#f97316"},
   {label:"Poison",hex:"#84cc16"},
@@ -8,11 +9,11 @@ export const SPELL_AREA_COLORS = [
 ] as const;
 export type VttSpellArea = {
  id:string;campaign_id:string;scene_id:string;label:string;color:string;
- center_x:number;center_z:number;radius:number;visible_to_players:boolean;
- created_at:string;
+ center_x:number;center_z:number;radius:number;shape_type:SpellShape;direction_rad:number;
+ visible_to_players:boolean;created_at:string;
 };
 export type SharedMeasure = {
- senderId:string;mode:"ruler"|"radius";
+ senderId:string;mode:"ruler"|"radius"|"cone";
  start:[number,number];end:[number,number];
 };
 export function safeSpellRadius(start:[number,number],end:[number,number],width:number,height:number):number{
@@ -23,7 +24,7 @@ export function safeSpellRadius(start:[number,number],end:[number,number],width:
 export function validSharedMeasure(value:unknown): value is Omit<SharedMeasure,"senderId"> {
  if(!value||typeof value!=="object")return false;
  const item=value as Record<string,unknown>;
- return (item.mode==="ruler"||item.mode==="radius") &&
+ return (item.mode==="ruler"||item.mode==="radius"||item.mode==="cone") &&
   [item.start,item.end].every(point=>Array.isArray(point)&&point.length===2&&
   point.every(n=>typeof n==="number"&&Number.isFinite(n)&&Math.abs(n)<1000));
 }

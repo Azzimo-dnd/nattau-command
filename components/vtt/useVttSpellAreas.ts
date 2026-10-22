@@ -1,9 +1,10 @@
 "use client";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {createClient} from "@/lib/supabase/client";
+import {safeConeTemplate,type SpellShape} from "./vttConeMath";
 import {safeSpellRadius,type VttSpellArea} from "./vttSpellAreas";
 
-const FIELDS="id,campaign_id,scene_id,label,color,center_x,center_z,radius,visible_to_players,created_at";
+const FIELDS="id,campaign_id,scene_id,label,color,center_x,center_z,radius,shape_type,direction_rad,visible_to_players,created_at";
 export function useVttSpellAreas(
  campaignId:string,sceneId:string|null,width:number,height:number,isDm:boolean,
  refreshNonce:number,onChanged:()=>void,
@@ -35,18 +36,34 @@ export function useVttSpellAreas(
   catch(e){setError(e instanceof Error?e.message:"Spell area operation failed.");return false;}
   finally{setBusy(false);}
  },[sceneId,isDm,busy,refresh,onChanged]);
- const add=useCallback((label:string,color:string,center:[number,number],edge:[number,number],visible:boolean)=>{
+ const add=useCallback((label:string,color:string,center:[number,number],edge:[number,number],visible:boolean,shape:SpellShape="circle")=>{
   return mutate(async()=>{
    if(!label.trim()||label.trim().length>80)throw Error("Enter a name (1–80 characters).");
    if(!/^#[0-9a-fA-F]{6}$/.test(color))throw Error("Invalid spell area color.");
-   const radius=safeSpellRadius(center,edge,width,height);
+   const geometry=shape==="cone"?safeConeTemplate(center,edge,width,height):null;
+   const radius=geometry?.length??safeSpellRadius(center,edge,width,height);
    const {error:writeError}=await supabase.from("vtt_spell_areas").insert({
     campaign_id:campaignId,scene_id:sceneId,label:label.trim(),color,
-    center_x:center[0],center_z:center[1],radius,visible_to_players:visible,
+    center_x:center[0],center_z:center[1],radius,
+    shape_type:shape,direction_rad:geometry?.direction??0,visible_to_players:visible,
    });
    if(writeError)throw writeError;
   },"Persistent spell area added.");
  },[campaignId,sceneId,width,height,mutate,supabase]);
+ const updateCone=useCallback((id:string,length:number,direction:number)=>{
+  return mutate(async()=>{
+   if(!Number.isFinite(length)||length<0.1||length>Math.min(100,Math.max(width,height))||
+      !Number.isFinite(direction)||Math.abs(direction)>Math.PI)throw Error("Invalid cone length or direction.");
+   const target=areas.find(a=>a.id===id&&a.shape_type==="cone");
+   if(!target)throw Error("Select a saved cone first.");
+   const {data,error:writeError}=await supabase.from("vtt_spell_areas")
+    .update({radius:Math.round(length*100)/100,direction_rad:direction})
+    .eq("id",id).eq("campaign_id",campaignId).eq("scene_id",sceneId!).eq("shape_type","cone")
+    .select("id");
+   if(writeError)throw writeError;
+   if(data?.length!==1)throw Error("Cone was not updated.");
+  },"Cone dimensions saved.");
+ },[mutate,supabase,campaignId,sceneId,width,height,areas]);
  const remove=useCallback((id:string)=>mutate(async()=>{
   const {data,error:writeError}=await supabase.from("vtt_spell_areas")
    .delete().eq("id",id).eq("campaign_id",campaignId).eq("scene_id",sceneId!)
@@ -61,5 +78,5 @@ export function useVttSpellAreas(
   if(writeError)throw writeError;
   if(data?.length!==1)throw Error("Area visibility was not changed.");
  },"Visibility updated."),[mutate,supabase,campaignId,sceneId]);
- return {areas,loading,busy,error,notice,add,remove,setVisible,refresh};
+ return {areas,loading,busy,error,notice,add,updateCone,remove,setVisible,refresh};
 }
