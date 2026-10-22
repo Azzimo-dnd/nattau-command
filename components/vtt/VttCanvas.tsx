@@ -13,6 +13,7 @@ import { VttDiceLayer } from "./VttDiceLayer";
 import { VttFogDraftOverlay, VttFogLayer } from "./VttFogLayer";
 import { VttTerrainLayer } from "./VttTerrainLayer";
 import { planTokenGroupMove, tokensInSelectionBox } from "./vttGroupMovement";
+import { orbitMouseButtons } from "./vttCameraInput";
 import type { TerrainAssetRow } from "@/lib/terrain/terrainTypes";
 import type { VttSceneTerrainInstance } from "./terrainSceneTypes";
 import type {
@@ -120,7 +121,7 @@ async function loadTokenAsset(supabase: ReturnType<typeof createClient>, token: 
   return promise;
 }
 
-function VttOrbitControls({ disabled, width, height, command }: { disabled: boolean; width: number; height: number; command?: VttCameraCommand | null }) {
+function VttOrbitControls({ disabled, lockLeftMouse, width, height, command }: { disabled: boolean; lockLeftMouse: boolean; width: number; height: number; command?: VttCameraCommand | null }) {
   const { camera, gl } = useThree();
   const ref = useRef<OrbitControls | null>(null);
 
@@ -165,7 +166,16 @@ function VttOrbitControls({ disabled, width, height, command }: { disabled: bool
     return () => { window.removeEventListener("keydown", onKeyDown); cancelAnimationFrame(frame); controls.dispose(); ref.current = null; };
   }, [camera, gl]);
 
-  useEffect(() => { if (ref.current) ref.current.enabled = !disabled; }, [disabled]);
+  useEffect(() => {
+    const controls = ref.current;
+    if (!controls) return;
+    controls.enabled = !disabled;
+    // OrbitControls receives the same pointer events as R3F. Disabling its
+    // left-button action *before* a drag begins avoids camera tilting while
+    // the GM selects units or starts moving a formation. Wheel/right-click
+    // controls remain unchanged, even in Move selection mode.
+    Object.assign(controls.mouseButtons, orbitMouseButtons(lockLeftMouse));
+  }, [disabled, lockLeftMouse]);
 
   useEffect(() => {
     const controls = ref.current;
@@ -550,6 +560,8 @@ export function VttCanvas({
       <meshBasicMaterial color="#22d3ee" transparent opacity={0.23} depthTest={false} side={THREE.DoubleSide}/>
     </mesh>}
     {diceRequest ? <VttDiceLayer key={diceRequest.rollId} request={diceRequest} sceneWidth={scene.grid_width} sceneHeight={scene.grid_height} onComplete={onDiceComplete} onImpact={onDiceImpact} /> : null}
-    <VttOrbitControls disabled={Boolean(draggingId) || formationDragging || terrainDragging || measuring || fogEditing} width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
+    <VttOrbitControls disabled={Boolean(draggingId) || formationDragging || terrainDragging || measuring || fogEditing}
+      lockLeftMouse={isDm && tokenMoveEnabled && toolMode === "navigate" && !fogEditing && !diceRequest}
+      width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
   </Canvas></>;
 }
