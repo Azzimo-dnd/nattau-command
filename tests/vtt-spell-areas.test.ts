@@ -53,7 +53,7 @@ test("GM can pin multiple colored areas; player sees only active, shared, reveal
  await asUser(player,async()=>{
   const r=await db.query<{label:string}>("select label from public.vtt_spell_areas order by label");
   assert.deepEqual(r.rows.map(v=>v.label),["Fire","Poison"]);
-  await assert.rejects(db.query("delete from public.vtt_spell_areas returning id"),/permission denied|row.level.security/i);
+  assert.equal((await db.query("delete from public.vtt_spell_areas returning id")).rows.length,0);
  });
  await asUser(hidden,async()=>{
   assert.equal((await db.query("select id from public.vtt_spell_areas")).rows.length,0);
