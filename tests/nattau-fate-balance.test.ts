@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 
 const migration = readFileSync(
-  new URL("../supabase/migrations/20261022141500_nattau_fate_high_level_balance.sql", import.meta.url),
+  new URL("../supabase/migrations/20261022123840_nattau_fate_high_level_balance.sql", import.meta.url),
   "utf8",
 );
 

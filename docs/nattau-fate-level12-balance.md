@@ -46,7 +46,7 @@ remain unless explicitly described below.
   D&D advancement, proficiency or saving throw rules.
 
 ## Migration and already claimed cards
-Migration: `supabase/migrations/20261022141500_nattau_fate_high_level_balance.sql`.
+Migration: `supabase/migrations/20261022123840_nattau_fate_high_level_balance.sql`.
 
 The **fate_cards** table is the live deck, but each reveal copies the selected
 reward into **fate_draws.reward_description_snapshot**. This is intentional.
@@ -59,3 +59,9 @@ drawn **Tower, reversed** displays the GM-approved formula after application.
 The current production Supabase database has **not** been modified by writing
 this feature branch. Apply the migration only when the GM approves the balance
 and the deploy is ready.
+
+## Production migration (2026-10-22)
+The approved migration was applied to the production Supabase database as
+`supabase/migrations/20261022123840_nattau_fate_high_level_balance.sql`. Post-migration inspection confirmed 7 revised active faces,
+1 updated Tower reversed snapshot in Battle of UĆ, and unchanged totals of
+22 card definitions and 20 draw records. Older draw snapshots were not rewritten.
