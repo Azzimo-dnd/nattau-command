@@ -116,6 +116,8 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
       setSelectedIds([]);
       setMeasureStart(null);
       setMeasureEnd(null);
+      setRemoteMeasures({});
+      setMeasureSharingEnabled(false);
       setPlayerPreview(false);
       setPing(null);
       setMapFile(null);
@@ -809,8 +811,6 @@ export function useVttBoard(campaignId: string, isDm: boolean, currentUserId: st
 
   const selectToolMode = useCallback((mode: VttToolMode) => {
     if(mode!==toolMode&&measureSharingEnabled)clearSharedMeasurement();
-    setRemoteMeasures({});
-
     setToolMode(mode); setMeasureStart(null); setMeasureEnd(null);
   }, [toolMode,measureSharingEnabled,clearSharedMeasurement]);
 
