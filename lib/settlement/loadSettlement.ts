@@ -27,7 +27,7 @@ function toBuilding(row: Row): SettlementBuilding {
     x: Number(row.x), y: Number(row.y), icon: row.icon,
     summary: row.summary, output: row.output ?? "",
     notes: row.notes, rebuildProgress: row.rebuild_progress,
-    rebuildNote: row.rebuild_note,
+    rebuildNote: row.rebuild_note, confirmedAfterSiege: true,
   };
 }
 
