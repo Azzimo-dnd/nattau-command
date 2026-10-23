@@ -50,7 +50,7 @@ function draftForNew(): SettlementBuilding {
   return {
     id: "location-" + Date.now().toString(36), name: "New Location",
     category: "civic", status: "planned", x: 50, y: 50, icon: "📍",
-    summary: "Awaiting description.", output: "", notes: [], rebuildProgress: 0, rebuildNote: "",
+    summary: "Awaiting description.", output: "", notes: [], rebuildProgress: 0, rebuildNote: "", confirmedAfterSiege: true,
   };
 }
 function normalizeNotes(text: string) {
@@ -113,11 +113,13 @@ export function SettlementMap({
       if (dbError) throw dbError;
       if (!data) throw new Error("Save was not confirmed by the server.");
       setBuildings(prev => {
+        const saved = {...draft, confirmedAfterSiege: true};
         const index = prev.findIndex(b => b.id === draft.id);
-        if (index < 0) return [...prev, draft];
-        return prev.map(b => b.id === draft.id ? draft : b);
+        if (index < 0) return [...prev, saved];
+        return prev.map(b => b.id === draft.id ? saved : b);
       });
       setSelectedId(draft.id);
+      setDraft(prev => ({...prev, confirmedAfterSiege: true}));
       setEditBuilding(false);
       setNotice("Location saved for Nattau campaign members.");
       router.refresh();
@@ -235,7 +237,7 @@ export function SettlementMap({
                   <span className="text-xl">{building.icon}</span>
                   <span className="min-w-0">
                     <span className="block font-semibold">{building.name}</span>
-                    <span className={"mt-1 inline-block rounded border px-2 py-0.5 text-xs uppercase " + statusColor(building.status)}>{building.status}</span>
+                    <span className={"mt-1 inline-block rounded border px-2 py-0.5 text-xs uppercase " + statusColor(building.status)}>{building.confirmedAfterSiege ? building.status : "Last known: " + building.status}</span>
                   </span>
                 </div>
               </button>
@@ -254,7 +256,7 @@ export function SettlementMap({
                   style={{left: building.x + "%", top: building.y + "%"}}
                   className="absolute z-10 -translate-x-1/2 -translate-y-1/2">
                   <span className={"flex h-8 w-8 items-center justify-center rounded-full border shadow-lg md:h-9 md:w-9 " +
-                    (selectedId === building.id ? "border-yellow-200 bg-yellow-600 text-slate-950" : statusColor(building.status))}>
+                    (selectedId === building.id ? "border-yellow-200 bg-yellow-600 text-slate-950" : building.confirmedAfterSiege ? statusColor(building.status) : "border-slate-600 bg-slate-900/70 text-slate-400")}>
                     {building.icon}
                   </span>
                   {showLabels && <span className="absolute left-1/2 top-10 -translate-x-1/2 whitespace-nowrap rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100">
@@ -272,8 +274,9 @@ export function SettlementMap({
                   <p className="text-xs uppercase tracking-widest text-yellow-500">Selected location</p>
                   <h3 className="mt-2 text-2xl font-bold">{current.name}</h3>
                 </div>
-                <span className={"rounded border px-3 py-1 text-xs uppercase " + statusColor(current.status)}>{current.status}</span>
+                <span className={"rounded border px-3 py-1 text-xs uppercase " + statusColor(current.status)}>{current.confirmedAfterSiege ? current.status : "Last known: " + current.status}</span>
               </div>
+              {!current.confirmedAfterSiege && <p className="mt-3 text-xs font-semibold text-orange-300">Current condition has not been confirmed since the siege.</p>}
               <p className="mt-3 text-sm leading-6 text-slate-300">{current.summary}</p>
               {current.output && <p className="mt-2 text-xs text-yellow-300">{current.output}</p>}
               <div className="mt-3 space-y-1 text-sm text-slate-400">
