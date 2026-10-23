@@ -28,13 +28,13 @@ async function fixture(){
   create table public.campaign_members(campaign_id uuid,user_id uuid,display_name text);
   create schema private;
   create function private.campaign_display_name(p_campaign_id uuid,p_user_id uuid,p_fallback text)
-  returns text language sql stable security definer set search_path='' as $
+  returns text language sql stable security definer set search_path='' as $body$
     select coalesce(
      (select nullif(trim(display_name),'') from public.campaign_members where campaign_id=p_campaign_id and user_id=p_user_id),
      (select nullif(trim(display_name),'') from public.profiles where id=p_user_id),
      p_fallback
     )
-  $;
+  $body$;
   create function public.is_campaign_dm(p_id uuid) returns boolean language sql stable
     security definer set search_path='' as $$
      select exists(select 1 from public.members where campaign_id=p_id and user_id=auth.uid() and role='dm')
