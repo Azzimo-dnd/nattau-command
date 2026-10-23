@@ -5,7 +5,7 @@ import {PGlite} from "@electric-sql/pglite";
 import {militaryUnits,formatDeploymentCost} from "../components/military/militaryData";
 import {specialUnitByKey,resolveSpecialUnitProfile,validateSpecialUnitProfile,specialUnitDefaults} from "../lib/strategic-map/specialUnits";
 
-const sql=readFileSync(new URL("../supabase/migrations/20261023121000_nattau_vengeful_thirteen.sql",import.meta.url),"utf8");
+const sql=readFileSync(new URL("../supabase/migrations/20261023095829_nattau_vengeful_thirteen.sql",import.meta.url),"utf8");
 const key="vengeful-thirteen";
 
 test("Thirteen Avengers are one distinct War Room and Strategic Map special unit",()=>{
