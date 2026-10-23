@@ -15,6 +15,7 @@ export type StrategicSpecialUnit = {
 };
 
 const registry = [
+  { key: "vengeful-thirteen", name: "The Vengeful Thirteen", icon: "🗡️", color: "border-red-500 text-red-100 bg-rose-950" },
   { key: "defensive-detachment", name: "Defensive Detachment", icon: "🛡️", color: "border-sky-400 text-sky-100 bg-sky-950" },
   { key: "artillery-corps", name: "Artillery Corps", icon: "💣", color: "border-orange-400 text-orange-100 bg-orange-950" },
   { key: "hunters-of-ared", name: "Hunters of Ared", icon: "🏹", color: "border-green-400 text-green-100 bg-green-950" },

@@ -75,6 +75,9 @@ export function formatDeploymentCost(cost: DeploymentCost) {
     return `${cost.amount} ${noun} · next session`;
   }
 
+  if(cost.options.length===1&&cost.options[0].amount===0){
+    return "Free · no upkeep";
+  }
   return cost.options
     .map((option) => {
       const base = `${option.amount} ${cost.resource}`;
@@ -84,6 +87,25 @@ export function formatDeploymentCost(cost: DeploymentCost) {
 }
 
 export const militaryUnits: MilitaryUnit[] = [
+  {
+    name:"The Vengeful Thirteen",
+    commander:"Kevin — Avenger of Nithis",
+    size:"13 warriors (Kevin + 12 veterans)",
+    cost:{
+      type:"resource",
+      resource:"RP",
+      options:[{amount:0}],
+    },
+    status:"Ready",
+    detail:"An elite, thirteen-strong strike unit formed from Kevin and twelve of UĆ's finest survivors. Restored to life by Mother Tyllen through the power of Nithis, Kevin trained these warriors in brutal, dirty fighting and swift elimination of priority targets. They wear captured Imperial armor and weapons, reforged with the guidance of the master artificer. No upkeep cost.",
+    durability:{type:"finite",current:2,max:2},
+    headquarters:{
+      state:"unavailable",
+      reason:"Newly formed in UĆ; no dedicated headquarters.",
+    },
+    members:["Kevin — commander; twelve unnamed veterans"],
+    theme:"standard",
+  },
   {
     name: "Defensive Detachment",
     commander: "Captain Varron Holt",

@@ -105,7 +105,7 @@ export function SpecialUnitsManager({
     <header className="mb-5">
       <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-500">Strategic forces · Independent layer</p>
       <h2 className="mt-1 text-2xl font-bold">Special Units Control</h2>
-      <p className="mt-2 text-sm text-slate-400">Track the eight existing War Room detachments. Set positions, current orders and publication for each unit independently. Nothing appears for players until positioned and published.</p>
+      <p className="mt-2 text-sm text-slate-400">Track the nine War Room detachments. Set positions, current orders and publication for each unit independently. Nothing appears for players until positioned and published.</p>
       <button type="button" disabled={busy} onClick={()=>void reload()} className="mt-3 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 disabled:opacity-50">Reload live unit data</button>
     </header>
     <div className="grid items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)_320px]">
