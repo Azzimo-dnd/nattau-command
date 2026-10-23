@@ -3,10 +3,16 @@
 begin;
 alter table public.vtt_dice_rolls
   add column if not exists visible_to_players boolean not null default true;
--- The existing two rolls have no historical visibility metadata and are treated
--- conservatively as private. New inserts from older app versions default to
--- public when the scene is actually shared, preserving rolling compatibility.
-update public.vtt_dice_rolls set visible_to_players=false;
+-- Preserve existing public history when a scene is currently shared.
+-- Rolls in non-public scenes are classified secret. No reliable historical
+-- disclosure flags existed before this migration; never retroactively publish
+-- old hidden-scene rolls when a GM later reveals that scene.
+-- New inserts from older app versions still default to public on shared scenes.
+update public.vtt_dice_rolls r
+set visible_to_players = coalesce(
+  (select s.is_active and s.visible_to_players
+   from public.vtt_scenes s
+   where s.id = r.scene_id),false);
 
 -- The creator controls sharing for GM rolls; players can only record public rolls.
 -- This trigger executes with the existing definer privileges and never trusts
@@ -40,8 +46,9 @@ begin
     if not new.visible_to_players then raise exception 'Only GM can roll privately'; end if;
   end if;
 
-  select nullif(trim(p.display_name),'') into v_display_name
-    from public.profiles p where p.id=v_user_id;
+  -- Preserve the existing campaign-specific display-name resolution.
+  -- The profile display name alone may differ across Nattau and Barovia.
+  v_display_name := private.campaign_display_name(v_campaign_id,v_user_id,'Campaign member');
   new.roller_id:=v_user_id;
   new.roller_name:=coalesce(v_display_name,'Campaign member');
   new.created_at:=now();
@@ -49,7 +56,10 @@ begin
   if not v_scene_active or not v_scene_visible then new.visible_to_players:=false; end if;
   return new;
 end;
-$$;
+$;
+
+-- Trigger functions must not be callable as RPC endpoints.
+revoke execute on function public.prepare_vtt_dice_roll() from public,anon,authenticated;
 
 drop policy if exists "VTT dice scene read" on public.vtt_dice_rolls;
 create policy "VTT dice scene read"

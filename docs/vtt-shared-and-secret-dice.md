@@ -21,9 +21,10 @@ identical final resting faces under differing client simulation timesteps.
 The new result toast therefore includes the authoritative per-die values,
 which are also visible in persistent history.
 
-The existing Alpha Grid scene is active but **not visible to players**, so
-its dice are GM-only until the GM enables scene visibility. It currently
-has two historical GM rolls.
+The Alpha Grid scene is currently **inactive and hidden from players**;
+its two old dice results remain GM-only even if the GM publishes it later.
+The currently active shared scene is **Temple Platz** (Battle of UĆ);
+it has 119 existing rolls, which must remain visible to the participants.
 
 ## Proposed security and UX additions — branch only, no production migration
 
@@ -34,7 +35,8 @@ has two historical GM rolls.
   history entry, not broadcast to other viewers.
 - Hidden/unpublished-scene GM rolls are secret even if the switch remains on.
 - A new DB column `visible_to_players` is enforced by a scene-aware
-  RLS SELECT policy; older rows are conservatively classified secret.
+  RLS SELECT policy; older rows from *hidden scenes* remain secret, while
+  already shared battle rolls preserve their visibility.
 - The trigger prevents players saving private rolls; new public rolls from
   older clients remain public by DB default, to allow an additive migration
   before a frontend deploy.
@@ -49,9 +51,8 @@ shared GM/player rolls, secret GM rolls, legacy privacy, and the trigger/RLS.
 
 **Do not deploy code before migration**
 `supabase/migrations/20261022183500_vtt_dice_roll_privacy.sql` has been
-applied to the environment. The migration has not been applied to the
-production Supabase project yet; the branch preview builds, but its history
-query cannot fully function against the old schema until then.
+applied to production Supabase. Applying this migration is a release step;
+the branch preview cannot use the new history fields against the old schema.
 
 ## Concurrent physical rolls (PR #38 extension)
 
@@ -75,8 +76,8 @@ Now multiple `rollId` entries run independently:
   available lanes.
 
 The new feature does **not** automatically enable a hidden scene for
-players. `Alpha Grid` must be manually made active and player-visible for
-multi-client rolls to appear across connected participants.
+players. `Temple Platz` is already active and player-visible, so this
+is the best scene for a multi-client verification.
 
 All preview build and source tests are helpful, but physical animation
 synchronization still needs a **two-browser, two-account manual test** against
