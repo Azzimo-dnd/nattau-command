@@ -22,7 +22,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $function$
 declare
   v_user_id uuid := auth.uid();
   v_campaign_id uuid;
@@ -56,7 +56,7 @@ begin
   if not v_scene_active or not v_scene_visible then new.visible_to_players:=false; end if;
   return new;
 end;
-$;
+$function$;
 
 -- Trigger functions must not be callable as RPC endpoints.
 revoke execute on function public.prepare_vtt_dice_roll() from public,anon,authenticated;
