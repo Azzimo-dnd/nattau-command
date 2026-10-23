@@ -26,7 +26,7 @@ its two old dice results remain GM-only even if the GM publishes it later.
 The currently active shared scene is **Temple Platz** (Battle of UĆ);
 it has 119 existing rolls, which must remain visible to the participants.
 
-## Proposed security and UX additions — branch only, no production migration
+## Security and UX additions
 
 - An optional GM **Public roll / GM secret** switch. New GM rolls are shared
   by default in a published scene; players always roll publicly.
@@ -50,7 +50,7 @@ shared GM/player rolls, secret GM rolls, legacy privacy, and the trigger/RLS.
 `npm test` and `npm run build` are required before any production release.
 
 **Do not deploy code before migration**
-`supabase/migrations/20261022183500_vtt_dice_roll_privacy.sql` has been
+`supabase/migrations/20261023092158_vtt_dice_roll_privacy.sql` has been
 applied to production Supabase. Applying this migration is a release step;
 the branch preview cannot use the new history fields against the old schema.
 
@@ -81,5 +81,12 @@ is the best scene for a multi-client verification.
 
 All preview build and source tests are helpful, but physical animation
 synchronization still needs a **two-browser, two-account manual test** against
-a shared scene before promotion to production. This PR remains a draft and
-production Supabase has not yet received the privacy migration.
+a shared scene before promotion to production. This PR remains a draft pending deployment; the production Supabase privacy migration has been installed.
+
+## Production verification (2026-10-23)
+
+Database migration installed as `supabase/migrations/20261023092158_vtt_dice_roll_privacy.sql`.
+Live verification: 119 existing public rolls on Temple Platz retained, two GM-only
+legacy rolls on Alpha Grid retained, total 121; 3 scenes and 25 tokens unchanged.
+Existing per-campaign display-name lookup preserved, with GM-secret rows filtered
+by RLS and the trigger RPC EXECUTE privilege revoked from anonymous clients.

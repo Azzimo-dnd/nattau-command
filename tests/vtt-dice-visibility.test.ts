@@ -5,7 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { shouldPublishVttDiceRoll } from "../components/vtt/vttDiceVisibility";
 import {formatVttDiceBreakdown} from "../components/vtt/vttDiceBreakdown";
 
-const migration=readFileSync(new URL("../supabase/migrations/20261022183500_vtt_dice_roll_privacy.sql",import.meta.url),"utf8");
+const migration=readFileSync(new URL("../supabase/migrations/20261023092158_vtt_dice_roll_privacy.sql",import.meta.url),"utf8");
 const uuid=(i:number)=>"00000000-0000-4000-8000-"+String(i).padStart(12,"0");
 const campaign=uuid(1),gm=uuid(2),player=uuid(3),scene=uuid(4),legacy=uuid(5);
 const publicScene=uuid(6),legacyPublic=uuid(7);
