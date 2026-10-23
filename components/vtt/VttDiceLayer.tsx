@@ -104,6 +104,8 @@ function createSpawn(
   generation = 0,
   automaticRerolls = 0,
   safetyRescues = 0,
+  spawnOffsetX = 0,
+  spawnOffsetZ = 0,
 ): SpawnedDie {
   const profile = getVttProfile(count);
   const grid = spawnGrid(dieIndex, count, sceneWidth, sceneHeight);
@@ -120,9 +122,9 @@ function createSpawn(
     safetyRescues,
     scale: profile.dieScale,
     position: [
-      grid.x + randomBetween(random, -0.14, 0.14),
+      grid.x + spawnOffsetX + randomBetween(random, -0.14, 0.14),
       1.65 + (grid.row % 3) * 0.12 + randomBetween(random, 0, 0.3),
-      grid.z + randomBetween(random, -0.14, 0.14),
+      grid.z + spawnOffsetZ + randomBetween(random, -0.14, 0.14),
     ],
     rotation: [
       randomBetween(random, 0, Math.PI * 2),
@@ -405,17 +407,21 @@ export function VttDiceLayer({
   request,
   sceneWidth,
   sceneHeight,
+  spawnOffsetX=0,
+  spawnOffsetZ=0,
   onComplete,
   onImpact,
 }: {
   request: PhysicsRollRequest;
   sceneWidth: number;
   sceneHeight: number;
+  spawnOffsetX?:number;
+  spawnOffsetZ?:number;
   onComplete: (result: PhysicsRollResult) => void;
   onImpact: (force: number) => void;
 }) {
   const profile = useMemo(() => getVttProfile(request.dice.length), [request.dice.length]);
-  const [dice, setDice] = useState<SpawnedDie[]>(() => request.dice.map((spec, index) => createSpawn(spec, index, request.dice.length, request, sceneWidth, sceneHeight)));
+  const [dice, setDice] = useState<SpawnedDie[]>(() => request.dice.map((spec, index) => createSpawn(spec,index,request.dice.length,request,sceneWidth,sceneHeight,0,0,0,spawnOffsetX,spawnOffsetZ)));
   const asleepRef = useRef(new Set<string>());
   const resultsRef = useRef(new Map<string, PhysicsDieResult>());
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -453,9 +459,11 @@ export function VttDiceLayer({
         die.generation + 1,
         die.automaticRerolls,
         nextSafetyRescues,
+        spawnOffsetX,
+        spawnOffsetZ,
       );
     }));
-  }, [request, sceneHeight, sceneWidth]);
+  }, [request, sceneHeight, sceneWidth, spawnOffsetX, spawnOffsetZ]);
 
   useEffect(() => {
     if (completedRef.current || dice.length === 0) return;
@@ -502,6 +510,8 @@ export function VttDiceLayer({
               die.generation + 1,
               die.automaticRerolls + 1,
               die.safetyRescues,
+              spawnOffsetX,
+              spawnOffsetZ,
             )
             : die
         )));
@@ -532,7 +542,7 @@ export function VttDiceLayer({
         trayDepth: sceneHeight,
       });
     }, SETTLE_CONFIRMATION_MS);
-  }, [dice, onComplete, profile.dieScale, profile.id, request, sceneHeight, sceneWidth]);
+  }, [dice, onComplete, profile.dieScale, profile.id, request, sceneHeight, sceneWidth, spawnOffsetX, spawnOffsetZ]);
 
   const handleSleep = useCallback((result: PhysicsDieResult) => {
     asleepRef.current.add(result.id);

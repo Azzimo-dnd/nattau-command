@@ -2,7 +2,8 @@
 
 import { dualityLabel } from "./vttDuality";
 import type { SupportedDie } from "@/components/dice/diceUtils";
-import type { VttDiceEnvelope, VttDiceMode, VttDiceResultToast } from "./useVttDice";
+import type { VttDiceEnvelope, VttActiveDiceRoll, VttDiceMode, VttDiceResultToast } from "./useVttDice";
+import {VTT_DICE_LANE_COLORS} from "./vttDiceLayout";
 
 const QUICK_DICE: SupportedDie[] = [4, 6, 8, 10, 12, 20, 100];
 
@@ -27,6 +28,8 @@ export function VttDiceBar({
   canUseD20Mode,
   canRoll,
   activeRoll,
+  activeRolls,
+  resultToasts,
   latestResult,
   error,
   appearanceName,
@@ -40,6 +43,10 @@ export function VttDiceBar({
   onClear,
   onHistory,
   onRoll,
+  isDm,
+  rollWillBeShared,
+  gmShareRoll,
+  onGmShareRoll,
 }: {
   isFullscreen: boolean;
   daggerheart?: boolean;
@@ -55,6 +62,8 @@ export function VttDiceBar({
   canUseD20Mode: boolean;
   canRoll: boolean;
   activeRoll: VttDiceEnvelope | null;
+  activeRolls:VttActiveDiceRoll[];
+  resultToasts:VttDiceResultToast[];
   latestResult: VttDiceResultToast | null;
   error: string | null;
   appearanceName: string;
@@ -68,6 +77,10 @@ export function VttDiceBar({
   onClear: () => void;
   onHistory: () => void;
   onRoll: () => void;
+  isDm:boolean;
+  rollWillBeShared:boolean;
+  gmShareRoll:boolean;
+  onGmShareRoll:(value:boolean)=>void;
 }) {
   const busy = Boolean(activeRoll);
   const limitExceeded = physicalCount > maxPhysicalDice;
@@ -75,18 +88,23 @@ export function VttDiceBar({
   return (
     <div className={`pointer-events-none absolute inset-x-2 z-30 flex justify-center ${isFullscreen ? "bottom-3" : "bottom-14"}`}>
       <div className="w-full max-w-[1180px]">
-        {latestResult ? (
-          <div className="mb-2 flex justify-center">
-            <div className="rounded-2xl border border-yellow-400/35 bg-slate-950/92 px-5 py-3 text-center shadow-2xl backdrop-blur-xl">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-yellow-300">{latestResult.rollerName} rolled</p>
-              <p className="mt-1 text-sm font-bold text-slate-200">
-                {latestResult.expression}{latestResult.mode === "normal" ? "" : ` · ${latestResult.mode}`}
-              </p>
-              <p className="mt-1 text-2xl font-black text-white">{latestResult.total}</p>
-              {latestResult.duality && <p className="mt-1 text-xs font-bold text-rose-200">Hope {latestResult.duality.hope} · Fear {latestResult.duality.fear} · {dualityLabel(latestResult.duality.outcome)}</p>}
-            </div>
-          </div>
-        ) : null}
+        {activeRolls.length>0&&<div className="mb-2 flex flex-wrap justify-center gap-1.5">
+          {activeRolls.map(({envelope,slot})=><div key={envelope.rollId}
+            className="rounded-lg border bg-slate-950/95 px-2.5 py-1.5 text-[10px] font-black text-white shadow-lg"
+            style={{borderColor:VTT_DICE_LANE_COLORS[slot]}}>
+            🎲 {envelope.rollerName} · {envelope.request.dice.length} dice
+          </div>)}
+        </div>}
+        {resultToasts.length>0&&<div className="mb-2 flex max-h-[28vh] flex-wrap justify-center gap-2 overflow-y-auto">
+          {resultToasts.map(result=><div key={result.rollId}
+            className="min-w-32 max-w-60 rounded-xl border border-yellow-400/35 bg-slate-950/95 px-3 py-2 text-center shadow-2xl backdrop-blur-xl">
+            <p className="text-[10px] font-black text-yellow-300">{result.rollerName} rolled</p>
+            <p className="truncate text-xs font-bold text-slate-200">{result.expression}{result.mode==="normal"?"":` · ${result.mode}`}</p>
+            {result.breakdown&&<p className="text-[10px] text-cyan-200">{result.breakdown}</p>}
+            <p className="text-xl font-black text-white">{result.total}</p>
+            {result.duality&&<p className="text-[10px] text-rose-200">Hope {result.duality.hope} · Fear {result.duality.fear} · {dualityLabel(result.duality.outcome)}</p>}
+          </div>)}
+        </div>}
 
         <div className="pointer-events-auto rounded-[22px] border border-slate-700/80 bg-slate-950/90 p-2 shadow-[0_18px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-3">
           <div className="mb-2 flex items-center justify-between gap-3 px-1">
@@ -174,6 +192,13 @@ export function VttDiceBar({
             >
               History{historyCount > 0 ? ` · ${historyCount}` : ""}
             </button>
+
+            {isDm?<label className="flex min-h-9 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/85 px-2.5 text-[10px] font-bold text-slate-200">
+              <input type="checkbox" aria-label="Share GM dice with players"
+                checked={gmShareRoll} disabled={busy} onChange={e=>onGmShareRoll(e.target.checked)}
+                className="accent-emerald-400"/>
+              {rollWillBeShared?"Public roll":"GM secret"}
+            </label>:<span className="self-center text-[10px] font-bold text-emerald-300">Public roll</span>}
 
             <button
               type="button"

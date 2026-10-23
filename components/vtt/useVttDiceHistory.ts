@@ -9,6 +9,7 @@ export type VttDiceHistoryRow = {
   id: string;
   scene_id: string;
   roll_key: string;
+  visible_to_players:boolean;
   roller_id: string | null;
   roller_name: string;
   expression: string;
@@ -22,6 +23,7 @@ export type VttDiceHistoryRow = {
 type SaveVttDiceRoll = {
   rollKey: string;
   sceneId: string;
+  visibleToPlayers:boolean;
   expression: string;
   mode: HistoryDiceMode;
   modifier: number;
@@ -57,7 +59,7 @@ export function useVttDiceHistory(sceneId: string | null) {
     if (!quiet) setLoading(true);
     const response = await supabase
       .from("vtt_dice_rolls")
-      .select("id,scene_id,roll_key,roller_id,roller_name,expression,mode,modifier,total,details,created_at")
+      .select("id,scene_id,roll_key,visible_to_players,roller_id,roller_name,expression,mode,modifier,total,details,created_at")
       .eq("scene_id", sceneId)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -107,13 +109,14 @@ export function useVttDiceHistory(sceneId: string | null) {
       .insert({
         scene_id: roll.sceneId,
         roll_key: roll.rollKey,
+        visible_to_players:roll.visibleToPlayers,
         expression: roll.expression,
         mode: roll.mode,
         modifier: roll.modifier,
         total: roll.total,
         details: roll.details,
       })
-      .select("id,scene_id,roll_key,roller_id,roller_name,expression,mode,modifier,total,details,created_at")
+      .select("id,scene_id,roll_key,visible_to_players,roller_id,roller_name,expression,mode,modifier,total,details,created_at")
       .single();
 
     setSaving(false);

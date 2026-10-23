@@ -10,6 +10,9 @@ import { disposeMiniatureScene, loadMiniatureAsset, type MiniatureAsset } from "
 import { MiniatureObject } from "@/components/miniatures/MiniatureObject";
 import type { PhysicsRollRequest, PhysicsRollResult } from "@/components/dice-physics/dicePhysicsTypes";
 import { VttDiceLayer } from "./VttDiceLayer";
+import {vttDiceLaneOffset} from "./vttDiceLayout";
+import {VttDiceRollNameplate} from "./VttDiceRollNameplate";
+import type {VttActiveDiceRoll} from "./useVttDice";
 import { VttFogDraftOverlay, VttFogLayer } from "./VttFogLayer";
 import { VttTerrainLayer } from "./VttTerrainLayer";
 import { VttSpellAreaLayer,VttConeShape } from "./VttSpellAreaLayer";
@@ -56,7 +59,7 @@ type Props = {
   spellAreas?: VttSpellArea[];
   remoteMeasurements?: SharedMeasure[];
   ping: VttPing | null;
-  diceRequest: PhysicsRollRequest | null;
+  diceRolls: VttActiveDiceRoll[];
   cameraCommand?: VttCameraCommand | null;
   onAssetProgress?: (progress: VttAssetProgress) => void;
   fogEnabled: boolean;
@@ -84,7 +87,7 @@ type Props = {
   onFogPointerMove: (point: VttFogPoint) => void;
   onFogPointerUp: (point: VttFogPoint) => void;
   onDiceComplete: (result: PhysicsRollResult) => void;
-  onDiceImpact: (force: number) => void;
+  onDiceImpact: (force: number,rollId:string) => void;
 };
 
 type TokenAssetDescriptor = Pick<VttToken, "source_kind" | "model_storage_path" | "paint_storage_path" | "model_file_name" | "model_format">;
@@ -355,7 +358,7 @@ export function VttCanvas({
   spellAreas = [],
   remoteMeasurements = [],
   ping,
-  diceRequest,
+  diceRolls,
   cameraCommand,
   onAssetProgress,
   fogEnabled,
@@ -400,6 +403,7 @@ export function VttCanvas({
   const [terrainError, setTerrainError] = useState<string | null>(null);
   const [assetState, setAssetState] = useState<Record<string, boolean>>({});
   const halfW = scene.grid_width / 2; const halfH = scene.grid_height / 2;
+  const hasDice = diceRolls.length > 0;
 
   const assetCache = useMemo<TokenAssetCache>(() => new Map(), []);
   useEffect(() => () => {
@@ -423,10 +427,10 @@ export function VttCanvas({
     return()=>{window.removeEventListener("blur",cancelSelectionGesture);
       window.removeEventListener("pointercancel",cancelSelectionGesture);};
   },[cancelSelectionGesture]);
-  useEffect(()=>{if(toolMode!=="navigate"||fogEditing||diceRequest||!isDm)cancelSelectionGesture();},
-    [toolMode,fogEditing,diceRequest,isDm,cancelSelectionGesture]);
+  useEffect(()=>{if(toolMode!=="navigate"||fogEditing||hasDice||!isDm)cancelSelectionGesture();},
+    [toolMode,fogEditing,hasDice,isDm,cancelSelectionGesture]);
   const tokenDown=(event:ThreeEvent<PointerEvent>,token:VttToken)=>{
-    if(event.button!==0||fogEditing||diceRequest||toolMode!=="navigate")return;
+    if(event.button!==0||fogEditing||hasDice||toolMode!=="navigate")return;
     event.stopPropagation();
     const additive=event.shiftKey||event.ctrlKey||event.metaKey;
     const groupAlreadySelected=selectedIds.includes(token.id);
@@ -482,7 +486,7 @@ export function VttCanvas({
   };
 
   const planeDown = (event: ThreeEvent<PointerEvent>) => {
-    if (event.button !== 0 || diceRequest) return;
+    if (event.button !== 0 || hasDice) return;
     if (fogEditing) {
       event.stopPropagation();
       onFogPointerDown([event.point.x, event.point.z]);
@@ -514,13 +518,13 @@ export function VttCanvas({
       const next={...marqueeRef.current,end:[event.point.x,event.point.z] as Point2};
       marqueeRef.current=next;setMarquee(next);return;
     }
-    if (fogEditing && !diceRequest) {
+    if (fogEditing && !hasDice) {
       event.stopPropagation();
       onFogPointerMove([event.point.x, event.point.z]);
       return;
     }
-    if (draggingId && isDm && !diceRequest) { event.stopPropagation(); onLocalMove(draggingId, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
-    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) {
+    if (draggingId && isDm && !hasDice) { event.stopPropagation(); onLocalMove(draggingId, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
+    if (measuring && !hasDice && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) {
       event.stopPropagation();
       const point:[number,number]=[event.point.x,event.point.z];
       onMeasureMove(measureStart&&(toolMode==="radius"||toolMode==="cone")?snapAoEEdge(measureStart,point):point);
@@ -537,13 +541,13 @@ export function VttCanvas({
       }
       return;
     }
-    if (fogEditing && !diceRequest) {
+    if (fogEditing && !hasDice) {
       event.stopPropagation();
       onFogPointerUp([event.point.x, event.point.z]);
       return;
     }
-    if (draggingId && isDm && !diceRequest) { event.stopPropagation(); const id = draggingId; setDraggingId(null); onCommitMove(id, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
-    if (measuring && !diceRequest && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) {
+    if (draggingId && isDm && !hasDice) { event.stopPropagation(); const id = draggingId; setDraggingId(null); onCommitMove(id, clampCoordinate(event.point.x, halfW), clampCoordinate(event.point.z, halfH)); return; }
+    if (measuring && !hasDice && (toolMode === "ruler" || toolMode === "radius" || toolMode === "cone")) {
       event.stopPropagation();setMeasuring(false);
       const point:[number,number]=[event.point.x,event.point.z];
       onMeasureEnd(measureStart&&(toolMode==="radius"||toolMode==="cone")?snapAoEEdge(measureStart,point):point);
@@ -551,7 +555,7 @@ export function VttCanvas({
   };
 
   return <>{moveWarning&&<div role="alert" className="pointer-events-none absolute left-1/2 top-16 z-30 -translate-x-1/2 rounded-xl border border-amber-400/40 bg-slate-950/95 px-4 py-2 text-xs text-amber-200">{moveWarning}</div>}
-  {(failedCount > 0 || (mapError && mapError === scene.map_storage_path) || terrainError) && <div role="alert" className="absolute right-3 top-14 z-30 max-w-xs rounded-xl border border-rose-400/30 bg-slate-950 p-3 text-xs text-rose-100"><p>{terrainError ?? (mapError === scene.map_storage_path ? "The map image could not be loaded." : "Some miniature files could not be loaded.")}</p><button type="button" onClick={() => { setMapError(null); setTerrainError(null); setAssetState({}); setAssetAttempt((attempt) => attempt + 1); }} className="mt-2 min-h-9 rounded-lg border border-rose-300/30 px-3 font-bold">Retry assets</button></div>}<Canvas fallback={<div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-300">The 3D table needs WebGL. Enable hardware acceleration or open it in another browser.</div>} shadows dpr={[1, 1.5]} camera={{ position: defaultCameraPosition(scene.grid_width, scene.grid_height).toArray() as [number, number, number], fov: 44, near: 0.1, far: 300 }} onPointerMissed={(event) => { if (toolMode === "navigate" && !diceRequest && !fogEditing && !event.shiftKey && !formationDragging && !marqueeRef.current) onSelect(null, false); }}>
+  {(failedCount > 0 || (mapError && mapError === scene.map_storage_path) || terrainError) && <div role="alert" className="absolute right-3 top-14 z-30 max-w-xs rounded-xl border border-rose-400/30 bg-slate-950 p-3 text-xs text-rose-100"><p>{terrainError ?? (mapError === scene.map_storage_path ? "The map image could not be loaded." : "Some miniature files could not be loaded.")}</p><button type="button" onClick={() => { setMapError(null); setTerrainError(null); setAssetState({}); setAssetAttempt((attempt) => attempt + 1); }} className="mt-2 min-h-9 rounded-lg border border-rose-300/30 px-3 font-bold">Retry assets</button></div>}<Canvas fallback={<div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-300">The 3D table needs WebGL. Enable hardware acceleration or open it in another browser.</div>} shadows dpr={[1, 1.5]} camera={{ position: defaultCameraPosition(scene.grid_width, scene.grid_height).toArray() as [number, number, number], fov: 44, near: 0.1, far: 300 }} onPointerMissed={(event) => { if (toolMode === "navigate" && !hasDice && !fogEditing && !event.shiftKey && !formationDragging && !marqueeRef.current) onSelect(null, false); }}>
     <color attach="background" args={["#070b11"]} /><ambientLight intensity={1.25} /><directionalLight position={[12, 22, 10]} intensity={2.5} castShadow /><directionalLight position={[-12, 10, -8]} intensity={0.8} />
     <BoardBase width={scene.grid_width} height={scene.grid_height} />
     <BattleMap key={`${scene.map_storage_path}:${assetAttempt}`} scene={scene} supabase={supabase} onError={setMapError} />
@@ -566,7 +570,7 @@ export function VttCanvas({
       mode={remote.mode} start={remote.start} end={remote.end} feetPerSquare={scene.feet_per_square}/>)}
     <PingOverlay ping={ping} />
     {isDm && terrainInstances.length > 0 ? <VttTerrainLayer key={assetAttempt} instances={terrainInstances} assets={terrainAssets} supabase={supabase}
-      selectedId={selectedTerrainId} canSelect={toolMode === "terrain" && !diceRequest && !fogEditing}
+      selectedId={selectedTerrainId} canSelect={toolMode === "terrain" && !hasDice && !fogEditing}
       gridWidth={scene.grid_width} gridHeight={scene.grid_height} snapToGrid={terrainSnapToGrid}
       onDraggingChange={setTerrainDragging} onCommitMove={(id,point)=>onTerrainCommitMove?.(id,point) ?? Promise.resolve(false)}
       onSelect={(id) => onTerrainSelect?.(id)} onError={setTerrainError} /> : null}
@@ -584,9 +588,19 @@ export function VttCanvas({
       <planeGeometry args={[Math.max(0.01,Math.abs(marquee.end[0]-marquee.start[0])),Math.max(0.01,Math.abs(marquee.end[1]-marquee.start[1]))]}/>
       <meshBasicMaterial color="#22d3ee" transparent opacity={0.23} depthTest={false} side={THREE.DoubleSide}/>
     </mesh>}
-    {diceRequest ? <VttDiceLayer key={diceRequest.rollId} request={diceRequest} sceneWidth={scene.grid_width} sceneHeight={scene.grid_height} onComplete={onDiceComplete} onImpact={onDiceImpact} /> : null}
+    {diceRolls.map(({envelope,slot})=>{
+       const [spawnOffsetX,spawnOffsetZ]=vttDiceLaneOffset(slot,scene.grid_width,scene.grid_height);
+       return <group key={envelope.rollId}>
+         <VttDiceLayer request={envelope.request}
+           sceneWidth={scene.grid_width} sceneHeight={scene.grid_height}
+           spawnOffsetX={spawnOffsetX} spawnOffsetZ={spawnOffsetZ}
+           onComplete={onDiceComplete} onImpact={force=>onDiceImpact(force,envelope.rollId)}/>
+         <VttDiceRollNameplate name={envelope.rollerName} expression={envelope.expression}
+           slot={slot} x={spawnOffsetX} z={spawnOffsetZ}/>
+       </group>;
+    })}
     <VttOrbitControls disabled={Boolean(draggingId) || formationDragging || terrainDragging || measuring || fogEditing}
-      lockLeftMouse={isDm && tokenMoveEnabled && toolMode === "navigate" && !fogEditing && !diceRequest}
+      lockLeftMouse={isDm && tokenMoveEnabled && toolMode === "navigate" && !fogEditing && !hasDice}
       width={scene.grid_width} height={scene.grid_height} command={cameraCommand} />
   </Canvas></>;
 }
