@@ -28,6 +28,7 @@ export type SettlementBuilding = {
   notes: string[];
   rebuildProgress?: number;
   rebuildNote?: string;
+  confirmedAfterSiege?: boolean;
 };
 
 export const settlementSummary = {
@@ -115,6 +116,7 @@ export const settlementBuildings: SettlementBuilding[] = [
     y: 51,
     icon: "⛵",
     summary: "Destroyed when Imperial fire struck its core; all 60 crew members died.",
+    confirmedAfterSiege: true,
     rebuildProgress: 0,
     rebuildNote: "Destroyed; no reconstruction approved.",
     notes: [
@@ -256,6 +258,7 @@ export const settlementBuildings: SettlementBuilding[] = [
     y: 44,
     icon: "📦",
     summary: "The warehouse burned during the siege, destroying part of UĆ\'s supplies; the stables\' condition is unconfirmed.",
+    confirmedAfterSiege: true,
     rebuildProgress: 0,
     rebuildNote: "Damage assessment and salvage pending.",
     notes: [
@@ -286,6 +289,7 @@ export const settlementBuildings: SettlementBuilding[] = [
     y: 86,
     icon: "🏠",
     summary: "Most homes were set on fire in the Imperial siege; many survivors need shelter.",
+    confirmedAfterSiege: true,
     rebuildProgress: 0,
     rebuildNote: "Housing reconstruction not yet started.",
     notes: [
@@ -338,7 +342,8 @@ export function isSettlementBuilding(value: unknown): value is SettlementBuildin
     && (v.output === undefined || typeof v.output === "string" && v.output.length <= 500)
     && Array.isArray(v.notes) && v.notes.length <= 15 && v.notes.every(x => typeof x === "string" && x.length <= 400)
     && (v.rebuildProgress === undefined || Number.isInteger(v.rebuildProgress) && (v.rebuildProgress as number) >= 0 && (v.rebuildProgress as number) <= 100)
-    && (v.rebuildNote === undefined || typeof v.rebuildNote === "string" && v.rebuildNote.length <= 1000);
+    && (v.rebuildNote === undefined || typeof v.rebuildNote === "string" && v.rebuildNote.length <= 1000)
+    && (v.confirmedAfterSiege === undefined || typeof v.confirmedAfterSiege === "boolean");
 }
 
 export function mergeSettlementBuildings(overrides: SettlementBuilding[]): SettlementBuilding[] {
