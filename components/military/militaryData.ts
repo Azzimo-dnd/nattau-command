@@ -183,13 +183,13 @@ export const militaryUnits: MilitaryUnit[] = [
       resource: "RP",
       options: [{ amount: 3 }, { amount: 6 }],
     },
-    status: "Inactive",
+    status: "Operational",
     detail:
       "Faith, battlefield support and morale control.",
     durability: { type: "finite", current: 4, max: 4 },
     headquarters: {
       state: "unavailable",
-      reason: "Unavailable while Mother Tyllen is in poor health.",
+      reason: "No dedicated headquarters has been assigned. The Daughters of Kain are fully operational.",
     },
     members: ["Mother Tyllen"],
   },
