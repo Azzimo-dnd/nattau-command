@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { TarokkaExperience } from "@/components/tarokka/TarokkaExperience";
 import { requireCampaignMembership } from "@/lib/campaigns/requireCampaignMembership";
 
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 
 export default async function BaroviaTarokkaPage() {
   const access = await requireCampaignMembership("barovia");
+  if (access.membership.role === "dm") redirect("/campaigns/barovia/gm/tarokka");
 
   return (
     <main className="mx-auto min-h-screen max-w-[1600px] px-3 py-6 sm:px-6 sm:py-8 xl:px-8">
@@ -38,7 +40,7 @@ export default async function BaroviaTarokkaPage() {
         <div className="rounded-2xl border border-[#432832] bg-[#160e13]/80 px-4 py-3 text-sm text-[#a9929a]">
           Walking the Mists as
           <strong className="ml-1 text-[#ead7dc]">{access.displayName}</strong>
-          {access.membership.role === "dm" ? " · Game Master" : ""}
+          {" · Player"}
         </div>
       </div>
 

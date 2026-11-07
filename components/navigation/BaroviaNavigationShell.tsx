@@ -75,7 +75,8 @@ const sessionItems: NavigationItem[] = [
   { label: "Sealed Relics", href: "/campaigns/barovia/puzzles", icon: "spark" },
 ];
 const gmSessionItems: NavigationItem[] = [
-  { label: "Next Gathering", href: "/campaigns/barovia/gm/session", icon: "session" },
+  { label: "GM Session Desk", href: "/campaigns/barovia/gm/session", icon: "session" },
+  { label: "Tarokka Control", href: "/campaigns/barovia/gm/tarokka", icon: "fate" },
   { label: "Relic Workshop", href: "/campaigns/barovia/gm/puzzles", icon: "spark" },
   { label: "Miniature Studio", href: "/campaigns/barovia/gm/miniatures", icon: "account" },
   { label: "Creatures of the Mists", href: "/campaigns/barovia/gm/vtt/enemies", icon: "war-room" },

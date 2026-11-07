@@ -139,9 +139,9 @@ export function BaroviaDashboard({
           <p className="font-serif text-xl font-bold text-[#e8d8ce]">Before the lanterns are lit</p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm text-[#dfacbd]">
             <Link href="/campaigns/barovia/session-planner">Share availability →</Link>
-            <Link href="/campaigns/barovia/tarokka">Read your omen →</Link>
+            <Link href={role === "dm" ? "/campaigns/barovia/gm/tarokka" : "/campaigns/barovia/tarokka"}>{role === "dm" ? "Manage Tarokka →" : "Read your omen →"}</Link>
             {role === "player" && <Link href="/campaigns/barovia/characters">Open Player Hub →</Link>}
-            {role === "dm" && <><Link href="/campaigns/barovia/gm/session">Announce the gathering →</Link><Link href="/campaigns/barovia/gm/members">Invite the party →</Link><Link href="/campaigns/barovia/gm/puzzles">Prepare a relic →</Link></>}
+            {role === "dm" && <><Link href="/campaigns/barovia/gm/session">Open GM Session Desk →</Link><Link href="/campaigns/barovia/gm/members">Invite the party →</Link><Link href="/campaigns/barovia/gm/puzzles">Prepare a relic →</Link></>}
           </div>
         </div>
       </section>

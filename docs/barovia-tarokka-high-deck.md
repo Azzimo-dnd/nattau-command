@@ -8,7 +8,7 @@ To zasady domowe Barovii. Oryginalne archetypy Tarokki są punktem wyjścia, a o
 
 ## Przed najbliższą sesją
 
-1. Otwórz **Session desk**. Sprawdź aktywny cykl oraz listę graczy. Konta testowe są widoczne, ale nie zwiększają licznika postępu drużyny.
+1. Otwórz **GM Session Desk → Tarokka control → Current Turning**. Sprawdź aktywny cykl oraz listę graczy. Konta testowe są widoczne, ale nie zwiększają licznika postępu drużyny.
 2. W **The High Deck** przejrzyj 14 kart. Możesz edytować inskrypcję, znaczenie, oba efekty i obie interpretacje fabularne. Zostaw co najmniej pięć kart w puli.
 3. Jeśli zaczynasz nowy okres między sesjami, użyj **Prepare next Turning**, wpisz nazwę i potwierdź. Poprzednie niewykorzystane omeny wygasają. Samo wdrożenie modułu nie otwiera nowego cyklu.
 4. Gracz otrzymuje trzy zakryte karty. Może obrócić wybraną kartę przed wskazaniem jej jako wyniku; początkowa orientacja pozostaje tajemnicą. Dopiero wybór utrwala i odkrywa kartę. Nie ma zmiany orientacji po zobaczeniu efektu.

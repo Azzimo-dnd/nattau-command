@@ -8,6 +8,8 @@ test("maps Barovia routes to the Barovia membership boundary", () => {
     campaignSlugForProtectedPath("/campaigns/barovia/characters"),
     "barovia"
   );
+  assert.equal(campaignSlugForProtectedPath("/campaigns/barovia/gm/session"), "barovia");
+  assert.equal(campaignSlugForProtectedPath("/campaigns/barovia/gm/tarokka"), "barovia");
 });
 
 test("maps modern and legacy Nattau routes to the Nattau membership boundary", () => {
