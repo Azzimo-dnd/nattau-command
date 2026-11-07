@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 import type { DaggerheartDerivedStats } from "@/lib/daggerheart/effects";
 import { daggerheartTraits } from "@/lib/daggerheart/catalog";
 import { effectiveDamage } from "@/lib/daggerheart/combat";
+import { DaggerheartEquipmentFeature } from "./DaggerheartEquipmentFeature";
 
 type Weapon = {
   instance_id?: string;
   name: string;
+  details?: string;
+  rules_text?: string;
   category?: string;
   equipped?: boolean;
   metadata?: Record<string, unknown>;
@@ -169,6 +172,8 @@ export function DaggerheartCombatPanel({
                 </span>
               </div>
             </div>
+
+            <DaggerheartEquipmentFeature item={weapon} kind="Weapon" />
 
             {weapon.category === "brawler_strike" && (
               <label className="mt-4 block">

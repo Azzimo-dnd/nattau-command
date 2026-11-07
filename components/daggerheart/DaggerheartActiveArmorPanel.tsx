@@ -1,6 +1,7 @@
 "use client";
 
 import type { DaggerheartDerivedStats } from "@/lib/daggerheart/effects";
+import { DaggerheartEquipmentFeature } from "./DaggerheartEquipmentFeature";
 
 type Armor = {
   instance_id?: string;
@@ -9,6 +10,7 @@ type Armor = {
   tier?: number | null;
   equipped?: boolean;
   details?: string;
+  rules_text?: string;
   metadata?: Record<string, unknown>;
   marked_slots?: number;
 };
@@ -64,6 +66,8 @@ export function DaggerheartActiveArmorPanel({
           Equipped
         </span>
       </div>
+
+      <DaggerheartEquipmentFeature item={equipped} kind="Armor" />
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="rounded-lg border border-[#35242b] bg-black/20 p-2.5">
@@ -132,16 +136,6 @@ export function DaggerheartActiveArmorPanel({
         </button>
       </div>
 
-      {equipped.details?.trim() && equipped.details.trim() !== "—" && (
-        <div className="mt-4 rounded-xl border border-[#35242b] bg-black/20 p-3">
-          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#78666c]">
-            Armor rule
-          </p>
-          <p className="mt-1 whitespace-pre-line text-xs leading-5 text-[#bca8ae]">
-            {equipped.details}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

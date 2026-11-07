@@ -6,6 +6,7 @@ import { DaggerheartCompendiumPicker, compendiumEntryDetails } from "@/component
 import {
   compendiumDefinitionRevision,
   compendiumEffectiveMetadata,
+  compendiumEffectiveRulesText,
   type DaggerheartCompendiumEntry,
 } from "@/lib/daggerheart/compendium";
 import { DaggerheartEffectsPanel } from "@/components/daggerheart/DaggerheartEffectsPanel";
@@ -83,6 +84,7 @@ type GearItem = {
   instance_id?: string;
   name: string;
   details: string;
+  rules_text?: string;
   compendium_id?: string;
   category?: string;
   slug?: string;
@@ -322,6 +324,9 @@ function validCharacterRow(value: unknown): value is CharacterRow {
         (item) =>
           typeof item.name !== "string" ||
           typeof item.details !== "string" ||
+          ("rules_text" in item &&
+            item.rules_text !== undefined &&
+            typeof item.rules_text !== "string") ||
           ("category" in item &&
             item.category !== undefined &&
             typeof item.category !== "string") ||
@@ -544,6 +549,7 @@ function gearFromCompendium(
     instance_id: crypto.randomUUID(),
     name: entry.name,
     details: compendiumEntryDetails(entry),
+    rules_text: compendiumEffectiveRulesText(entry),
     compendium_id: entry.id,
     category: entry.category,
     slug: entry.slug,
@@ -624,6 +630,7 @@ function hydrateCharacterCompendium(
       ...item,
       name: entry.name,
       details: compendiumEntryDetails(entry),
+      rules_text: compendiumEffectiveRulesText(entry),
       category: entry.category,
       slug: entry.slug,
       source_key: entry.source_key,
