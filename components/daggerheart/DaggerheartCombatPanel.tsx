@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import type { DaggerheartDerivedStats } from "@/lib/daggerheart/effects";
 import { daggerheartTraits } from "@/lib/daggerheart/catalog";
-import { effectiveDamage, weaponRulesText } from "@/lib/daggerheart/combat";
+import { effectiveDamage } from "@/lib/daggerheart/combat";
+import { DaggerheartEquipmentFeature } from "./DaggerheartEquipmentFeature";
 
 type Weapon = {
   instance_id?: string;
@@ -122,8 +123,6 @@ export function DaggerheartCombatPanel({
         const range = text(weapon.metadata?.range);
         const damage = text(weapon.metadata?.damage);
         const burden = text(weapon.metadata?.burden);
-        const rules = weaponRulesText(weapon);
-        const feature = rules.match(/^([^:\n]{1,80}):\s*([\s\S]+)$/);
         const modifier = traitValue(stats, trait);
         const damageBonus = damageBonusFromMetadata(weapon.metadata, stats, level);
         const damageProficiency =
@@ -174,24 +173,7 @@ export function DaggerheartCombatPanel({
               </div>
             </div>
 
-            {rules && (
-              <div
-                aria-label={`${weapon.name} feature`}
-                className="mt-4 rounded-xl border border-[#64404d] bg-[#2a1720]/65 px-3 py-3 sm:px-4"
-              >
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#bd8797]">
-                  Weapon feature
-                </p>
-                <p className="mt-1 break-words whitespace-pre-wrap text-sm leading-6 text-[#d9c5cc]">
-                  {feature ? (
-                    <>
-                      <strong className="font-black text-[#f0dce2]">{feature[1]}: </strong>
-                      {feature[2]}
-                    </>
-                  ) : rules}
-                </p>
-              </div>
-            )}
+            <DaggerheartEquipmentFeature item={weapon} kind="Weapon" />
 
             {weapon.category === "brawler_strike" && (
               <label className="mt-4 block">

@@ -1,25 +1,3 @@
-export function weaponRulesText(weapon: {
-  rules_text?: string;
-  details?: string;
-}) {
-  // Hydrated rules are authoritative, including weapons with no feature.
-  if (typeof weapon.rules_text === "string") {
-    const rules = weapon.rules_text.trim();
-    return /^[—–-]$/.test(rules) ? "" : rules;
-  }
-
-  // Older saved sheets keep rules after the stat line in `details`.
-  // Prefer the current section if that snapshot also contains original rules.
-  const details = weapon.details?.trim() ?? "";
-  const current = details.match(/^Official errata\/current(?: \([^\n]*\))?: ([\s\S]*)$/m);
-  const parts = (current?.[1] ?? details).split(" · ");
-  while (/^(trait|range|damage|burden|base major|base severe|base score):/i.test(parts[0] ?? "")) {
-    parts.shift();
-  }
-  const rules = parts.join(" · ").trim();
-  return /^[—–-]$/.test(rules) ? "" : rules;
-}
-
 export function effectiveDamage(
   raw: string,
   proficiency: number,

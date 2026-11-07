@@ -3,12 +3,13 @@ import test from "node:test";
 import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DaggerheartCombatPanel } from "../components/daggerheart/DaggerheartCombatPanel";
+import { DaggerheartActiveArmorPanel } from "../components/daggerheart/DaggerheartActiveArmorPanel";
 import { baseStatsForClass } from "../lib/daggerheart/effects";
 import {
   compendiumEffectiveRulesText,
   type DaggerheartCompendiumEntry,
 } from "../lib/daggerheart/compendium";
-import { weaponRulesText } from "../lib/daggerheart/combat";
+import { daggerheartEquipmentRulesText } from "../lib/daggerheart/equipment";
 
 type PanelProps = ComponentProps<typeof DaggerheartCombatPanel>;
 
@@ -90,7 +91,7 @@ test("legacy snapshots show their feature without repeating weapon statistics", 
   assert.match(html, /Quick: /);
   assert.match(html, /Saved example rule/);
   assert.doesNotMatch(html, /trait: Presence|range: Melee|damage: d8phy|burden:/);
-  assert.equal(weaponRulesText({
+  assert.equal(daggerheartEquipmentRulesText({
     details: "Original source: Quick: Old example.\n\nOfficial errata/current (v2): trait: Presence · Quick: Current example.",
   }), "Quick: Current example.");
 });
@@ -101,7 +102,7 @@ test("absent features do not create blank cards or resurrect outdated text", () 
     assert.doesNotMatch(html, /Weapon feature|Outdated example/);
     assert.match(html, /Roll Training Rapier damage/);
   }
-  assert.equal(weaponRulesText({ details: "trait: Presence · range: Melee · damage: d8phy · burden: One-Handed" }), "");
+  assert.equal(daggerheartEquipmentRulesText({ details: "trait: Presence · range: Melee · damage: d8phy · burden: One-Handed" }), "");
 });
 
 test("stored weapons never show up as active feature sources", () => {
@@ -120,4 +121,71 @@ test("custom multiline weapon text is preserved and rendered safely", () => {
   assert.match(html, /A custom rule without a feature heading\.\nKeep this second line/);
   assert.match(html, /&lt;script&gt;example&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script>/);
+});
+
+type ArmorProps = ComponentProps<typeof DaggerheartActiveArmorPanel>;
+
+function renderArmor(armor: ArmorProps["armor"]) {
+  return renderToStaticMarkup(createElement(DaggerheartActiveArmorPanel, {
+    armor,
+    stats: { ...stats, armor_score: 3, armor_slots_max: 3, major_threshold: 6, severe_threshold: 12 },
+    markedSlots: 1,
+    onMarkedSlotsChange: () => {},
+  }));
+}
+
+function armor(overrides: Partial<ArmorProps["armor"][number]> = {}) {
+  return {
+    name: "Training Gambeson",
+    category: "armor",
+    equipped: true,
+    rules_text: "Flexible: Example armor rule from the linked entry.",
+    metadata: { base_major: 5, base_severe: 11, base_score: 3 },
+    ...overrides,
+  };
+}
+
+test("armor exposes only the equipped feature above its unchanged live stats and slot controls", () => {
+  const html = renderArmor([
+    armor({ name: "Stored Chainmail", equipped: false, rules_text: "Heavy: Stored example." }),
+    armor(),
+  ]);
+  assert.match(html, /Armor feature/);
+  assert.match(html, /Flexible: /);
+  assert.match(html, /Example armor rule from the linked entry/);
+  assert.doesNotMatch(html, /Stored Chainmail|Heavy: |<details|<summary/);
+  assert.ok(html.indexOf("Armor feature") < html.indexOf("Armor Score"));
+  assert.match(html, /Major[\s\S]*?>6<\/p>/);
+  assert.match(html, /Severe[\s\S]*?>12<\/p>/);
+  assert.match(html, /1 \/ 3/);
+  assert.match(html, /Mark Armor Slot/);
+  assert.match(html, /Clear Armor Slot/);
+});
+
+test("legacy armor rules omit repeated base statistics and featureless armor stays compact", () => {
+  const details = "base major: 5 · base severe: 11 · base score: 3";
+  const legacy = renderArmor([armor({ rules_text: undefined, details: `${details} · Flexible: Saved armor example.` })]);
+  assert.match(legacy, /Flexible: /);
+  assert.match(legacy, /Saved armor example/);
+  assert.doesNotMatch(legacy, /base major:|base severe:|base score:/);
+  for (const item of [armor({ rules_text: "—", details: "Heavy: Old example." }), armor({ rules_text: undefined, details })]) {
+    const html = renderArmor([item]);
+    assert.doesNotMatch(html, /Armor feature|Old example/);
+    assert.match(html, /Armor Score/);
+  }
+});
+
+test("armor uses current errata and unarmored characters do not inherit stored features", () => {
+  const entry = {
+    rules_text: "Flexible: Original armor example.",
+    errata: { rules_text: "Flexible: Corrected armor example." },
+  } as DaggerheartCompendiumEntry;
+  const current = renderArmor([armor({ rules_text: compendiumEffectiveRulesText(entry), details: entry.rules_text })]);
+  assert.match(current, /Corrected armor example/);
+  assert.doesNotMatch(current, /Original armor example/);
+  for (const items of [[], [armor({ equipped: false })]]) {
+    const html = renderArmor(items);
+    assert.match(html, /No armor is currently equipped/);
+    assert.doesNotMatch(html, /Armor feature|Flexible: /);
+  }
 });
