@@ -67,6 +67,10 @@ export function SessionControls({
   campaignSlug,
 }: SessionControlsProps) {
   const barovia = campaignSlug === "barovia";
+  const panelClass = `rounded-2xl border p-5 sm:p-6 ${barovia ? "border-[#4b2f3d] bg-[#170f16]" : "border-slate-800 bg-slate-950/55"}`;
+  const accentClass = barovia ? "text-[#c58da5]" : "text-yellow-500/80";
+  const fieldColors = barovia ? "border-[#593448] bg-[#100a0f] text-[#e9d4df] focus:border-[#bd7694]" : "border-slate-800 bg-slate-950 text-slate-100 focus:border-yellow-500/50";
+  const selectedStatusClass = barovia ? "border-[#aa627f] bg-[#622a43]/40" : "border-yellow-500/50 bg-yellow-500/10";
   const router = useRouter();
   const [status, setStatus] = useState<CampaignSessionStatus>(
     initialSettings.status,
@@ -191,14 +195,14 @@ export function SessionControls({
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
       <form
         onSubmit={saveSettings}
-        className="rounded-2xl border border-slate-800 bg-slate-950/55 p-5 sm:p-6"
+        className={panelClass}
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-yellow-500/80">
+          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${accentClass}`}>
             Publication
           </p>
           <h2 className="mt-2 text-2xl font-bold text-slate-100">
-            Next Session Controls
+            {barovia ? "Session announcement" : "Next Session Controls"}
           </h2>
           <p className="mt-2 text-sm text-slate-400">
             {barovia ? "Announce the next gathering, leave a note for the party and record any consequences already agreed at the table." : "Publish the next session date, a short note and any price owed to Azzimo. Campaign members see the result on the Command Center."}
@@ -211,7 +215,7 @@ export function SessionControls({
             <label
               className={`cursor-pointer rounded-xl border p-4 transition ${
                 status === "scheduled"
-                  ? "border-yellow-500/50 bg-yellow-500/10"
+                  ? selectedStatusClass
                   : "border-slate-800 bg-slate-950/40 hover:border-slate-700"
               }`}
             >
@@ -232,7 +236,7 @@ export function SessionControls({
             <label
               className={`cursor-pointer rounded-xl border p-4 transition ${
                 status === "tba"
-                  ? "border-yellow-500/50 bg-yellow-500/10"
+                  ? selectedStatusClass
                   : "border-slate-800 bg-slate-950/40 hover:border-slate-700"
               }`}
             >
@@ -261,7 +265,7 @@ export function SessionControls({
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
                 required
-                className="mt-2 w-full min-w-0 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-500/50 [color-scheme:dark]"
+                className={`mt-2 w-full min-w-0 rounded-xl border px-4 py-3 outline-none transition [color-scheme:dark] ${fieldColors}`}
               />
             </label>
             <label className="block">
@@ -272,7 +276,7 @@ export function SessionControls({
                 onChange={(event) => setTime(event.target.value)}
                 step={60}
                 required
-                className="mt-2 w-full min-w-0 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-yellow-500/50 [color-scheme:dark]"
+                className={`mt-2 w-full min-w-0 rounded-xl border px-4 py-3 outline-none transition [color-scheme:dark] ${fieldColors}`}
               />
             </label>
           </div>
@@ -288,7 +292,7 @@ export function SessionControls({
             maxLength={280}
             rows={4}
             placeholder="Optional note for the party..."
-            className="mt-2 w-full resize-y rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-yellow-500/50"
+            className={`mt-2 w-full resize-y rounded-xl border px-4 py-3 outline-none transition placeholder:text-slate-600 ${fieldColors}`}
           />
           <span className="mt-1 block text-right text-xs text-slate-600">
             {message.length}/280
@@ -384,20 +388,20 @@ export function SessionControls({
         <button
           type="submit"
           disabled={isSaving || !initialSettings.databaseReady}
-          className="mt-6 inline-flex items-center justify-center rounded-xl bg-yellow-500 px-5 py-3 font-bold text-slate-950 transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-60"
+          className={`mt-6 inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-3 font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${barovia ? "bg-[#7f3655] text-[#fff0f6] hover:bg-[#984767]" : "bg-yellow-500 text-slate-950 hover:bg-yellow-400"}`}
         >
-          {isSaving ? "Publishing..." : "Publish Session Settings"}
+          {isSaving ? "Publishing..." : barovia ? "Publish gathering" : "Publish Session Settings"}
         </button>
       </form>
 
       <aside className="space-y-6">
-        <section className="rounded-2xl border border-slate-800 bg-slate-950/55 p-5 sm:p-6">
+        <section className={panelClass}>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Live Preview
           </p>
 
-          <div className="mt-4 rounded-2xl border border-yellow-500/15 bg-slate-900/70 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-yellow-500/80">
+          <div className={`mt-4 rounded-2xl border p-5 ${barovia ? "border-[#76465d] bg-[#321b2a]" : "border-yellow-500/15 bg-slate-900/70"}`}>
+            <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${accentClass}`}>
               Next Session
             </p>
 
@@ -445,7 +449,7 @@ export function SessionControls({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-950/55 p-5 sm:p-6">
+        <section className={panelClass}>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Current Publication
           </p>

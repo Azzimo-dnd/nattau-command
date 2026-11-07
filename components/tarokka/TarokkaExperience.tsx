@@ -134,7 +134,7 @@ export function TarokkaExperience({ campaignId, currentUserId, role }: { campaig
   }
   const setUsed = (drawId: string, used: boolean, useNote: string) => mutate("set_tarokka_effect_used", { p_draw_id: drawId, p_used: used, p_note: useNote });
   const tabs: { key: TarokkaTab; label: string; show: boolean }[] = [
-    { key: "gm", label: "Session desk", show: isDm }, { key: "omen", label: "Your omen", show: !isDm },
+    { key: "gm", label: "Current Turning", show: isDm }, { key: "omen", label: "Your omen", show: !isDm },
     { key: "deck", label: "The High Deck", show: true }, { key: "reading", label: "Grand Reading", show: true }, { key: "history", label: "History", show: true },
   ];
 
