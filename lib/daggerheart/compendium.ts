@@ -108,6 +108,10 @@ export function compendiumEffectiveMetadata(entry: DaggerheartCompendiumEntry) {
   } as Record<string, unknown>;
 }
 
+export function compendiumEffectiveRulesText(entry: DaggerheartCompendiumEntry) {
+  return entry.errata?.rules_text ?? entry.rules_text;
+}
+
 export function compendiumDefinitionRevision(entry: DaggerheartCompendiumEntry) {
   return (
     entry.errata?.revision ??

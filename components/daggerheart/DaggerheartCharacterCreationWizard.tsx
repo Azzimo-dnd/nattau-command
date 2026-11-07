@@ -17,6 +17,7 @@ import {
 import {
   compendiumDefinitionRevision,
   compendiumEffectiveMetadata,
+  compendiumEffectiveRulesText,
   type DaggerheartCompendiumEntry,
 } from "@/lib/daggerheart/compendium";
 import type { DaggerheartAction } from "@/lib/daggerheart/actions";
@@ -58,6 +59,7 @@ type GearItem = {
   instance_id?: string;
   name: string;
   details: string;
+  rules_text?: string;
   compendium_id?: string;
   category?: string;
   slug?: string;
@@ -161,6 +163,7 @@ function gearFromEntry(entry: DaggerheartCompendiumEntry): GearItem {
   return {
     name: entry.name,
     details: compendiumEntryDetails(entry),
+    rules_text: compendiumEffectiveRulesText(entry),
     compendium_id: entry.id,
     category: entry.category,
     slug: entry.slug,
