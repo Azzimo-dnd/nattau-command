@@ -10,6 +10,8 @@ export type BuildingStatus =
   | "active"
   | "stable"
   | "damaged"
+  | "destroyed"
+  | "rebuilding"
   | "inactive"
   | "planned";
 
@@ -24,14 +26,28 @@ export type SettlementBuilding = {
   summary: string;
   output?: string;
   notes: string[];
+  rebuildProgress?: number;
+  rebuildNote?: string;
+  confirmedAfterSiege?: boolean;
 };
 
 export const settlementSummary = {
   name: "UĆ Village",
-  population: "100+",
+  population: "Count pending",
   morale: "High",
-  food: "Stable Surplus",
-  defense: "Fortified",
+  food: "Supplies damaged",
+  defense: "Under assessment",
+  civilianCasualties: "About 40 civilians",
+  galleonCasualties: "60 galleon crew",
+  militaryCasualties: "5 soldiers",
+  recovery: "Mobilizing",
+};
+export type SettlementSummary = typeof settlementSummary;
+export const SIEGE_DATE = "22 October 2026";
+export const settlementAftermath = {
+  casualtiesNote: "Kealith fell during the siege. Kevin returned through Nithis's power. Mira remains missing.",
+  moraleNote: "Torsten's funeral address held the community together. Pippo pledged workers and materials.",
+  mapNote: "Historical layout from before the siege. Markers reflect confirmed aftermath only; other locations have not been reassessed.",
 };
 
 export const settlementBuildings: SettlementBuilding[] = [
@@ -95,14 +111,17 @@ export const settlementBuildings: SettlementBuilding[] = [
     id: "flying-galleon",
     name: "Flying Galleon",
     category: "special",
-    status: "active",
+    status: "destroyed",
     x: 48,
     y: 51,
     icon: "⛵",
-    summary: "Grounded flying galleon at the center of UĆ.",
+    summary: "Destroyed when Imperial fire struck its core; all 60 crew members died.",
+    confirmedAfterSiege: true,
+    rebuildProgress: 0,
+    rebuildNote: "Destroyed; no reconstruction approved.",
     notes: [
-      "A major landmark of the settlement.",
-      "May serve as storage, command space or transport.",
+      "The historic map still shows the former galleon site.",
+      "The wreck remains as a memorial to the lost crew.",
     ],
   },
   {
@@ -234,13 +253,16 @@ export const settlementBuildings: SettlementBuilding[] = [
     id: "warehouse-stables",
     name: "Warehouse & Stables",
     category: "infrastructure",
-    status: "active",
+    status: "damaged",
     x: 31,
     y: 44,
     icon: "📦",
-    summary: "Storage and animal handling area.",
+    summary: "The warehouse burned during the siege, destroying part of UĆ\'s supplies; the stables\' condition is unconfirmed.",
+    confirmedAfterSiege: true,
+    rebuildProgress: 0,
+    rebuildNote: "Damage assessment and salvage pending.",
     notes: [
-      "Used for supplies, transport animals and general logistics.",
+      "Assess surviving stores and the structure before reopening.",
       "Important for trade and expeditions.",
     ],
   },
@@ -262,13 +284,17 @@ export const settlementBuildings: SettlementBuilding[] = [
     id: "residential-district",
     name: "Residential District",
     category: "housing",
-    status: "stable",
+    status: "destroyed",
     x: 25,
     y: 86,
     icon: "🏠",
-    summary: "Main housing area for settlers.",
+    summary: "Most homes were set on fire in the Imperial siege; many survivors need shelter.",
+    confirmedAfterSiege: true,
+    rebuildProgress: 0,
+    rebuildNote: "Housing reconstruction not yet started.",
     notes: [
-      "Unmarked smaller houses are treated as residential buildings.",
+      "Most houses were burned; this does not imply every house was lost.",
+      "Pippo pledged materials and workers for the rebuild.",
     ],
   },
 ];
@@ -290,4 +316,40 @@ export function getCategoryLabel(category: BuildingCategory) {
     default:
       return "Unknown";
   }
+}
+export const settlementCategories: BuildingCategory[] = [
+  "food", "military", "civic", "housing", "special", "infrastructure",
+];
+export const settlementStatuses: BuildingStatus[] = [
+  "active", "stable", "damaged", "destroyed", "rebuilding", "inactive", "planned",
+];
+export const settlementSummaryFields = [
+  "population", "morale", "food", "defense",
+  "civilianCasualties", "galleonCasualties", "militaryCasualties", "recovery",
+] as const;
+
+export function isSettlementBuilding(value: unknown): value is SettlementBuilding {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.id === "string" && v.id.length > 0 && v.id.length <= 100
+    && typeof v.name === "string" && v.name.trim().length > 0 && v.name.length <= 120
+    && settlementCategories.includes(v.category as BuildingCategory)
+    && settlementStatuses.includes(v.status as BuildingStatus)
+    && typeof v.x === "number" && Number.isFinite(v.x) && v.x >= 0 && v.x <= 100
+    && typeof v.y === "number" && Number.isFinite(v.y) && v.y >= 0 && v.y <= 100
+    && typeof v.icon === "string" && v.icon.length > 0 && v.icon.length <= 24
+    && typeof v.summary === "string" && v.summary.trim().length > 0 && v.summary.length <= 2000
+    && (v.output === undefined || typeof v.output === "string" && v.output.length <= 500)
+    && Array.isArray(v.notes) && v.notes.length <= 15 && v.notes.every(x => typeof x === "string" && x.length <= 400)
+    && (v.rebuildProgress === undefined || Number.isInteger(v.rebuildProgress) && (v.rebuildProgress as number) >= 0 && (v.rebuildProgress as number) <= 100)
+    && (v.rebuildNote === undefined || typeof v.rebuildNote === "string" && v.rebuildNote.length <= 1000)
+    && (v.confirmedAfterSiege === undefined || typeof v.confirmedAfterSiege === "boolean");
+}
+
+export function mergeSettlementBuildings(overrides: SettlementBuilding[]): SettlementBuilding[] {
+  const merged = new Map(settlementBuildings.map(building => [building.id, building]));
+  for (const override of overrides) {
+    if (isSettlementBuilding(override)) merged.set(override.id, override);
+  }
+  return Array.from(merged.values());
 }
